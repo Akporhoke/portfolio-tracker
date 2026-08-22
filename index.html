@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Portfolio Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Network Warning Banner -->
+    <div id="networkWarning" class="network-warning hidden">
+        <span>📡</span> No internet connection - viewing cached data
+    </div>
+
+    <!-- Offline Mode Banner -->
+    <div id="offlineBanner" class="offline-banner hidden">
+        <span>⚠️</span> You're offline. Last updated <span id="lastUpdated">now</span>.
+    </div>
+
+    <!-- Pull to Refresh Indicator -->
+    <div class="pull-to-refresh" id="pullToRefresh">
+        ↓ Pull to refresh
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="greeting">
+                <p class="hello">Good Morning,</p>
+                <h1 class="name" id="userName">Guest</h1>
+            </div>
+            <div class="avatar" id="avatar">G</div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="stat">
+                <p class="stat-number" id="statWatching">5</p>
+                <p class="stat-label">Watching</p>
+            </div>
+            <div class="divider"></div>
+            <div class="stat">
+                <p class="stat-number" id="statHeld">3</p>
+                <p class="stat-label">Held</p>
+            </div>
+            <div class="divider"></div>
+            <div class="stat">
+                <p class="stat-number" id="statSold">2</p>
+                <p class="stat-label">Sold</p>
+            </div>
+        </div>
+
+        <!-- Main Portfolio Card -->
+        <div class="portfolio-card">
+            <div class="portfolio-main">
+                <div class="portfolio-left">
+                    <p class="portfolio-label">Total Portfolio</p>
+                    <p class="portfolio-value" id="totalPortfolio">₦0</p>
+                    <p class="portfolio-change" id="portfolioChange">+0% today</p>
+                </div>
+                <div class="portfolio-right">
+                    <p class="top-performer-label">Top Performer</p>
+                    <p class="top-performer-ticker" id="topPerformerTicker">—</p>
+                    <p class="top-performer-change" id="topPerformerChange">+0%</p>
+                    <div class="top-performer-stats">
+                        <p id="topPerformerInvested">Invested: ₦0</p>
+                        <p id="topPerformerGain">Gain: +₦0</p>
+                        <p id="topPerformerLoss">Loss: -₦0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sector Allocation -->
+            <div class="sector-section">
+                <p class="sector-label">Sector Allocation</p>
+                <div class="sector-bar">
+                    <div class="sector-finance" id="sectorFinance"></div>
+                    <div class="sector-tech" id="sectorTech"></div>
+                    <div class="sector-consumer" id="sectorConsumer"></div>
+                </div>
+                <div class="sector-legend">
+                    <span>Finance <span id="financePercent">40</span>%</span>
+                    <span>Tech <span id="techPercent">30</span>%</span>
+                    <span>Consumer <span id="consumerPercent">25</span>%</span>
+                </div>
+            </div>
+
+            <!-- Goal Progress -->
+            <div class="goal-section">
+                <p class="goal-label">Goal Progress</p>
+                <p class="goal-target" id="goalTarget">₦1,000,000 target</p>
+                <div class="goal-bar">
+                    <div class="goal-progress" id="goalProgress" style="width: 85%;"></div>
+                </div>
+                <p class="goal-percent" id="goalPercent">85% achieved</p>
+            </div>
+        </div>
+
+        <!-- Mini Portfolio Cards (NSE & US) -->
+        <div class="mini-cards">
+            <div class="mini-card nse">
+                <p class="mini-label">NSE Portfolio</p>
+                <p class="mini-value" id="nseValue">₦0</p>
+                <p class="mini-change" id="nseChange">+0%</p>
+                <div class="mini-stats">
+                    <span id="nseGain">+₦0</span>
+                    <span id="nseLoss">-₦0</span>
+                </div>
+            </div>
+            <div class="mini-card us">
+                <p class="mini-label">US Portfolio</p>
+                <p class="mini-value" id="usValue">$0</p>
+                <p class="mini-change" id="usChange">+0%</p>
+                <div class="mini-stats">
+                    <span id="usGain">+$0</span>
+                    <span id="usLoss">-$0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="home">
+                <span>🏠</span>
+                <p>Home</p>
+            </button>
+            <button class="tab-btn" data-tab="analytics">
+                <span>📊</span>
+                <p>Analytics</p>
+            </button>
+            <button class="tab-btn add-btn" id="addBtn">
+                <span>+</span>
+            </button>
+            <button class="tab-btn" data-tab="watchlist">
+                <span>👁️</span>
+                <p>Watchlist</p>
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span>⚙️</span>
+                <p>Settings</p>
+            </button>
+        </div>
+
+        <!-- TAB: HOME (Portfolio Performance & Activity) -->
+        <div class="tab-content active" id="homeTab">
+            <!-- Portfolio Performance Chart -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Portfolio Performance</h3>
+                    <div class="chart-toggles">
+                        <button class="toggle active" data-period="7">7D</button>
+                        <button class="toggle" data-period="30">30D</button>
+                        <button class="toggle" data-period="365">1Y</button>
+                    </div>
+                </div>
+                <div class="chart" id="performanceChart">
+                    <!-- Chart bars will be generated here -->
+                </div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div class="activity-section">
+                <div class="activity-header">
+                    <h3>Recent Activity</h3>
+                    <select class="activity-filter" id="activityFilter">
+                        <option value="all">All</option>
+                        <option value="invested">Invested</option>
+                        <option value="sold">Sold</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="watching">Watching</option>
+                    </select>
+                </div>
+                <div class="activity-list" id="activityList">
+                    <!-- Activity items will be generated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: WATCHLIST -->
+        <div class="tab-content" id="watchlistTab">
+            <div class="watchlist-container">
+                <h2>Watchlist</h2>
+                <div class="watchlist-list" id="watchlistList">
+                    <!-- Watchlist items will be generated here -->
+                </div>
+                <div class="empty-state" id="watchlistEmpty">
+                    <p style="font-size: 32px;">👁️</p>
+                    <p style="font-weight: 600;">No stocks watched yet</p>
+                    <p style="color: #999; font-size: 12px;">Start watching stocks to analyze before investing</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: PORTFOLIO -->
+        <div class="tab-content" id="portfolioTab">
+            <div class="portfolio-container">
+                <h2>Portfolio</h2>
+                <div class="portfolio-list" id="portfolioList">
+                    <!-- Portfolio items will be generated here -->
+                </div>
+                <div class="empty-state" id="portfolioEmpty">
+                    <p style="font-size: 32px;">📈</p>
+                    <p style="font-weight: 600;">No stocks owned yet</p>
+                    <p style="color: #999; font-size: 12px;">Invest in stocks to start building your portfolio</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: SOLD -->
+        <div class="tab-content" id="soldTab">
+            <div class="sold-container">
+                <h2>Sold Stocks</h2>
+                <div class="sold-list" id="soldList">
+                    <!-- Sold items will be generated here -->
+                </div>
+                <div class="empty-state" id="soldEmpty">
+                    <p style="font-size: 32px;">✓</p>
+                    <p style="font-weight: 600;">No stocks sold yet</p>
+                    <p style="color: #999; font-size: 12px;">Your exit history will appear here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: ANALYTICS -->
+        <div class="tab-content" id="analyticsTab">
+            <div class="analytics-container">
+                <h2>Analytics</h2>
+                <p style="text-align: center; color: #999; margin-top: 40px;">📊 Full analytics coming soon</p>
+            </div>
+        </div>
+
+        <!-- TAB: SETTINGS -->
+        <div class="tab-content" id="settingsTab">
+            <div class="settings-container">
+                <h2>Settings</h2>
+                <div class="settings-form">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="settingName" placeholder="Your name">
+                    </div>
+                    <div class="form-group">
+                        <label>Portfolio Goal (₦)</label>
+                        <input type="number" id="settingGoal" placeholder="1000000">
+                    </div>
+                    <button class="btn-primary" id="saveSetting">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+
+    <!-- Add Stock Modal -->
+    <div class="modal" id="addStockModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Stock</h2>
+                <button class="close-modal" id="closeAddModal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Stock Ticker</label>
+                    <input type="text" id="addTicker" placeholder="e.g., GTCO, AAPL" autocomplete="off">
+                    <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
+                    <p class="error" id="tickerError"></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" id="addQuantity" placeholder="Number of shares" min="1">
+                    <p class="error" id="quantityError"></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Entry Price</label>
+                    <input type="number" id="addPrice" placeholder="Price per share" step="0.01" min="0">
+                    <p class="error" id="priceError"></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Sector</label>
+                    <select id="addSector">
+                        <option value="">Select sector</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Tech">Tech</option>
+                        <option value="Consumer">Consumer</option>
+                        <option value="Energy">Energy</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Manufacturing">Manufacturing</option>
+                    </select>
+                    <p class="error" id="sectorError"></p>
+                </div>
+
+                <div class="form-group">
+                    <label>Notes (Optional)</label>
+                    <textarea id="addNotes" placeholder="Why are you investing?"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Action</label>
+                    <div class="action-buttons">
+                        <button class="btn-primary" id="addToPortfolio">Add to Portfolio</button>
+                        <button class="btn-secondary" id="addToWatchlist">Add to Watchlist</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal (for selling/rejecting) -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content modal-small">
+            <div style="text-align: center; padding: 20px;">
+                <p style="font-size: 36px; margin: 0 0 12px;">⚠️</p>
+                <h3 id="confirmTitle">Confirm Action</h3>
+                <p id="confirmMessage" style="color: #666; margin: 12px 0;">Are you sure?</p>
+                <div style="background: #f5f5f5; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                    <p id="confirmDetails" style="font-size: 12px; margin: 0; color: #999;"></p>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn-secondary" id="confirmCancel">Cancel</button>
+                    <button class="btn-danger" id="confirmSubmit">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Indicator -->
+    <div class="sync-indicator" id="syncIndicator">
+        <span>⟳</span> Syncing...
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
