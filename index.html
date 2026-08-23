@@ -80,17 +80,16 @@
                     <div class="sector-consumer" id="sectorConsumer"></div>
                 </div>
                 <div class="sector-legend">
-                    <span>Finance <span id="financePercent">40</span>%</span>
-                    <span>Tech <span id="techPercent">30</span>%</span>
-                    <span>Consumer <span id="consumerPercent">25</span>%</span>
+                    <span>Finance <span id="financePercent">0</span>%</span>
+                    <span>Tech <span id="techPercent">0</span>%</span>
+                    <span>Consumer <span id="consumerPercent">0</span>%</span>
                 </div>
             </div>
 
             <!-- Goal Progress -->
             <div class="goal-section">
                 <p class="goal-label">Goal Progress</p>
-                <p class="goal-target" id="goalTarget">₦1,000,000 target</p>
-                <div class="goal-bar">
+=                <div class="goal-bar">
                     <div class="goal-progress" id="goalProgress" style="width: 85%;"></div>
                 </div>
                 <p class="goal-percent" id="goalPercent">85% achieved</p>
@@ -122,22 +121,22 @@
         <!-- Tabs Navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="home">
-                <span>🏠</span>
+                <span><i class="fa-solid fa-house-user"></i></span>
                 <p>Home</p>
             </button>
             <button class="tab-btn" data-tab="analytics">
-                <span>📊</span>
+                <span><i class="fa-solid fa-chart-simple"></i></span>
                 <p>Analytics</p>
             </button>
             <button class="tab-btn add-btn" id="addBtn">
                 <span>+</span>
             </button>
             <button class="tab-btn" data-tab="watchlist">
-                <span>👁️</span>
+                <span><i class="fa-solid fa-binoculars"></i></span>
                 <p>Watchlist</p>
             </button>
             <button class="tab-btn" data-tab="settings">
-                <span>⚙️</span>
+                <span><i class="fa-solid fa-gear"></i></span>
                 <p>Settings</p>
             </button>
         </div>
@@ -336,5 +335,6 @@
 
     <!-- Scripts -->
     <script src="app.js"></script>
+    <script src="https://kit.fontawesome.com/ebc2dac530.js" crossorigin="anonymous"></script>
 </body>
 </html>

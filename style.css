@@ -317,17 +317,17 @@ body {
 }
 
 .sector-finance {
-    flex: 40%;
+    flex: 0%;
     background: #FFD93D;
 }
 
 .sector-tech {
-    flex: 35%;
+    flex: 0%;
     background: #4ECDC4;
 }
 
 .sector-consumer {
-    flex: 25%;
+    flex: 0%;
     background: #90EE90;
 }
 
