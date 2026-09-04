@@ -1197,3 +1197,873 @@ body {
         --text-secondary: var(--dark-text-secondary);
     }
 }
+/* ============================================
+   MODAL TABS (Add to your existing style.css)
+   ============================================ */
+.modal-tabs {
+    display: flex;
+    border-bottom: 1px solid #eee;
+    background: var(--bg-hover);
+}
+
+.modal-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 2px solid transparent;
+}
+
+.modal-tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.modal-form {
+    display: none;
+}
+
+.modal-form.active {
+    display: block;
+}
+
+/* ============================================
+   DURATION BUTTONS
+   ============================================ */
+.duration-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.duration-btn {
+    padding: var(--spacing-md);
+    border: 1px solid #ddd;
+    background: var(--bg-card);
+    border-radius: var(--border-radius);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: var(--text-secondary);
+}
+
+.duration-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.duration-btn:hover {
+    border-color: var(--primary);
+}
+
+/* ============================================
+   STOCK ITEM ACTIONS
+   ============================================ */
+.stock-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    padding: var(--spacing-xs);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-icon.btn-add {
+    color: var(--success);
+}
+
+.btn-icon.btn-add:hover {
+    background: rgba(76, 175, 80, 0.1);
+}
+
+.btn-icon.btn-delete {
+    color: var(--error);
+}
+
+.btn-icon.btn-delete:hover {
+    background: rgba(211, 47, 47, 0.1);
+}
+
+/* ============================================
+   UPDATED STOCK ITEM (Flex Layout)
+   ============================================ */
+.stock-item {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.stock-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.stock-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.stock-ticker {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stock-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.stock-price {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.stock-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.stock-change {
+    font-size: 12px;
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.stock-change.positive {
+    color: #00a651;
+}
+
+.stock-change.negative {
+    color: var(--error);
+}
+
+/* ============================================
+   FIX: Autocomplete Positioning
+   ============================================ */
+.form-group {
+    position: relative;
+}
+
+.autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid #ddd;
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.autocomplete-dropdown.active {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-bottom: 0.5px solid #eee;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.autocomplete-item:hover {
+    background: var(--bg-hover);
+}
+
+.autocomplete-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.autocomplete-content {
+    flex: 1;
+}
+
+.autocomplete-ticker {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.autocomplete-name {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+/* ============================================
+   MARKET MODAL / SELL BUTTON / CONFIDENCE BADGE
+   ============================================ */
+.mini-card {
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.mini-card:active {
+    transform: scale(0.97);
+}
+
+.market-stock-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.btn-icon.btn-sell {
+    background: var(--error);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+.btn-icon.btn-sell:hover {
+    opacity: 0.9;
+}
+
+.confidence-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.confidence-badge.strong { background: #E8F5E9; color: #00a651; }
+.confidence-badge.good { background: #E1F5FE; color: #2196F3; }
+.confidence-badge.moderate { background: #FFF3E0; color: var(--warning); }
+.confidence-badge.weak { background: #FFEBEE; color: #E57373; }
+.confidence-badge.negative { background: #FFEBEE; color: var(--error); }
+.confidence-badge.pending { background: #f0f0f0; color: var(--text-secondary); }
+
+/* ============================================
+   MINI CARD HINT TEXT
+   ============================================ */
+.mini-hint {
+    font-size: 10px;
+    color: rgba(0, 0, 0, 0.4);
+    margin-top: var(--spacing-md);
+    text-align: center;
+    font-weight: 500;
+}
+
+.mini-card.us .mini-hint {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   PORTFOLIO LIST MODAL
+   ============================================ */
+.modal-medium {
+    max-width: 500px;
+}
+
+.portfolio-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.portfolio-list-item {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.portfolio-list-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.portfolio-list-item .stock-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .stock-info {
+    flex: 1;
+}
+
+.portfolio-list-item .stock-ticker {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.portfolio-list-item .stock-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.portfolio-list-item .stock-price {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .stock-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.portfolio-list-item .stock-change {
+    font-size: 12px;
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.portfolio-list-item .stock-change.positive {
+    color: #00a651;
+}
+
+.portfolio-list-item .stock-change.negative {
+    color: var(--error);
+}
+
+.portfolio-list-item .btn-sell {
+    background: rgba(102, 126, 234, 0.1);
+    color: var(--primary);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .btn-sell:hover {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+/* ============================================
+   STOCK DETAIL MODAL
+   ============================================ */
+.modal-detail {
+    max-width: 450px;
+}
+
+.stock-detail-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.detail-confidence,
+.detail-price {
+    background: var(--bg-hover);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.detail-confidence .label,
+.detail-price .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.detail-confidence .value,
+.detail-price .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.detail-stats {
+    background: var(--bg-hover);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.detail-stats .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    border-bottom: 0.5px solid #eee;
+}
+
+.detail-stats .stat-row:last-child {
+    border-bottom: none;
+}
+
+.detail-stats .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.detail-stats .stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.detail-stats .stat-value.positive {
+    color: #00a651;
+}
+
+.detail-stats .stat-value.negative {
+    color: var(--error);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* ============================================
+   SELL BUTTON ON PORTFOLIO LIST
+   ============================================ */
+.btn-sell {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: var(--spacing-xs);
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.btn-sell:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   MODAL SIZE VARIANTS
+   ============================================ */
+.modal-small {
+    max-width: 380px;
+}
+
+.modal-medium {
+    max-width: 500px;
+}
+
+.modal-detail {
+    max-width: 450px;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 600px) {
+    .modal-small,
+    .modal-medium,
+    .modal-detail {
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    .portfolio-list-item {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   MINI CARD HINT TEXT
+   ============================================ */
+.mini-hint {
+    font-size: 10px;
+    color: rgba(0, 0, 0, 0.4);
+    margin-top: var(--spacing-md);
+    text-align: center;
+    font-weight: 500;
+}
+
+.mini-card.us .mini-hint {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* ============================================
+   PORTFOLIO LIST MODAL
+   ============================================ */
+.modal-medium {
+    max-width: 500px;
+}
+
+.portfolio-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+}
+
+.portfolio-list-item {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md);
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.portfolio-list-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.portfolio-list-item .stock-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .stock-info {
+    flex: 1;
+}
+
+.portfolio-list-item .stock-ticker {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.portfolio-list-item .stock-name {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.portfolio-list-item .stock-price {
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .stock-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.portfolio-list-item .stock-change {
+    font-size: 12px;
+    margin: var(--spacing-xs) 0 0 0;
+}
+
+.portfolio-list-item .stock-change.positive {
+    color: #00a651;
+}
+
+.portfolio-list-item .stock-change.negative {
+    color: var(--error);
+}
+
+.portfolio-list-item .btn-sell {
+    background: rgba(102, 126, 234, 0.1);
+    color: var(--primary);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.portfolio-list-item .btn-sell:hover {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+/* ============================================
+   STOCK DETAIL MODAL
+   ============================================ */
+.modal-detail {
+    max-width: 450px;
+}
+
+.stock-detail-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.detail-confidence,
+.detail-price {
+    background: var(--bg-hover);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.detail-confidence .label,
+.detail-price .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-md);
+}
+
+.detail-confidence .value,
+.detail-price .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.detail-stats {
+    background: var(--bg-hover);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-lg);
+}
+
+.detail-stats .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    border-bottom: 0.5px solid #eee;
+}
+
+.detail-stats .stat-row:last-child {
+    border-bottom: none;
+}
+
+.detail-stats .stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.detail-stats .stat-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.detail-stats .stat-value.positive {
+    color: #00a651;
+}
+
+.detail-stats .stat-value.negative {
+    color: var(--error);
+}
+
+.btn-full {
+    width: 100%;
+}
+
+/* ============================================
+   SELL BUTTON ON PORTFOLIO LIST
+   ============================================ */
+.btn-sell {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: var(--spacing-xs);
+    transition: all 0.2s ease;
+    opacity: 0.7;
+}
+
+.btn-sell:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   MODAL SIZE VARIANTS
+   ============================================ */
+.modal-small {
+    max-width: 380px;
+}
+
+.modal-medium {
+    max-width: 500px;
+}
+
+.modal-detail {
+    max-width: 450px;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 600px) {
+    .modal-small,
+    .modal-medium,
+    .modal-detail {
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    .portfolio-list-item {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   CLEAR ACTIVITY BUTTON
+   ============================================ */
+.btn-clear-activity {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    margin-left: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #d32f2f;
+    background: transparent;
+    border: 1px solid #d32f2f;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn-clear-activity:hover {
+    background: #d32f2f;
+    color: #fff;
+}
+
+.btn-clear-activity:active {
+    transform: scale(0.97);
+}
+
+.btn-clear-activity:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.currency-toggle {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+ 
+.currency-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+ 
+.currency-btn:hover {
+    border-color: #667eea;
+}
+ 
+.currency-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+ 
+.form-hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.currency-toggle {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.currency-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.currency-btn:hover {
+    border-color: #667eea;
+}
+
+.currency-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.form-hint {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}

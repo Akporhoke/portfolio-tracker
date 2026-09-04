@@ -1,0 +1,33 @@
+<!-- Replace the existing Settings form in your HTML with this -->
+
+<div class="tab-content" id="settingsTab">
+    <div class="settings-container">
+        <h2>Settings</h2>
+        <div class="settings-form">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="settingName" placeholder="Your name">
+            </div>
+
+            <div class="form-group">
+                <label>Portfolio Goal (₦)</label>
+                <input type="number" id="settingGoal" placeholder="1000000">
+            </div>
+
+            <!-- ← NEW: Currency Toggle -->
+            <div class="form-group">
+                <label>Display Total Portfolio In</label>
+                <div class="currency-toggle">
+                    <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Nigerian Naira</button>
+                    <button class="currency-btn" data-currency="USD" id="currencyUSD">$ US Dollar</button>
+                </div>
+                <p class="form-hint">Choose which currency to display your total portfolio value</p>
+            </div>
+
+            <button class="btn-primary" id="saveSetting">Save Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add these styles to your CSS -->
+<style>

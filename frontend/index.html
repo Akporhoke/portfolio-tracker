@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+
     <!-- Network Warning Banner -->
     <div id="networkWarning" class="network-warning hidden">
         <span>📡</span> No internet connection - viewing cached data
@@ -20,6 +22,10 @@
     <!-- Pull to Refresh Indicator -->
     <div class="pull-to-refresh" id="pullToRefresh">
         ↓ Pull to refresh
+    </div>
+
+     <div class="status-bar">
+        <span id="currentTime">00:00</span>
     </div>
 
     <!-- Main Container -->
@@ -89,7 +95,7 @@
             <!-- Goal Progress -->
             <div class="goal-section">
                 <p class="goal-label">Goal Progress</p>
-=                <div class="goal-bar">
+                <div class="goal-bar">
                     <div class="goal-progress" id="goalProgress" style="width: 85%;"></div>
                 </div>
                 <p class="goal-percent" id="goalPercent">85% achieved</p>
@@ -98,7 +104,7 @@
 
         <!-- Mini Portfolio Cards (NSE & US) -->
         <div class="mini-cards">
-            <div class="mini-card nse">
+            <div class="mini-card nse" id="nseCard">
                 <p class="mini-label">NSE Portfolio</p>
                 <p class="mini-value" id="nseValue">₦0</p>
                 <p class="mini-change" id="nseChange">+0%</p>
@@ -107,7 +113,7 @@
                     <span id="nseLoss">-₦0</span>
                 </div>
             </div>
-            <div class="mini-card us">
+            <div class="mini-card us" id="usCard">
                 <p class="mini-label">US Portfolio</p>
                 <p class="mini-value" id="usValue">$0</p>
                 <p class="mini-change" id="usChange">+0%</p>
@@ -128,7 +134,7 @@
                 <span><i class="fa-solid fa-chart-simple"></i></span>
                 <p>Analytics</p>
             </button>
-            <button class="tab-btn add-btn" id="addBtn">
+            <button class="tab-btn add-btn" id="addBtn" aria-label="Add stock">
                 <span>+</span>
             </button>
             <button class="tab-btn" data-tab="watchlist">
@@ -162,7 +168,7 @@
             <div class="activity-section">
                 <div class="activity-header">
                     <h3>Recent Activity</h3>
-                    <select class="activity-filter" id="activityFilter">
+                    <select class="activity-filter" id="activityFilter" aria-label="Filter activity">
                         <option value="all">All</option>
                         <option value="invested">Invested</option>
                         <option value="sold">Sold</option>
@@ -180,6 +186,16 @@
         <div class="tab-content" id="watchlistTab">
             <div class="watchlist-container">
                 <h2>Watchlist</h2>
+
+                <!-- ← NEW: search/sort toolbar -->
+                <div class="list-toolbar">
+                    <input type="text" id="watchlistSearchInput" placeholder="Search ticker" aria-label="Search watchlist by ticker" autocomplete="off">
+                    <select id="watchlistSortSelect" aria-label="Sort watchlist">
+                        <option value="date-desc">Newest first</option>
+                        <option value="ticker-asc">Ticker A–Z</option>
+                    </select>
+                </div>
+
                 <div class="watchlist-list" id="watchlistList">
                     <!-- Watchlist items will be generated here -->
                 </div>
@@ -195,6 +211,17 @@
         <div class="tab-content" id="portfolioTab">
             <div class="portfolio-container">
                 <h2>Portfolio</h2>
+
+                <!-- ← NEW: search/sort toolbar -->
+                <div class="list-toolbar">
+                    <input type="text" id="portfolioSearchInput" placeholder="Search ticker" aria-label="Search portfolio by ticker" autocomplete="off">
+                    <select id="portfolioSortSelect" aria-label="Sort portfolio">
+                        <option value="ticker-asc">Ticker A–Z</option>
+                        <option value="value-desc">Value: High to Low</option>
+                        <option value="gain-desc">Gain %: High to Low</option>
+                    </select>
+                </div>
+
                 <div class="portfolio-list" id="portfolioList">
                     <!-- Portfolio items will be generated here -->
                 </div>
@@ -230,22 +257,34 @@
         </div>
 
         <!-- TAB: SETTINGS -->
-        <div class="tab-content" id="settingsTab">
-            <div class="settings-container">
-                <h2>Settings</h2>
-                <div class="settings-form">
-                    <div class="form-group">
-                        <label>Name</label>
-                        <input type="text" id="settingName" placeholder="Your name">
-                    </div>
-                    <div class="form-group">
-                        <label>Portfolio Goal (₦)</label>
-                        <input type="number" id="settingGoal" placeholder="1000000">
-                    </div>
-                    <button class="btn-primary" id="saveSetting">Save Settings</button>
-                </div>
+
+<div class="tab-content" id="settingsTab">
+    <div class="settings-container">
+        <h2>Settings</h2>
+        <div class="settings-form">
+            <div class="form-group">
+                <label for="settingName">Name</label>
+                <input type="text" id="settingName" placeholder="Your name">
             </div>
+
+            <div class="form-group">
+                <label for="settingGoal">Portfolio Goal (₦)</label>
+                <input type="number" id="settingGoal" placeholder="1000000">
+            </div>
+
+            <div class="form-group">
+                <label>Display Total Portfolio In</label>
+                <div class="currency-toggle">
+                    <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Nigerian Naira</button>
+                    <button class="currency-btn" data-currency="USD" id="currencyUSD">$ US Dollar</button>
+                </div>
+                <p class="form-hint">Choose which currency to display your total portfolio value</p>
+            </div>
+
+            <button class="btn-primary" id="saveSetting">Save Settings</button>
         </div>
+    </div>
+</div>
     </div>
 
     <!-- MODALS -->
@@ -255,54 +294,121 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Add Stock</h2>
-                <button class="close-modal" id="closeAddModal">✕</button>
+                <button class="close-modal" id="closeAddModal" aria-label="Close add stock modal">✕</button>
             </div>
+
+            <!-- MODAL TABS -->
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" data-form="portfolio">Portfolio</button>
+                <button class="modal-tab-btn" data-form="watchlist">Watchlist</button>
+            </div>
+
             <div class="modal-body">
-                <div class="form-group">
-                    <label>Stock Ticker</label>
-                    <input type="text" id="addTicker" placeholder="e.g., GTCO, AAPL" autocomplete="off">
-                    <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
-                    <p class="error" id="tickerError"></p>
-                </div>
 
-                <div class="form-group">
-                    <label>Quantity</label>
-                    <input type="number" id="addQuantity" placeholder="Number of shares" min="1">
-                    <p class="error" id="quantityError"></p>
-                </div>
-
-                <div class="form-group">
-                    <label>Entry Price</label>
-                    <input type="number" id="addPrice" placeholder="Price per share" step="0.01" min="0">
-                    <p class="error" id="priceError"></p>
-                </div>
-
-                <div class="form-group">
-                    <label>Sector</label>
-                    <select id="addSector">
-                        <option value="">Select sector</option>
-                        <option value="Finance">Finance</option>
-                        <option value="Tech">Tech</option>
-                        <option value="Consumer">Consumer</option>
-                        <option value="Energy">Energy</option>
-                        <option value="Healthcare">Healthcare</option>
-                        <option value="Manufacturing">Manufacturing</option>
-                    </select>
-                    <p class="error" id="sectorError"></p>
-                </div>
-
-                <div class="form-group">
-                    <label>Notes (Optional)</label>
-                    <textarea id="addNotes" placeholder="Why are you investing?"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label>Action</label>
-                    <div class="action-buttons">
-                        <button class="btn-primary" id="addToPortfolio">Add to Portfolio</button>
-                        <button class="btn-secondary" id="addToWatchlist">Add to Watchlist</button>
+                <!-- PORTFOLIO FORM -->
+                <div class="modal-form active" id="portfolioForm">
+                    <div class="form-group">
+                        <label>Stock Ticker</label>
+                        <input type="text" id="addTicker" placeholder="e.g., GTCO, AAPL" autocomplete="off">
+                        <div class="autocomplete-dropdown" id="autocompleteDropdown"></div>
+                        <p class="error" id="tickerError"></p>
                     </div>
+
+                    <div class="form-group">
+                        <label>Market</label>
+                        <select id="addMarket">
+                            <option value="">Select market</option>
+                            <option value="NGX">Nigerian Stock Exchange (NGX)</option>
+                            <option value="US">US Stock Market</option>
+                        </select>
+                        <p class="error" id="marketError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Quantity</label>
+                        <input type="number" id="addQuantity" placeholder="Number of shares" min="1">
+                        <p class="error" id="quantityError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Entry Price</label>
+                        <input type="number" id="addPrice" placeholder="Price per share" step="0.01" min="0">
+                        <p class="error" id="priceError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Sector</label>
+                        <select id="addSector">
+                            <option value="">Select sector</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Tech">Tech</option>
+                            <option value="Consumer">Consumer</option>
+                            <option value="Energy">Energy</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Manufacturing">Manufacturing</option>
+                        </select>
+                        <p class="error" id="sectorError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes (Optional)</label>
+                        <textarea id="addNotes" placeholder="Why are you investing?"></textarea>
+                    </div>
+
+                    <button class="btn-primary" id="addToPortfolio">Add to Portfolio</button>
                 </div>
+
+                <!-- WATCHLIST FORM -->
+                <div class="modal-form" id="watchlistForm">
+                    <div class="form-group">
+                        <label>Stock Ticker</label>
+                        <input type="text" id="watchTicker" placeholder="e.g., GTCO, AAPL" autocomplete="off">
+                        <div class="autocomplete-dropdown" id="autocompleteDropdown2"></div>
+                        <p class="error" id="watchTickerError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Market</label>
+                        <select id="watchMarket">
+                            <option value="">Select market</option>
+                            <option value="NGX">Nigerian Stock Exchange (NGX)</option>
+                            <option value="US">US Stock Market</option>
+                        </select>
+                        <p class="error" id="watchMarketError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Watching Duration</label>
+                        <div class="duration-options">
+                            <button class="duration-btn active" data-duration="2d">2 Days</button>
+                            <button class="duration-btn" data-duration="1w">1 Week</button>
+                            <button class="duration-btn" data-duration="2w">2 Weeks</button>
+                        </div>
+                        <input type="hidden" id="watchDuration" value="2d">
+                        <p class="error" id="durationError"></p>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Sector (Optional)</label>
+                        <select id="watchSector">
+                            <option value="">Select sector</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Tech">Tech</option>
+                            <option value="Consumer">Consumer</option>
+                            <option value="Energy">Energy</option>
+                            <option value="Healthcare">Healthcare</option>
+                            <option value="Manufacturing">Manufacturing</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes (Optional)</label>
+                        <textarea id="watchNotes" placeholder="Why are you watching this?"></textarea>
+                    </div>
+
+                    <button class="btn-primary" id="addToWatchlist">Add to Watchlist</button>
+                </div>
+
             </div>
         </div>
     </div>
@@ -320,6 +426,49 @@
                 <div class="modal-actions">
                     <button class="btn-secondary" id="confirmCancel">Cancel</button>
                     <button class="btn-danger" id="confirmSubmit">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Stock List Modal -->
+    <div class="modal" id="marketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="marketModalTitle">NSE Portfolio</h2>
+                <button class="close-modal" id="closeMarketModal" aria-label="Close market modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="market-stock-list" id="marketStockList">
+                    <!-- stock rows injected here -->
+                </div>
+                <div class="empty-state" id="marketStockEmpty" style="display:none;">
+                    <p style="font-size: 32px;">📭</p>
+                    <p style="font-weight: 600;">No stocks in this market yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stock Detail Modal -->
+    <div class="modal" id="stockDetailModal">
+        <div class="modal-content modal-detail">
+            <div class="modal-header">
+                <h2 id="detailStockName">—</h2>
+                <button class="close-modal" onclick="closeStockDetailModal()" aria-label="Close stock detail modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="stock-detail-container">
+                    <div class="detail-confidence">
+                        <p class="label">Confidence Level</p>
+                        <p class="value" id="detailConfidence">0</p>
+                    </div>
+                    <div class="detail-price">
+                        <p class="label">Current Price</p>
+                        <p class="value" id="detailPrice">₦0</p>
+                    </div>
+                    <div class="detail-stats" id="detailStats"></div>
+                    <button class="btn-danger btn-full" onclick="confirmSellFromDetail()">Sell Stock</button>
                 </div>
             </div>
         </div>
