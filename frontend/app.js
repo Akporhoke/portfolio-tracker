@@ -35,7 +35,14 @@ const state = {
 /* ============================================
    CONFIGURATION
    ============================================ */
-const API_BASE = 'https://portfolio-tracker-plwj.onrender.com/api/';
+const API_BASE = (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1'
+)
+    ? 'http://localhost:5000/api'
+    : 'https://portfolio-tracker-plwj.onrender.com/api';
+    console.log('API_BASE:', API_BASE);
+    
 const REFRESH_INTERVAL = 300000; // 5 minutes
 const TOAST_DURATION = 3000;
 const UNDO_TOAST_DURATION = 6000; // ← NEW: longer window for actions with Undo

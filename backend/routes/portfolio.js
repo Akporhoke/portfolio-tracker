@@ -2,8 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Portfolio = require('../models/portfolio');
 const getPrice = require('../utils/getPrice');
-const calculateConfidenceLevel = require('../utils/confidenceCalculator'); // ← ADD THIS
-
+const { calculateConfidenceLevel } = require('../utils/confidenceCalculator');
 // Helper: get or create a portfolio doc
 async function getOrCreatePortfolio(userId) {
   let portfolio = await Portfolio.findOne({ userId });
