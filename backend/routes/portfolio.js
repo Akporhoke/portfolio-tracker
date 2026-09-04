@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Portfolio = require('../models/Portfolio');
+const Portfolio = require('../models/portfolio');
 const getPrice = require('../utils/getPrice');
 const calculateConfidenceLevel = require('../utils/confidenceCalculator'); // ← ADD THIS
 
