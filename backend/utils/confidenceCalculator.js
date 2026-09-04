@@ -1,142 +1,159 @@
+// backend/utils/confidenceCalculator.js
+
 /**
- * CONFIDENCE LEVEL CALCULATOR
- * 5-Factor Scoring System (0-100)
- * 
- * Factors:
- * 1. Momentum (25 pts) - Price change since purchase
- * 2. Stability (20 pts) - Market volatility (inverse)
- * 3. Volume/Conviction (20 pts) - Stock liquidity/popularity
- * 4. Sector Strength (20 pts) - Sector performance
- * 5. Technical (15 pts) - Trend consistency
+ * Calculate a confidence score for a stock.
+ *
+ * Works with both:
+ * - Portfolio stocks: buyPrice
+ * - Watchlist stocks: priceAtAdd
+ *
+ * Returns a safe number between 0 and 100.
  */
 
-function calculateConfidenceLevel(stock, market) {
-  const { ticker, buyPrice, currentPrice, sector, dateAdded } = stock;
-  
-  let confidence = 0;
+function calculateConfidenceLevel(stock, market = {}) {
+    const {
+        ticker,
+        buyPrice,
+        priceAtAdd,
+        currentPrice,
+        sector,
+        dateAdded
+    } = stock;
 
-  // ========================================
-  // 1. MOMENTUM (25 points)
-  // ========================================
-  const momentum = ((currentPrice - buyPrice) / buyPrice) * 100;
-  let momentumScore = 0;
+    // Use buyPrice for portfolio stocks,
+    // priceAtAdd for watchlist stocks,
+    // and currentPrice as a final fallback.
+    const referencePrice =
+        Number(buyPrice) ||
+        Number(priceAtAdd) ||
+        Number(currentPrice) ||
+        0;
 
-  if (momentum >= 15) momentumScore = 25;      // Strong gain
-  else if (momentum >= 10) momentumScore = 22;  // Good gain
-  else if (momentum >= 5) momentumScore = 18;   // Moderate gain
-  else if (momentum >= 0) momentumScore = 12;   // Slight gain
-  else if (momentum >= -5) momentumScore = 8;   // Slight loss
-  else if (momentum >= -10) momentumScore = 4;  // Moderate loss
-  else momentumScore = 0;                        // Heavy loss
+    const price = Number(currentPrice) || referencePrice;
 
-  confidence += momentumScore;
+    /*
+     * If we don't have a valid price, return a neutral
+     * confidence score instead of allowing NaN into MongoDB.
+     */
+    if (!referencePrice || !price) {
+        return 50;
+    }
 
-  // ========================================
-  // 2. STABILITY (20 points)
-  // ========================================
-  // Inverse of volatility - lower volatility = higher score
-  // Proxy: Use market type and recent price stability
-  let stabilityScore = 0;
+    // --------------------------------------------------
+    // 1. MOMENTUM — 30%
+    // --------------------------------------------------
 
-  // US market is generally less volatile than NGX
-  const baseVolatility = market === 'US' ? 1.2 : 2.0;
-  
-  // Assume price within 5% range = stable
-  const assumedRange = buyPrice * 0.05;
-  const priceDeviation = Math.abs(currentPrice - buyPrice);
-  
-  if (priceDeviation <= assumedRange) stabilityScore = 20;      // Very stable
-  else if (priceDeviation <= assumedRange * 1.5) stabilityScore = 16;  // Stable
-  else if (priceDeviation <= assumedRange * 2) stabilityScore = 12;    // Moderate
-  else stabilityScore = 8;  // Volatile
+    const momentumPercent =
+        ((price - referencePrice) / referencePrice) * 100;
 
-  confidence += stabilityScore;
+    // Convert momentum into a 0–100 score.
+    // Positive movement increases confidence,
+    // negative movement decreases it.
+    const momentum = Math.max(
+        0,
+        Math.min(100, 50 + momentumPercent * 5)
+    );
 
-  // ========================================
-  // 3. VOLUME & CONVICTION (20 points)
-  // ========================================
-  // Score based on: stock popularity + time held
-  let volumeScore = 10; // base score
+    // --------------------------------------------------
+    // 2. STABILITY — 25%
+    // --------------------------------------------------
 
-  // Popular blue-chip stocks score higher
-  const blueChips = {
-    'GTCO': 20,      // Guaranty Trust - high liquidity
-    'NSRNG': 19,     // Nestle - high liquidity
-    'AAPL': 20,      // Apple - very high volume
-    'MSFT': 20,      // Microsoft - very high volume
-    'GOOGL': 20,     // Google
-    'SEPLAT': 16,    // Seplat - medium volume
-    'STANBIC': 18,   // Stanbic - high volume
-    'ZENITHBANK': 17 // Zenith - medium-high
-  };
+    /*
+     * We don't necessarily have enough historical data
+     * when a stock is first added.
+     *
+     * Until proper historical data is available,
+     * use a neutral stability score.
+     */
+    let stability = 50;
 
-  if (blueChips[ticker]) {
-    volumeScore = blueChips[ticker];
-  }
+    if (market.stability !== undefined) {
+        const marketStability = Number(market.stability);
 
-  // Boost score for longer conviction period (time held)
-  if (dateAdded) {
-    const daysHeld = Math.floor((Date.now() - new Date(dateAdded)) / (1000 * 60 * 60 * 24));
-    if (daysHeld >= 90) volumeScore = Math.min(volumeScore + 3, 20);  // +3 for 3+ months
-    else if (daysHeld >= 30) volumeScore = Math.min(volumeScore + 1, 20); // +1 for 1+ month
-  }
+        if (Number.isFinite(marketStability)) {
+            stability = Math.max(
+                0,
+                Math.min(100, marketStability)
+            );
+        }
+    }
 
-  confidence += volumeScore;
+    // --------------------------------------------------
+    // 3. VOLATILITY — 20%
+    // --------------------------------------------------
 
-  // ========================================
-  // 4. SECTOR STRENGTH (20 points)
-  // ========================================
-  const sectorPerformance = {
-    'Finance': 19,       // Strong sector in both markets
-    'Tech': 20,          // Strongest growth sector
-    'Consumer': 17,      // Stable, defensive
-    'Energy': 14,        // Volatile, recovery play
-    'Healthcare': 18,    // Stable, defensive
-    'Manufacturing': 13, // Cyclical
-    'Telecoms': 15,      // Utility-like
-    'Other': 12          // Unknown
-  };
+    let volatility = 50;
 
-  const sectorScore = sectorPerformance[sector] || 12;
-  confidence += sectorScore;
+    if (market.volatility !== undefined) {
+        const marketVolatility = Number(market.volatility);
 
-  // ========================================
-  // 5. TECHNICAL INDICATORS (15 points)
-  // ========================================
-  // Score based on price trend consistency
-  // Since we don't have detailed history, estimate from momentum
-  let technicalScore = 10;
+        if (Number.isFinite(marketVolatility)) {
+            // Higher volatility = lower confidence.
+            volatility = Math.max(
+                0,
+                Math.min(100, 100 - marketVolatility)
+            );
+        }
+    }
 
-  // Strong uptrend = higher technical score
-  if (momentum >= 20) technicalScore = 15;      // Strong uptrend
-  else if (momentum >= 10) technicalScore = 13; // Mild uptrend
-  else if (momentum >= 0) technicalScore = 10;  // Consolidating
-  else if (momentum >= -10) technicalScore = 7; // Mild downtrend
-  else technicalScore = 4;                       // Strong downtrend
+    // --------------------------------------------------
+    // 4. VOLUME — 15%
+    // --------------------------------------------------
 
-  confidence += technicalScore;
+    let volume = 50;
 
-  // ========================================
-  // FINAL SCORE (0-100)
-  // ========================================
-  return Math.min(Math.max(Math.round(confidence), 0), 100);
+    if (market.volume !== undefined) {
+        const marketVolume = Number(market.volume);
+
+        if (Number.isFinite(marketVolume)) {
+            volume = Math.max(
+                0,
+                Math.min(100, marketVolume)
+            );
+        }
+    }
+
+    // --------------------------------------------------
+    // 5. SECTOR — 10%
+    // --------------------------------------------------
+
+    /*
+     * Keep sector neutral for now.
+     *
+     * You can replace this later with your actual
+     * sector-allocation logic.
+     */
+    let sectorScore = 50;
+
+    if (sector) {
+        sectorScore = 50;
+    }
+
+    // --------------------------------------------------
+    // FINAL CONFIDENCE
+    // --------------------------------------------------
+
+    let confidence =
+        (momentum * 0.30) +
+        (stability * 0.25) +
+        (volatility * 0.20) +
+        (volume * 0.15) +
+        (sectorScore * 0.10);
+
+    // Protect MongoDB from NaN / Infinity.
+    if (!Number.isFinite(confidence)) {
+        confidence = 50;
+    }
+
+    // Always keep the result between 0 and 100.
+    confidence = Math.max(
+        0,
+        Math.min(100, confidence)
+    );
+
+    return Math.round(confidence);
 }
 
-// ========================================
-// EXPORT
-// ========================================
-module.exports = calculateConfidenceLevel;
-
-/**
- * USAGE IN BACKEND:
- * 
- * const calculateConfidenceLevel = require('../utils/confidenceCalculator');
- * 
- * const confidence = calculateConfidenceLevel(stock, 'NGX');
- * // stock = { ticker, buyPrice, currentPrice, sector, dateAdded }
- * 
- * EXAMPLE OUTPUT:
- * - Stock up 15%, stable sector, high volume → 92
- * - Stock down 10%, volatile, small cap → 35
- * - Stock flat, medium sector, held 2 months → 58
- */
+module.exports = {
+    calculateConfidenceLevel
+};
