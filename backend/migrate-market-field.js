@@ -1,7 +1,7 @@
 // migrate-market-field.js
 require('dotenv').config();
 const mongoose = require('mongoose');
-const Portfolio = require('./models/Portfolio');
+const Portfolio = require('./models/portfolio');
 
 const DEFAULT_MARKET = 'NGX';
 

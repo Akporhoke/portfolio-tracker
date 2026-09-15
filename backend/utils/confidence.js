@@ -1,4 +1,4 @@
-const DEFAULT_WEIGHTS = {
+/*const DEFAULT_WEIGHTS = {
   momentum: 0.25,
   stability: 0.20,
   volatility: 0.15,
@@ -62,7 +62,7 @@ function getSignal(score) {
  * @param {number} sectorAvgGainPercent - average % gain of the stock's sector over same window
  * @param {object} weights - optional override, defaults to equal Phase-A weights
  */
-function calculateConfidenceScore(ohlcv, sectorAvgGainPercent = 0, weights = DEFAULT_WEIGHTS) {
+/**function calculateConfidenceScore(ohlcv, sectorAvgGainPercent = 0, weights = DEFAULT_WEIGHTS) {
   if (!ohlcv || ohlcv.length < 7) {
     return null; // not enough data yet — caller should show "collecting data"
   }
@@ -91,4 +91,4 @@ function calculateConfidenceScore(ohlcv, sectorAvgGainPercent = 0, weights = DEF
   };
 }
 
-module.exports = { calculateConfidenceScore, DEFAULT_WEIGHTS };
+module.exports = { calculateConfidenceScore, DEFAULT_WEIGHTS };*/

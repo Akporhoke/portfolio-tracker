@@ -2067,3 +2067,496 @@ body {
     color: #999;
     margin-top: 4px;
 }
+
+/* ============================================
+   WATCHLIST EXPANDABLE ANALYSIS
+   ============================================ */
+
+.watchlist-card {
+    background: var(--bg-card);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.watchlist-card-main {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.watchlist-card-main:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.watchlist-expand-icon {
+    margin-left: 4px;
+    color: var(--text-secondary);
+    font-size: 18px;
+    width: 20px;
+    text-align: center;
+}
+
+.watchlist-analysis {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease;
+}
+
+.watchlist-analysis.active {
+    grid-template-rows: 1fr;
+}
+
+.watchlist-analysis-inner {
+    min-height: 0;
+    overflow: hidden;
+    padding: 0 16px;
+    border-top: 1px solid var(--border-color, #eee);
+    transition: padding 0.3s ease;
+}
+
+.watchlist-analysis.active .watchlist-analysis-inner {
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+.analysis-section-header,
+.confidence-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.analysis-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.analysis-subtitle {
+    margin: 3px 0 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.chart-loading {
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.stock-history-chart {
+    margin-top: 12px;
+    min-height: 220px;
+    border-radius: 12px;
+    background: var(--bg-secondary, #f8f9fa);
+    overflow: hidden;
+}
+
+.chart-placeholder {
+    min-height: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-align: center;
+    padding: 20px;
+}
+
+.chart-error {
+    color: var(--error, #d32f2f);
+}
+
+.stock-chart-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 12px 0;
+}
+
+.chart-range-label {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.chart-change {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.chart-data-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.stock-chart-svg-wrap {
+    width: 100%;
+    height: 210px;
+    padding: 5px 8px 0;
+}
+
+.stock-chart-svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.chart-axis {
+    stroke: #dfe3e8;
+    stroke-width: 1;
+}
+
+.chart-area {
+    fill: rgba(102, 126, 234, 0.08);
+}
+
+.chart-line {
+    stroke: #667eea;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.chart-dot {
+    fill: #667eea;
+}
+
+.chart-date-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 12px 10px;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.chart-range-label {
+    color: #1f2937;
+}
+
+.chart-change {
+    color: #1f2937;
+}
+
+.chart-change.positive {
+    color: #16a34a;
+}
+
+.chart-change.negative {
+    color: #dc2626;
+}
+
+.chart-data-label {
+    color: #6b7280;
+}
+
+/* Interactive stock chart */
+
+/* Interactive stock chart */
+
+.stock-chart-svg-wrap {
+    position: relative;
+}
+
+.chart-interaction-area {
+    cursor: crosshair;
+    touch-action: none;
+}
+
+.chart-crosshair {
+    pointer-events: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    opacity: 0.5;
+}
+
+.chart-price-guide {
+    pointer-events: none;
+    stroke: currentColor;
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    opacity: 0.3;
+}
+
+.chart-hover-dot {
+    pointer-events: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    r: 5;
+}
+
+.chart-tooltip {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10;
+
+    padding: 8px 11px;
+    border-radius: 8px;
+
+    background: #ffffff;
+    color: #111827;
+
+    border: 1px solid #d1d5db;
+
+    box-shadow:
+        0 4px 14px
+        rgba(0, 0, 0, 0.12);
+}
+
+.chart-tooltip-price {
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.chart-tooltip-change {
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.chart-tooltip-change.positive {
+    color: #16a34a;
+}
+
+.chart-tooltip-change.negative {
+    color: #dc2626;
+}
+
+.chart-tooltip-date {
+    margin-top: 2px;
+    color: #6b7280;
+    font-size: 11px;
+}
+
+
+/* Main chart price */
+
+.chart-range-label {
+    color: #111827;
+}
+
+
+/* Main chart percentage */
+
+.chart-change {
+    color: #111827;
+}
+
+.chart-change.positive {
+    color: #16a34a;
+}
+
+.chart-change.negative {
+    color: #dc2626;
+}
+
+
+/* Trading-day label */
+
+.chart-data-label {
+    color: #6b7280;
+}
+
+
+
+
+
+
+
+/* ============================================
+   CONFIDENCE ANALYSIS
+   ============================================ */
+
+.watchlist-confidence-section {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color, #eee);
+}
+
+.confidence-score-large {
+    min-width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 17px;
+    font-weight: 800;
+}
+
+.confidence-score-large.strong {
+    background: #E8F5E9;
+    color: #00a651;
+}
+
+.confidence-score-large.good {
+    background: #E1F5FE;
+    color: #2196F3;
+}
+
+.confidence-score-large.moderate {
+    background: #FFF3E0;
+    color: var(--warning);
+}
+
+.confidence-score-large.weak {
+    background: #FFEBEE;
+    color: #E57373;
+}
+
+.confidence-score-large.negative {
+    background: #FFEBEE;
+    color: var(--error);
+}
+
+.confidence-score-large.pending {
+    background: #f0f0f0;
+    color: var(--text-secondary);
+}
+
+.confidence-signal {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.confidence-signal.strong {
+    background: #E8F5E9;
+    color: #00a651;
+}
+
+.confidence-signal.good {
+    background: #E1F5FE;
+    color: #2196F3;
+}
+
+.confidence-signal.moderate {
+    background: #FFF3E0;
+    color: var(--warning);
+}
+
+.confidence-signal.weak {
+    background: #FFEBEE;
+    color: #E57373;
+}
+
+.confidence-signal.negative {
+    background: #FFEBEE;
+    color: var(--error);
+}
+
+.confidence-components {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.confidence-metric {
+    width: 100%;
+}
+
+.confidence-metric-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.confidence-metric-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.confidence-metric-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.confidence-metric-track {
+    width: 100%;
+    height: 5px;
+    background: #eeeeee;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.confidence-metric-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: #667eea;
+    transition: width 0.4s ease;
+}
+
+
+/* ============================================
+   WATCHLIST ANALYSIS ACTIONS
+   ============================================ */
+
+.watchlist-analysis-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.watchlist-analysis-btn {
+    flex: 1;
+    min-height: 38px;
+    font-size: 12px;
+}
+
+@media (max-width: 600px) {
+
+    .watchlist-card-main {
+        gap: 10px;
+    }
+
+    .watchlist-card-main .stock-info {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .watchlist-card-main .stock-price {
+        min-width: 65px;
+    }
+
+    .watchlist-card-main .stock-name {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .stock-history-chart {
+        min-height: 190px;
+    }
+
+    .stock-chart-svg-wrap {
+        height: 180px;
+    }
+
+    .watchlist-analysis-actions {
+        flex-direction: column;
+    }
+}
+
+
+#pullToRefresh {
+    display: none;
+}
