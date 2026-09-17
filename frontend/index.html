@@ -40,23 +40,37 @@
         </div>
 
         <!-- Quick Stats -->
-        <div class="quick-stats">
-            <div class="stat">
-                <p class="stat-number" id="statWatching">5</p>
-                <p class="stat-label">Watching</p>
-            </div>
-            <div class="divider"></div>
-            <div class="stat">
-                <p class="stat-number" id="statHeld">3</p>
-                <p class="stat-label">Held</p>
-            </div>
-            <div class="divider"></div>
-            <div class="stat">
-                <p class="stat-number" id="statSold">2</p>
-                <p class="stat-label">Sold</p>
-            </div>
-        </div>
+<div class="quick-stats">
 
+    <div class="stat">
+        <div class="stat-top">
+            <span class="stat-indicator watching"></span>
+            <p class="stat-label">Watching</p>
+        </div>
+        <p class="stat-number" id="statWatching">5</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="stat">
+        <div class="stat-top">
+            <span class="stat-indicator held"></span>
+            <p class="stat-label">Held</p>
+        </div>
+        <p class="stat-number" id="statHeld">3</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="stat">
+        <div class="stat-top">
+            <span class="stat-indicator sold"></span>
+            <p class="stat-label">Sold</p>
+        </div>
+        <p class="stat-number" id="statSold">2</p>
+    </div>
+
+</div>
         <!-- Main Portfolio Card -->
         <div class="portfolio-card">
             <div class="portfolio-main">
@@ -65,16 +79,44 @@
                     <p class="portfolio-value" id="totalPortfolio">₦0</p>
                     <p class="portfolio-change" id="portfolioChange">+0% today</p>
                 </div>
-                <div class="portfolio-right">
-                    <p class="top-performer-label">Top Performer</p>
-                    <p class="top-performer-ticker" id="topPerformerTicker">—</p>
-                    <p class="top-performer-change" id="topPerformerChange">+0%</p>
-                    <div class="top-performer-stats">
-                        <p id="topPerformerInvested">Invested: ₦0</p>
-                        <p id="topPerformerGain">Gain: +₦0</p>
-                        <p id="topPerformerLoss">Loss: -₦0</p>
-                    </div>
-                </div>
+<div class="portfolio-right">
+    <div class="top-performer-header">
+        <div class="top-performer-heading">
+            <span class="top-performer-dot"></span>
+            <p class="top-performer-label">Top Performer</p>
+        </div>
+
+        <span class="top-performer-icon">↗</span>
+    </div>
+
+    <div class="top-performer-main">
+        <div>
+            <p class="top-performer-ticker" id="topPerformerTicker">—</p>
+            <p class="top-performer-subtitle">Strongest holding</p>
+        </div>
+
+        <p class="top-performer-change" id="topPerformerChange">+0%</p>
+    </div>
+
+    <div class="top-performer-divider"></div>
+
+    <div class="top-performer-stats">
+        <div class="top-performer-stat">
+            <span>Invested</span>
+            <strong id="topPerformerInvested">₦0</strong>
+        </div>
+
+        <div class="top-performer-stat">
+            <span>Gain</span>
+            <strong id="topPerformerGain">+₦0</strong>
+        </div>
+
+        <div class="top-performer-stat loss-stat">
+            <span>Loss</span>
+            <strong id="topPerformerLoss">-₦0</strong>
+        </div>
+    </div>
+</div>
             </div>
 
             <!-- Sector Allocation -->
@@ -200,9 +242,9 @@
                     <!-- Watchlist items will be generated here -->
                 </div>
                 <div class="empty-state" id="watchlistEmpty">
-                    <p style="font-size: 32px;">👁️</p>
                     <p style="font-weight: 600;">No stocks watched yet</p>
                     <p style="color: #999; font-size: 12px;">Start watching stocks to analyze before investing</p>
+                    <img src="owl_x5f_waving.svg" alt="">
                 </div>
             </div>
         </div>
@@ -252,7 +294,7 @@
         <div class="tab-content" id="analyticsTab">
             <div class="analytics-container">
                 <h2>Analytics</h2>
-                <p style="text-align: center; color: #999; margin-top: 40px;">📊 Full analytics coming soon</p>
+                <p style="text-align: center; color: #999; margin-top: 40px;"><img src="owl_x5f_analyst_x5f_fixed_x5f_embedded.svg" alt="" /> Full analytics coming soon</p>
             </div>
         </div>
 

@@ -3972,6 +3972,82 @@ function syncCurrencyToggleUI() {
 /* ============================================
    PORTFOLIO SUMMARY
    ============================================ */
+   
+   function animatePortfolioValue(
+    targetValue,
+    currencySign,
+    duration = 900
+) {
+    const element =
+        document.getElementById('totalPortfolio');
+
+    if (!element) return;
+
+    const endValue =
+        Number(targetValue) || 0;
+
+    const startValue =
+        Number(element.dataset.value) || 0;
+
+    // Don't animate if nothing changed
+    if (startValue === endValue) {
+        element.textContent =
+            `${currencySign}${formatNumber(endValue)}`;
+
+        return;
+    }
+
+    const startTime =
+        performance.now();
+
+    function update(currentTime) {
+        const elapsed =
+            currentTime - startTime;
+
+        const progress =
+            Math.min(
+                elapsed / duration,
+                1
+            );
+
+        // Smooth ease-out
+        const easedProgress =
+            1 -
+            Math.pow(
+                1 - progress,
+                3
+            );
+
+        const currentValue =
+            startValue +
+            (
+                endValue -
+                startValue
+            ) *
+            easedProgress;
+
+        element.textContent =
+            `${currencySign}${formatNumber(
+                currentValue
+            )}`;
+
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        } else {
+            element.textContent =
+                `${currencySign}${formatNumber(
+                    endValue
+                )}`;
+
+            element.dataset.value =
+                endValue;
+        }
+    }
+
+    requestAnimationFrame(update);
+}
+   
+   
 
 function updatePortfolioCard() {
 
@@ -4102,13 +4178,10 @@ function updatePortfolioCard() {
         );
 
 
-    if (totalPortfolio) {
-
-        totalPortfolio.textContent =
-            `${totalCurrencySign}${formatNumber(
-                displayTotal
-            )}`;
-    }
+    animatePortfolioValue(
+    displayTotal,
+    totalCurrencySign
+);
 
 
     const portfolioChange =
@@ -4829,15 +4902,26 @@ function renderActivity() {
     }
 
 
-    if (
-        activities.length === 0
-    ) {
+if (
+    activities.length === 0
+) {
 
-        container.innerHTML =
-            '<div class="empty-state"><p>No activities</p></div>';
+    container.innerHTML = `
+        <div id="activityEmpty">
+            <p>No activities</p>
+            <p style="color: #999; font-size: 13px; margin-bottom: 20px;">
+                Your activity will appear here
+            </p>
+            <img 
+                src="owl_x5f_waving.svg" 
+                alt="No activities" 
+                style="width: 360px; height: 360px; object-fit: contain; margin: 0; padding: 0;"
+            />
+        </div>
+    `;
 
-        return;
-    }
+    return;
+}
 
 
     container.innerHTML =
