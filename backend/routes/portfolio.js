@@ -1747,10 +1747,12 @@ if (
         true;
 
     confidence.completedAt =
-        new Date();
+    confidence.completedAt ||
+    new Date();
 
-    confidence.finalDate =
-        new Date();
+confidence.finalDate =
+    confidence.finalDate ||
+    new Date();
 }
 
 return confidence;
@@ -1785,6 +1787,10 @@ async function updateWatchlistConfidence(
         if (!stock) {
             continue;
         }
+        console.log(
+    `[Confidence Debug] ${stock.ticker}:`,
+    stock.confidenceLevel
+);
 
         // ----------------------------------------------------
         // Never touch frozen confidence
@@ -1927,85 +1933,6 @@ router.get(
 
 
 
-// ============================================================
-// GET REAL STOCK HISTORY
-// ============================================================
-
-router.get(
-    '/stocks/history/:ticker',
-    async (req, res) => {
-        try {
-            const ticker =
-                normalizeTicker(req.params.ticker);
-
-            const market =
-                normalizeMarket(req.query.market);
-
-            const requestedDays =
-                Number(req.query.days);
-
-            const days =
-                Number.isFinite(requestedDays) &&
-                requestedDays > 0
-                    ? Math.min(
-                        Math.floor(requestedDays),
-                        365
-                    )
-                    : 30;
-
-            if (!ticker) {
-                return res.status(400).json({
-                    error: 'ticker is required'
-                });
-            }
-
-            console.log(
-                `[History] ${ticker} ${market} requesting ${days} days`
-            );
-
-            const history =
-                await getPriceHistory(
-                    ticker,
-                    days,
-                    market
-                );
-
-            const normalizedHistory =
-                normalizeHistoryRows(history);
-
-            if (
-                normalizedHistory.length === 0
-            ) {
-                return res.status(404).json({
-                    error:
-                        'No historical price data available',
-                    ticker,
-                    market
-                });
-            }
-
-            console.log(
-                `[History] ${ticker}: ${normalizedHistory.length} real trading days`
-            );
-
-            res.json(normalizedHistory);
-
-        } catch (error) {
-
-            console.error(
-                `[GET /stocks/history/${req.params.ticker}] Error:`,
-                error
-            );
-
-            res.status(500).json({
-                error:
-                    'Failed to load stock history',
-                message:
-                    error.message
-            });
-        }
-    }
-);
 
 
 // ============================================================
@@ -2116,20 +2043,16 @@ router.get(
                     }
                 }
             }
-
-            // ------------------------------------------------
-            // Update confidence
-            // ------------------------------------------------
-
-           await updateWatchlistConfidence(
-    portfolio
-);
-
-// Do NOT save the whole portfolio here.
-// GET requests can overlap with POST/DELETE requests,
-// causing Mongoose VersionError from stale documents.
-// The refreshed prices and confidence are still returned
-// from this in-memory portfolio object.
+// ------------------------------------------------
+// Confidence
+// ------------------------------------------------
+//
+// Confidence is calculated when a stock is added
+// and updated by the appropriate write flow.
+// Do NOT recalculate it during GET requests.
+//
+// This prevents duplicate confidence calculations
+// whenever the frontend loads the portfolio.
 
             // ------------------------------------------------
             // Return clean JSON

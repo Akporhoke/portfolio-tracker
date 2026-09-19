@@ -1,6 +1,6 @@
 const axios = require('axios');
 const PriceSnapshot = require('../models/PriceSnapshot');
-
+const ProviderState = require('../models/ProviderState');
 // ============================================================
 // API CONFIG
 // ============================================================
@@ -23,6 +23,8 @@ const historyCache = new Map();
 
 // Prevent duplicate Twelve Data requests
 const twelveDataInFlight = new Map();
+const investoInFlight = new Map();
+const investoHistoryInFlight = new Map();
 
 // ============================================================
 // TWELVE DATA REQUEST QUEUE
@@ -99,30 +101,215 @@ let companyListCache = null;
 let companyListCacheTime = 0;
 let companyListRequest = null;
 
+
+
 // ============================================================
-// INVESTO RATE LIMIT / COOLDOWN
+// NGN MARKET QUOTA / COOLDOWN
+// ============================================================
+// ============================================================
+// PROVIDER PERSISTENT COOLDOWN
 // ============================================================
 
-let investoCooldownUntil = 0;
+async function getProviderState(provider) {
+    try {
+        return await ProviderState.findOne({
+            provider
+        }).lean();
+    } catch (error) {
+        console.error(
+            `[getProviderState] ${provider}:`,
+            error.message
+        );
 
-const INVESTO_COOLDOWN_MS =
-    60 * 60 * 1000;
-
-function isInvestoCoolingDown() {
-    return Date.now() <
-        investoCooldownUntil;
+        return null;
+    }
 }
 
-function activateInvestoCooldown() {
-    investoCooldownUntil =
-        Date.now() +
-        INVESTO_COOLDOWN_MS;
+async function isProviderCoolingDown(provider) {
+    const state =
+        await getProviderState(provider);
 
-    console.warn(
-        '⏸️ Investo rate limit detected. No Investo requests will be made for 1 hour.'
+    if (
+        !state ||
+        !state.cooldownUntil
+    ) {
+        return false;
+    }
+
+    const cooldownUntil =
+        new Date(
+            state.cooldownUntil
+        ).getTime();
+
+    if (
+        Date.now() >= cooldownUntil
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+async function activateProviderCooldown(
+    provider,
+    cooldownUntil,
+    reason
+) {
+    try {
+        await ProviderState.findOneAndUpdate(
+            { provider },
+            {
+                provider,
+                status: 'quota_exceeded',
+                cooldownUntil:
+                    new Date(cooldownUntil),
+                lastError:
+                    reason || 'quota_exceeded',
+                updatedAt: new Date()
+            },
+            {
+                upsert: true,
+                returnDocument: 'after'
+            }
+        );
+
+        console.warn(
+            `⏸️ ${provider} cooldown active until ${new Date(
+                cooldownUntil
+            ).toISOString()}`
+        );
+    } catch (error) {
+        console.error(
+            `[activateProviderCooldown] ${provider}:`,
+            error.message
+        );
+    }
+}
+
+async function clearProviderCooldown(
+    provider
+) {
+    try {
+        await ProviderState.findOneAndUpdate(
+            { provider },
+            {
+                status: 'available',
+                cooldownUntil: null,
+                lastError: '',
+                updatedAt: new Date()
+            },
+            {
+                upsert: true
+            }
+        );
+    } catch (error) {
+        console.error(
+            `[clearProviderCooldown] ${provider}:`,
+            error.message
+        );
+    }
+}
+
+// ============================================================
+// NGN MARKET QUOTA / COOLDOWN
+// ============================================================
+
+function getNextMonthStartUTC() {
+    const now = new Date();
+
+    return new Date(
+        Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth() + 1,
+            1,
+            0,
+            0,
+            0,
+            0
+        )
+    ).getTime();
+}
+
+function isNGNMarketQuotaExceeded(data) {
+    const code =
+        data?.error?.code ||
+        data?.code ||
+        data?.errorCode;
+
+    const message =
+        String(
+            data?.error?.message ||
+            data?.error?.detail ||
+            data?.message ||
+            data?.error ||
+            ''
+        ).toLowerCase();
+
+    return (
+        code === 'QUOTA_EXCEEDED' ||
+        code === 'quota_exceeded' ||
+        message.includes(
+            'monthly call limit'
+        ) ||
+        message.includes(
+            'quota exceeded'
+        )
     );
 }
 
+async function isNGNMarketCoolingDown() {
+    return await isProviderCoolingDown(
+        'ngnmarket'
+    );
+}
+
+async function activateNGNMarketQuotaCooldown() {
+    const cooldownUntil =
+        getNextMonthStartUTC();
+
+    await activateProviderCooldown(
+        'ngnmarket',
+        cooldownUntil,
+        'monthly_quota_exceeded'
+    );
+}
+
+// ============================================================
+// INVESTO DAILY QUOTA / COOLDOWN
+// ============================================================
+
+function getNextInvestoResetUTC() {
+    const now = new Date();
+
+    return new Date(
+        Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() + 1,
+            0,
+            0,
+            0,
+            0
+        )
+    ).getTime();
+}
+
+async function isInvestoCoolingDown() {
+    return await isProviderCoolingDown(
+        'investo'
+    );
+}
+
+async function activateInvestoCooldown() {
+    const cooldownUntil =
+        getNextInvestoResetUTC();
+
+    await activateProviderCooldown(
+        'investo',
+        cooldownUntil,
+        'daily_quota_exceeded'
+    );
+}
 // ============================================================
 // API KEYS
 // ============================================================
@@ -331,8 +518,15 @@ async function recordSnapshot(
 // ============================================================
 // NGN MARKET — COMPANY LIST
 // ============================================================
-
 async function getNGNMarketCompanies() {
+    if (await isNGNMarketCoolingDown()) {
+        console.log(
+            '⏸️ NGN Market quota cooldown active. Skipping NGN Market.'
+        );
+
+        return [];
+    }
+
     const token =
         getNGNMarketToken();
 
@@ -381,18 +575,24 @@ async function getNGNMarketCompanies() {
                     );
 
                 const body =
-                    response.data;
+    response.data;
 
-                if (
-                    body?.success === false
-                ) {
-                    console.error(
-                        '[getNGNMarketCompanies] API error:',
-                        body.error || body
-                    );
+if (isNGNMarketQuotaExceeded(body)) {
+    await activateNGNMarketQuotaCooldown();
 
-                    return [];
-                }
+    return [];
+}
+
+if (
+    body?.success === false
+) {
+    console.error(
+        '[getNGNMarketCompanies] API error:',
+        body.error || body
+    );
+
+    return [];
+}
 
                 let companies = [];
 
@@ -433,6 +633,10 @@ async function getNGNMarketCompanies() {
                     `✓ NGN Market returned ${companies.length} NGX companies`
                 );
 
+                await clearProviderCooldown(
+    'ngnmarket'
+);
+
                 if (body?.meta) {
                     console.log(
                         `ℹ️ NGN Market quota: ${
@@ -447,17 +651,26 @@ async function getNGNMarketCompanies() {
 
                 return companies;
             } catch (error) {
-                const responseData =
-                    error.response?.data;
+    const responseData =
+        error.response?.data;
 
-                console.error(
-                    '[getNGNMarketCompanies] Error:',
-                    responseData ||
-                    error.message
-                );
+    if (
+        isNGNMarketQuotaExceeded(
+            responseData
+        )
+    ) {
+await activateNGNMarketQuotaCooldown();
+        return [];
+    }
 
-                return [];
-            } finally {
+    console.error(
+        '[getNGNMarketCompanies] Error:',
+        responseData ||
+        error.message
+    );
+
+    return [];
+}finally {
                 companyListRequest = null;
             }
         })();
@@ -552,14 +765,13 @@ async function getNGNMarketPrice(
 // ============================================================
 // INVESTO — CURRENT PRICE
 // ============================================================
-
 async function getInvestoCurrentPrice(
     ticker
 ) {
     const symbol =
         normalizeTicker(ticker);
 
-    if (isInvestoCoolingDown()) {
+    if (await isInvestoCoolingDown()) {
         console.log(
             `⏸️ Investo cooldown active. Skipping ${symbol}`
         );
@@ -578,174 +790,205 @@ async function getInvestoCurrentPrice(
         return null;
     }
 
-    try {
+    // --------------------------------------------------------
+    // SHARE IDENTICAL IN-FLIGHT REQUESTS
+    // --------------------------------------------------------
+
+    if (investoInFlight.has(symbol)) {
         console.log(
-            `→ Requesting Investo current price for ${symbol}`
+            `↳ Sharing in-flight Investo request for ${symbol}`
         );
 
-        const response =
-            await axios.get(
-                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                {
-                    params: {
-                        interval: 'latest',
-                        provenance: 1
-                    },
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    },
-                    timeout: 15000
+        return await investoInFlight.get(symbol);
+    }
+
+    const requestPromise =
+        (async () => {
+            try {
+                console.log(
+                    `→ Requesting Investo current price for ${symbol}`
+                );
+
+                const response =
+                    await axios.get(
+                        `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                        {
+                            params: {
+                                interval: 'latest',
+                                provenance: 1
+                            },
+                            headers: {
+                                Authorization:
+                                    `Bearer ${token}`
+                            },
+                            timeout: 15000
+                        }
+                    );
+
+                const body =
+                    response.data;
+
+                if (body?.ok === false) {
+                    const code =
+                        body?.error?.code;
+
+                    if (
+                        code === 'rate_limited'
+                    ) {
+                        await activateInvestoCooldown();
+                        return null;
+                    }
+
+                    if (
+                        code === 'unknown_symbol'
+                    ) {
+                        console.warn(
+                            `⚠️ Investo has no current-price data for ${symbol}`
+                        );
+
+                        return null;
+                    }
+
+                    if (
+                        code ===
+                            'missing_api_key' ||
+                        code ===
+                            'invalid_api_key' ||
+                        code ===
+                            'revoked_api_key'
+                    ) {
+                        console.error(
+                            `❌ Investo authentication error for ${symbol}:`,
+                            body.error?.message
+                        );
+
+                        return null;
+                    }
+
+                    console.error(
+                        `[getInvestoCurrentPrice] ${symbol}:`,
+                        body.error || body
+                    );
+
+                    return null;
                 }
-            );
 
-        const body =
-            response.data;
+                const data =
+                    body?.data;
 
-        if (body?.ok === false) {
-            const code =
-                body?.error?.code;
+                let price = null;
 
-            if (
-                code === 'rate_limited'
-            ) {
-                activateInvestoCooldown();
-                return null;
-            }
+                if (
+                    data &&
+                    !Array.isArray(data)
+                ) {
+                    price =
+                        parseNumber(
+                            data.close ??
+                            data.price ??
+                            data.currentPrice ??
+                            data.lastPrice
+                        );
+                }
 
-            if (
-                code === 'unknown_symbol'
-            ) {
-                console.warn(
-                    `⚠️ Investo has no current-price data for ${symbol}`
+                if (
+                    !isValidPrice(price) &&
+                    Array.isArray(data) &&
+                    data.length
+                ) {
+                    const latest =
+                        data[data.length - 1];
+
+                    price =
+                        parseNumber(
+                            latest?.close ??
+                            latest?.price ??
+                            latest?.currentPrice ??
+                            latest?.lastPrice
+                        );
+                }
+
+                if (!isValidPrice(price)) {
+                    console.warn(
+                        `⚠️ Investo has no current-price data for ${symbol}`
+                    );
+
+                    return null;
+                }
+
+                console.log(
+                    `✓ Investo current price for ${symbol}: ${price}`
                 );
 
-                return null;
-            }
+                await clearProviderCooldown(
+                    'investo'
+                );
 
-            if (
-                code ===
-                    'missing_api_key' ||
-                code ===
-                    'invalid_api_key' ||
-                code ===
-                    'revoked_api_key'
-            ) {
+                await recordSnapshot(
+                    symbol,
+                    price,
+                    'investo'
+                );
+
+                return price;
+
+            } catch (error) {
+                const responseData =
+                    error.response?.data;
+
+                const errorCode =
+                    responseData?.error?.code;
+
+                if (
+                    error.response?.status === 429 ||
+                    errorCode === 'rate_limited'
+                ) {
+                    await activateInvestoCooldown();
+                }
+
+                if (
+                    error.response?.status === 404 ||
+                    errorCode === 'unknown_symbol'
+                ) {
+                    console.warn(
+                        `⚠️ Investo has no current-price data for ${symbol}`
+                    );
+
+                    return null;
+                }
+
+                if (
+                    error.response?.status === 401 ||
+                    error.response?.status === 403
+                ) {
+                    console.error(
+                        `❌ Investo authentication/permission error for ${symbol}:`,
+                        responseData ||
+                        error.message
+                    );
+
+                    return null;
+                }
+
                 console.error(
-                    `❌ Investo authentication error for ${symbol}:`,
-                    body.error?.message
+                    `[getInvestoCurrentPrice] ${symbol}:`,
+                    responseData ||
+                    error.message
                 );
 
                 return null;
             }
+        })();
 
-            console.error(
-                `[getInvestoCurrentPrice] ${symbol}:`,
-                body.error || body
-            );
+    investoInFlight.set(
+        symbol,
+        requestPromise
+    );
 
-            return null;
-        }
-
-        const data =
-            body?.data;
-
-        let price = null;
-
-        if (
-            data &&
-            !Array.isArray(data)
-        ) {
-            price =
-                parseNumber(
-                    data.close ??
-                    data.price ??
-                    data.currentPrice ??
-                    data.lastPrice
-                );
-        }
-
-        if (
-            !isValidPrice(price) &&
-            Array.isArray(data) &&
-            data.length
-        ) {
-            const latest =
-                data[data.length - 1];
-
-            price =
-                parseNumber(
-                    latest?.close ??
-                    latest?.price ??
-                    latest?.currentPrice ??
-                    latest?.lastPrice
-                );
-        }
-
-        if (!isValidPrice(price)) {
-            console.warn(
-                `⚠️ Investo has no current-price data for ${symbol}`
-            );
-
-            return null;
-        }
-
-        console.log(
-            `✓ Investo current price for ${symbol}: ${price}`
-        );
-
-        await recordSnapshot(
-            symbol,
-            price,
-            'investo'
-        );
-
-        return price;
-    } catch (error) {
-        const responseData =
-            error.response?.data;
-
-        const errorCode =
-            responseData?.error?.code;
-
-        if (
-            error.response?.status === 429 ||
-            errorCode === 'rate_limited'
-        ) {
-            activateInvestoCooldown();
-        }
-
-        if (
-            error.response?.status === 404 ||
-            errorCode === 'unknown_symbol'
-        ) {
-            console.warn(
-                `⚠️ Investo has no current-price data for ${symbol}`
-            );
-
-            return null;
-        }
-
-        if (
-            error.response?.status === 401 ||
-            error.response?.status === 403
-        ) {
-            console.error(
-                `❌ Investo authentication/permission error for ${symbol}:`,
-                responseData ||
-                error.message
-            );
-
-            return null;
-        }
-
-        console.error(
-            `[getInvestoCurrentPrice] ${symbol}:`,
-            responseData ||
-            error.message
-        );
-
-        return null;
+    try {
+        return await requestPromise;
+    } finally {
+        investoInFlight.delete(symbol);
     }
 }
 
@@ -830,7 +1073,7 @@ async function getInvestoHistory(
     const symbol =
         normalizeTicker(ticker);
 
-    if (isInvestoCoolingDown()) {
+    if (await isInvestoCoolingDown()) {
         console.log(
             `⏸️ Investo cooldown active. Skipping history for ${symbol}`
         );
@@ -892,171 +1135,206 @@ async function getInvestoHistory(
         return cached;
     }
 
-    try {
+    // --------------------------------------------------------
+    // SHARE IDENTICAL IN-FLIGHT HISTORY REQUESTS
+    // --------------------------------------------------------
+
+    if (investoHistoryInFlight.has(cacheKey)) {
         console.log(
-            `→ Requesting Investo history for ${symbol}: ${from} → ${end}`
+            `↳ Sharing in-flight Investo history request for ${symbol}`
         );
 
-        const response =
-            await axios.get(
-                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                {
-                    params: {
-                        from,
-                        to: end,
-                        provenance: 1
-                    },
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    },
-                    timeout: 20000
+        return await investoHistoryInFlight.get(
+            cacheKey
+        );
+    }
+
+    const requestPromise =
+        (async () => {
+            try {
+                console.log(
+                    `→ Requesting Investo history for ${symbol}: ${from} → ${end}`
+                );
+
+                const response =
+                    await axios.get(
+                        `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                        {
+                            params: {
+                                from,
+                                to: end,
+                                provenance: 1
+                            },
+                            headers: {
+                                Authorization:
+                                    `Bearer ${token}`
+                            },
+                            timeout: 20000
+                        }
+                    );
+
+                const body =
+                    response.data;
+
+                if (body?.ok === false) {
+                    const code =
+                        body?.error?.code;
+
+                    if (
+                        code === 'rate_limited'
+                    ) {
+                        await activateInvestoCooldown();
+                        return [];
+                    }
+
+                    if (
+                        code === 'unknown_symbol'
+                    ) {
+                        console.warn(
+                            `⚠️ Investo has no historical data for ${symbol}.`
+                        );
+
+                        return [];
+                    }
+
+                    if (
+                        code ===
+                            'missing_api_key' ||
+                        code ===
+                            'invalid_api_key' ||
+                        code ===
+                            'revoked_api_key'
+                    ) {
+                        console.error(
+                            `❌ Investo authentication error while loading ${symbol}:`,
+                            body.error?.message
+                        );
+
+                        return [];
+                    }
+
+                    console.error(
+                        `[getInvestoHistory] ${symbol}:`,
+                        body.error || body
+                    );
+
+                    return [];
                 }
-            );
 
-        const body =
-            response.data;
+                const rawRows =
+                    Array.isArray(body?.data)
+                        ? body.data
+                        : Array.isArray(body)
+                            ? body
+                            : Array.isArray(
+                                body?.history
+                            )
+                                ? body.history
+                                : Array.isArray(
+                                    body?.results
+                                )
+                                    ? body.results
+                                    : [];
 
-        if (body?.ok === false) {
-            const code =
-                body?.error?.code;
-
-            if (
-                code === 'rate_limited'
-            ) {
-                activateInvestoCooldown();
-                return [];
-            }
-
-            if (
-                code === 'unknown_symbol'
-            ) {
-                console.warn(
-                    `⚠️ Investo has no historical data for ${symbol}.`
-                );
-
-                return [];
-            }
-
-            if (
-                code ===
-                    'missing_api_key' ||
-                code ===
-                    'invalid_api_key' ||
-                code ===
-                    'revoked_api_key'
-            ) {
-                console.error(
-                    `❌ Investo authentication error while loading ${symbol}:`,
-                    body.error?.message
-                );
-
-                return [];
-            }
-
-            console.error(
-                `[getInvestoHistory] ${symbol}:`,
-                body.error || body
-            );
-
-            return [];
-        }
-
-        const rawRows =
-            Array.isArray(body?.data)
-                ? body.data
-                : Array.isArray(body)
-                    ? body
-                    : Array.isArray(
-                        body?.history
+                const rows =
+                    normalizeHistoricalRows(
+                        rawRows
                     )
-                        ? body.history
-                        : Array.isArray(
-                            body?.results
+                        .filter(
+                            row =>
+                                row.date >= from &&
+                                row.date <= end
                         )
-                            ? body.results
-                            : [];
-
-        const rows =
-            normalizeHistoricalRows(
-                rawRows
-            )
-                .filter(
-                    row =>
-                        row.date >= from &&
-                        row.date <= end
-                )
-                .sort(
-                    (a, b) =>
-                        a.date.localeCompare(
-                            b.date
+                        .sort(
+                            (a, b) =>
+                                a.date.localeCompare(
+                                    b.date
+                                )
                         )
-                )
-                .slice(-safeDays);
+                        .slice(-safeDays);
 
-        cacheSet(
-            historyCache,
-            cacheKey,
-            rows,
-            HISTORY_CACHE_TTL
+                cacheSet(
+                    historyCache,
+                    cacheKey,
+                    rows,
+                    HISTORY_CACHE_TTL
+                );
+
+                console.log(
+                    `✓ Investo history for ${symbol}: ${rows.length} real trading days`
+                );
+
+                await clearProviderCooldown(
+                    'investo'
+                );
+
+                if (rows.length) {
+                    console.log(
+                        `  ↳ ${rows[0].date} → ${rows[rows.length - 1].date}`
+                    );
+                }
+
+                return rows;
+
+            } catch (error) {
+                const responseData =
+                    error.response?.data;
+
+                const errorCode =
+                    responseData?.error?.code;
+
+                if (
+                    error.response?.status === 429 ||
+                    errorCode === 'rate_limited'
+                ) {
+                    await activateInvestoCooldown();
+                }
+
+                if (
+                    error.response?.status === 404 ||
+                    errorCode === 'unknown_symbol'
+                ) {
+                    console.warn(
+                        `⚠️ Investo has no historical data for ${symbol}.`
+                    );
+
+                    return [];
+                }
+
+                if (
+                    error.response?.status === 401 ||
+                    error.response?.status === 403
+                ) {
+                    console.error(
+                        `❌ Investo authentication/permission error for ${symbol}:`,
+                        responseData ||
+                        error.message
+                    );
+
+                    return [];
+                }
+
+                console.error(
+                    `[getInvestoHistory] ${symbol}:`,
+                    responseData ||
+                    error.message
+                );
+
+                return [];
+            }
+        })();
+
+    investoHistoryInFlight.set(
+        cacheKey,
+        requestPromise
+    );
+
+    try {
+        return await requestPromise;
+    } finally {
+        investoHistoryInFlight.delete(
+            cacheKey
         );
-
-        console.log(
-            `✓ Investo history for ${symbol}: ${rows.length} real trading days`
-        );
-
-        if (rows.length) {
-            console.log(
-                `  ↳ ${rows[0].date} → ${rows[rows.length - 1].date}`
-            );
-        }
-
-        return rows;
-    } catch (error) {
-        const responseData =
-            error.response?.data;
-
-        const errorCode =
-            responseData?.error?.code;
-
-        if (
-            error.response?.status === 429 ||
-            errorCode === 'rate_limited'
-        ) {
-            activateInvestoCooldown();
-        }
-
-        if (
-            error.response?.status === 404 ||
-            errorCode === 'unknown_symbol'
-        ) {
-            console.warn(
-                `⚠️ Investo has no historical data for ${symbol}.`
-            );
-
-            return [];
-        }
-
-        if (
-            error.response?.status === 401 ||
-            error.response?.status === 403
-        ) {
-            console.error(
-                `❌ Investo authentication/permission error for ${symbol}:`,
-                responseData ||
-                error.message
-            );
-
-            return [];
-        }
-
-        console.error(
-            `[getInvestoHistory] ${symbol}:`,
-            responseData ||
-            error.message
-        );
-
-        return [];
     }
 }
 
@@ -1751,5 +2029,6 @@ module.exports = {
     getPrice,
     getPriceHistory,
     getInvestoHistory,
-    getQuote
+    getQuote,
+    getNGNMarketCompanies
 };

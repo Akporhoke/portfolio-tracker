@@ -299,11 +299,12 @@ function setupEventListeners() {
             'input',
             e =>
                 handleAutocomplete(
-                    e,
-                    'autocompleteDropdown',
-                    'addTicker',
-                    'addSector'
-                )
+    e,
+    'autocompleteDropdown',
+    'addTicker',
+    'addSector',
+    'addMarket'
+)
         );
     }
 
@@ -315,13 +316,14 @@ function setupEventListeners() {
         watchTicker.addEventListener(
             'input',
             e =>
-                handleAutocomplete(
-                    e,
-                    'autocompleteDropdown2',
-                    'watchTicker',
-                    'watchSector'
-                )
-        );
+   handleAutocomplete(
+    e,
+    'autocompleteDropdown2',
+    'watchTicker',
+    'watchSector',
+    'watchMarket'
+)
+);
     }
 
 
@@ -2710,194 +2712,199 @@ function validatePrice(e) {
    AUTOCOMPLETE
    ============================================ */
 
+let autocompleteTimer = null;
 async function handleAutocomplete(
     e,
     dropdownId,
     inputId,
-    sectorId
+    sectorId,
+    marketId
 ) {
-
     const query =
-        e.target.value.toUpperCase();
-
+        e.target.value.trim();
 
     const dropdown =
         document.getElementById(
             dropdownId
         );
 
-
     if (!dropdown) {
         return;
     }
 
-
-    if (!query) {
-
-        dropdown.classList.remove(
-            'active'
-        );
-
-        return;
-    }
-
-
-    const allStocks = [
-
-        {
-            ticker: 'GTCO',
-            name: 'Guaranty Trust',
-            sector: 'Finance',
-            market: 'NGX'
-        },
-
-        {
-            ticker: 'NSRNG',
-            name: 'Nestle Nigeria',
-            sector: 'Consumer',
-            market: 'NGX'
-        },
-
-        {
-            ticker: 'AAPL',
-            name: 'Apple',
-            sector: 'Tech',
-            market: 'US'
-        },
-
-        {
-            ticker: 'MSFT',
-            name: 'Microsoft',
-            sector: 'Tech',
-            market: 'US'
-        },
-
-        {
-            ticker: 'SEPLAT',
-            name: 'Seplat',
-            sector: 'Energy',
-            market: 'NGX'
-        },
-
-        {
-            ticker: 'AMZN',
-            name: 'Amazon',
-            sector: 'Consumer',
-            market: 'US'
-        }
-    ];
-
-
-    const matches =
-        allStocks.filter(
-            s =>
-                s.ticker.includes(query)
-        );
-
-
-    if (
-        matches.length === 0
-    ) {
-
-        dropdown.classList.remove(
-            'active'
-        );
-
-        return;
-    }
-
-
-    dropdown.innerHTML =
-        matches
-            .map(
-                (stock, i) => `
-                    <div
-                        class="autocomplete-item"
-                        onclick="selectStock(
-                            '${stock.ticker}',
-                            '${stock.sector}',
-                            '${inputId}',
-                            '${sectorId}'
-                        )"
-                    >
-
-                        <div
-                            class="autocomplete-avatar"
-                            style="background: ${
-                                API_COLORS[
-                                    i %
-                                    API_COLORS.length
-                                ]
-                            }"
-                        >
-                            ${escapeHtml(
-                                stock.ticker[0]
-                            )}
-                        </div>
-
-                        <div class="autocomplete-content">
-
-                            <p class="autocomplete-ticker">
-                                ${escapeHtml(
-                                    stock.ticker
-                                )}
-                            </p>
-
-                            <p class="autocomplete-name">
-                                ${escapeHtml(
-                                    stock.name
-                                )}
-                            </p>
-
-                        </div>
-
-                    </div>
-                `
-            )
-            .join('');
-
-
-    dropdown.classList.add(
-        'active'
+    // Clear previous timer
+    clearTimeout(
+        autocompleteTimer
     );
+
+    // Hide dropdown if input is empty
+    if (!query) {
+        dropdown.classList.remove(
+            'active'
+        );
+
+        dropdown.innerHTML = '';
+
+        return;
+    }
+
+    // Debounce API request
+    autocompleteTimer =
+        setTimeout(
+            async () => {
+                try {
+                    const response =
+                        await fetch(
+                            `${API_BASE}/stocks/search?q=${encodeURIComponent(query)}`
+                        );
+
+                    if (!response.ok) {
+                        throw new Error(
+                            'Stock search failed'
+                        );
+                    }
+
+                    const data =
+                        await response.json();
+
+                    const matches =
+                        data.results || [];
+
+                    // No results
+                    if (
+                        matches.length === 0
+                    ) {
+                        dropdown.classList.remove(
+                            'active'
+                        );
+
+                        dropdown.innerHTML = '';
+
+                        return;
+                    }
+
+                    dropdown.innerHTML =
+                        matches
+                            .map(
+                                (
+                                    stock,
+                                    i
+                                ) => `
+                                    <div
+                                        class="autocomplete-item"
+                                        onclick="selectStock(
+                                            '${escapeHtml(stock.ticker)}',
+                                            '${escapeHtml(stock.sector || '')}',
+                                            '${escapeHtml(stock.market || '')}',
+                                            '${inputId}',
+                                            '${sectorId}',
+                                            '${marketId}'
+                                        )"
+                                    >
+                                        <div
+                                            class="autocomplete-avatar"
+                                            style="background: ${
+                                                API_COLORS[
+                                                    i %
+                                                    API_COLORS.length
+                                                ]
+                                            }"
+                                        >
+                                            ${escapeHtml(
+                                                stock.ticker[0]
+                                            )}
+                                        </div>
+
+                                        <div class="autocomplete-content">
+                                            <p class="autocomplete-ticker">
+                                                ${escapeHtml(
+                                                    stock.ticker
+                                                )}
+                                            </p>
+
+                                            <p class="autocomplete-name">
+                                                ${escapeHtml(
+                                                    stock.name
+                                                )}
+                                            </p>
+
+                                            <p class="autocomplete-meta">
+                                                ${escapeHtml(
+                                                    stock.market || ''
+                                                )}
+                                                ${
+                                                    stock.sector
+                                                        ? ` • ${escapeHtml(stock.sector)}`
+                                                        : ''
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+                                `
+                            )
+                            .join('');
+
+                    dropdown.classList.add(
+                        'active'
+                    );
+
+                } catch (error) {
+                    console.error(
+                        'Autocomplete error:',
+                        error
+                    );
+
+                    dropdown.classList.remove(
+                        'active'
+                    );
+                }
+            },
+            300
+        );
 }
+
 
 
 function selectStock(
     ticker,
     sector,
+    market,
     inputId,
-    sectorId
+    sectorId,
+    marketId
 ) {
-
     const input =
         document.getElementById(
             inputId
         );
-
 
     const sectorInput =
         document.getElementById(
             sectorId
         );
 
+    const marketInput =
+        document.getElementById(
+            marketId
+        );
 
     if (input) {
         input.value = ticker;
     }
 
+    if (marketInput) {
+        marketInput.value = market;
+    }
 
     if (sectorInput) {
         sectorInput.value = sector;
     }
-
 
     const dropdown =
         input?.parentElement
             ?.querySelector(
                 '.autocomplete-dropdown'
             );
-
 
     if (dropdown) {
         dropdown.classList.remove(
