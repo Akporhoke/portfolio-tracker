@@ -874,11 +874,63 @@ body {
     background: #90EE90;
 }
 
-.goal-percent {
+.goal-progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-top: 8px;
+
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
-    margin: 0;
+
+    color: rgba(255, 255, 255, 0.82);
 }
+
+.goal-amount-text {
+    font-weight: 600;
+}
+
+.goal-progress-info span:last-child {
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.goal-remaining {
+    margin: 6px 0 0;
+
+    font-size: 10px;
+
+    color: rgba(255, 255, 255, 0.58);
+
+    text-align: right;
+
+    opacity: 0;
+
+    max-height: 0;
+
+    overflow: hidden;
+
+    transform: translateY(-4px);
+
+    transition:
+        opacity 0.2s ease,
+        max-height 0.2s ease,
+        transform 0.2s ease;
+}
+
+.goal-section.show-remaining
+.goal-remaining {
+    opacity: 1;
+
+    max-height: 20px;
+
+    transform: translateY(0);
+}
+
+.goal-section {
+    cursor: pointer;
+}
+
 
 /* ============================================
    MINI CARDS
@@ -2918,3 +2970,343 @@ body {
         transform: scale(1);
     }
 } 
+
+/* ============================================
+   WATCHLIST ANALYSIS ACTION BUTTONS
+   ============================================ */
+
+.watchlist-analysis-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.watchlist-analysis-btn {
+    min-height: 40px;
+
+    padding: 0 14px;
+
+    border-radius: 10px;
+
+    border: 1px solid transparent;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease,
+        border-color 0.15s ease;
+}
+
+
+/* Add to Portfolio */
+.watchlist-analysis-actions
+button:first-child {
+
+    background:
+        linear-gradient(
+            135deg,
+            #087F73 0%,
+            #0A9486 100%
+        );
+
+    color: #FFFFFF;
+
+    border-color:
+        rgba(8, 127, 115, 0.25);
+
+    box-shadow:
+        0 4px 10px
+        rgba(8, 127, 115, 0.16);
+}
+
+
+.watchlist-analysis-actions
+button:first-child:hover {
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 14px
+        rgba(8, 127, 115, 0.22);
+}
+
+
+.watchlist-analysis-actions
+button:first-child:active {
+
+    transform: scale(0.98);
+}
+
+
+/* Remove from Watchlist */
+.watchlist-analysis-actions
+button:last-child {
+
+    background: #FFFFFF;
+
+    color: #D32F2F;
+
+    border-color:
+        rgba(211, 47, 47, 0.20);
+
+    box-shadow:
+        0 3px 8px
+        rgba(0, 0, 0, 0.05);
+}
+
+
+.watchlist-analysis-actions
+button:last-child:hover {
+
+    background: #FFF5F5;
+
+    border-color:
+        rgba(211, 47, 47, 0.35);
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 5px 12px
+        rgba(211, 47, 47, 0.10);
+}
+
+
+.watchlist-analysis-actions
+button:last-child:active {
+
+    transform: scale(0.98);
+}
+
+
+@media (max-width: 600px) {
+
+    .watchlist-analysis-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .watchlist-analysis-btn {
+        width: 100%;
+        min-height: 42px;
+    }
+}
+
+/* ============================================
+   WATCHLIST ACTION BUTTONS
+   ============================================ */
+
+.watchlist-analysis-btn {
+    position: relative;
+
+    min-height: 40px;
+
+    border-radius: 10px;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease,
+        border-color 0.15s ease,
+        opacity 0.15s ease;
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+
+/* --------------------------------------------
+   Button content
+   -------------------------------------------- */
+
+.watchlist-btn-content,
+.watchlist-btn-loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+}
+
+
+.watchlist-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 13px;
+    line-height: 1;
+}
+
+
+/* --------------------------------------------
+   NGX ADD BUTTON
+   -------------------------------------------- */
+
+.watchlist-add-ngx {
+    background:
+        linear-gradient(
+            135deg,
+            #087F73 0%,
+            #0A9486 100%
+        );
+
+    color: #FFFFFF;
+
+    border: 1px solid
+        rgba(255, 255, 255, 0.10);
+
+    box-shadow:
+        0 4px 10px
+        rgba(8, 127, 115, 0.18);
+}
+
+
+.watchlist-add-ngx:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 14px
+        rgba(8, 127, 115, 0.24);
+}
+
+
+/* --------------------------------------------
+   US ADD BUTTON
+   -------------------------------------------- */
+
+.watchlist-add-us {
+    background:
+        linear-gradient(
+            135deg,
+            #1E4F9A 0%,
+            #2D73C5 100%
+        );
+
+    color: #FFFFFF;
+
+    border: 1px solid
+        rgba(255, 255, 255, 0.10);
+
+    box-shadow:
+        0 4px 10px
+        rgba(30, 79, 154, 0.18);
+}
+
+
+.watchlist-add-us:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 6px 14px
+        rgba(30, 79, 154, 0.24);
+}
+
+
+/* --------------------------------------------
+   REMOVE BUTTON
+   -------------------------------------------- */
+
+.watchlist-analysis-actions
+.btn-delete {
+    background: #FFFFFF;
+
+    color: #D32F2F;
+
+    border: 1px solid
+        rgba(211, 47, 47, 0.20);
+
+    box-shadow:
+        0 3px 8px
+        rgba(0, 0, 0, 0.05);
+}
+
+
+.watchlist-analysis-actions
+.btn-delete:hover {
+    background: #FFF5F5;
+
+    border-color:
+        rgba(211, 47, 47, 0.35);
+
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 5px 12px
+        rgba(211, 47, 47, 0.10);
+}
+
+
+/* --------------------------------------------
+   ACTIVE
+   -------------------------------------------- */
+
+.watchlist-analysis-btn:active {
+    transform: scale(0.98);
+}
+
+
+/* --------------------------------------------
+   DISABLED / LOADING
+   -------------------------------------------- */
+
+.watchlist-analysis-btn:disabled {
+    opacity: 0.65;
+
+    cursor: not-allowed;
+
+    transform: none !important;
+
+    box-shadow: none !important;
+}
+
+
+/* --------------------------------------------
+   LOADING SPINNER
+   -------------------------------------------- */
+
+.watchlist-btn-spinner {
+    width: 12px;
+    height: 12px;
+
+    border: 2px solid
+        currentColor;
+
+    border-right-color:
+        transparent;
+
+    border-radius: 50%;
+
+    animation:
+        watchlistButtonSpin
+        0.7s linear infinite;
+}
+
+
+@keyframes watchlistButtonSpin {
+
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

@@ -30,7 +30,7 @@
         <!-- Header -->
         <div class="header">
             <div class="greeting">
-                <p class="hello">Good Morning,</p>
+                <p class="hello" id="greetingText">Good Morning,</p>
                 <h1 class="name" id="userName">Guest</h1>
             </div>
             <div class="avatar" id="avatar">G</div>
@@ -89,8 +89,12 @@
     <div class="top-performer-main">
         <div>
             <p class="top-performer-ticker" id="topPerformerTicker">—</p>
-            <p class="top-performer-subtitle">Strongest holding</p>
-        </div>
+<p
+    class="top-performer-subtitle"
+    id="topPerformerSubtitle"
+>
+    Best return since entry
+</p>        </div>
 
         <p class="top-performer-change" id="topPerformerChange">+0%</p>
     </div>
@@ -132,13 +136,36 @@
             </div>
 
             <!-- Goal Progress -->
-            <div class="goal-section">
-                <p class="goal-label">Goal Progress</p>
-                <div class="goal-bar">
-                    <div class="goal-progress" id="goalProgress" style="width: 85%;"></div>
-                </div>
-                <p class="goal-percent" id="goalPercent">85% achieved</p>
-            </div>
+           <div
+    class="goal-section"
+    id="goalSection"
+>
+    <p class="goal-label">Goal Progress</p>
+
+    <div class="goal-bar">
+        <div
+            class="goal-progress"
+            id="goalProgress"
+        ></div>
+    </div>
+
+    <div class="goal-progress-info">
+        <span id="goalAmountText">
+            ₦0 of ₦0
+        </span>
+
+        <span id="goalPercent">
+            0%
+        </span>
+    </div>
+
+    <p
+        class="goal-remaining"
+        id="goalRemaining"
+    >
+        ₦0 remaining
+    </p>
+</div>
         </div>
 
         <!-- Mini Portfolio Cards (NSE & US) -->
@@ -228,12 +255,52 @@
 
                 <!-- ← NEW: search/sort toolbar -->
                 <div class="list-toolbar">
-                    <input type="text" id="watchlistSearchInput" placeholder="Search ticker" aria-label="Search watchlist by ticker" autocomplete="off">
-                    <select id="watchlistSortSelect" aria-label="Sort watchlist">
-                        <option value="date-desc">Newest first</option>
-                        <option value="ticker-asc">Ticker A–Z</option>
-                    </select>
-                </div>
+    <input
+        type="text"
+        id="watchlistSearchInput"
+        placeholder="Search ticker"
+        aria-label="Search watchlist by ticker"
+        autocomplete="off"
+    >
+
+    <select
+        id="watchlistSortSelect"
+        aria-label="Sort watchlist"
+    >
+        <option value="date-desc">
+            Newest first
+        </option>
+
+        <option value="ticker-asc">
+            Ticker A–Z
+        </option>
+
+        <option value="confidence-desc">
+            Confidence: High → Low
+        </option>
+
+        <option value="confidence-asc">
+            Confidence: Low → High
+        </option>
+    </select>
+
+    <select
+        id="watchlistMarketSelect"
+        aria-label="Filter watchlist by market"
+    >
+        <option value="all">
+            All Markets
+        </option>
+
+        <option value="US">
+            American (US)
+        </option>
+
+        <option value="NGX">
+            Nigerian (NGX)
+        </option>
+    </select>
+</div>
 
                 <div class="watchlist-list" id="watchlistList">
                     <!-- Watchlist items will be generated here -->

@@ -533,11 +533,21 @@ function setupSearchAndSortListeners() {
             'watchlistSortSelect'
         );
 
+    const wMarket =
+        document.getElementById(
+            'watchlistMarketSelect'
+        );
 
+
+    /*
+     * PORTFOLIO SEARCH
+     */
     if (pSearch) {
+
         pSearch.addEventListener(
             'input',
             e => {
+
                 state.portfolioSearch =
                     e.target.value;
 
@@ -547,7 +557,11 @@ function setupSearchAndSortListeners() {
     }
 
 
+    /*
+     * PORTFOLIO SORT
+     */
     if (pSort) {
+
         pSort.addEventListener(
             'change',
             e => {
@@ -561,7 +575,11 @@ function setupSearchAndSortListeners() {
     }
 
 
+    /*
+     * WATCHLIST SEARCH
+     */
     if (wSearch) {
+
         wSearch.addEventListener(
             'input',
             e => {
@@ -575,12 +593,34 @@ function setupSearchAndSortListeners() {
     }
 
 
+    /*
+     * WATCHLIST SORT
+     */
     if (wSort) {
+
         wSort.addEventListener(
             'change',
             e => {
 
                 state.watchlistSort =
+                    e.target.value;
+
+                renderWatchlist();
+            }
+        );
+    }
+
+
+    /*
+     * WATCHLIST MARKET FILTER
+     */
+    if (wMarket) {
+
+        wMarket.addEventListener(
+            'change',
+            e => {
+
+                state.watchlistMarket =
                     e.target.value;
 
                 renderWatchlist();
@@ -681,12 +721,18 @@ function applyWatchlistSearchAndSort(stocks) {
 
     let result = [...stocks];
 
+
+    /*
+     * SEARCH
+     */
     const q =
         state.watchlistSearch
             .trim()
             .toUpperCase();
 
+
     if (q) {
+
         result =
             result.filter(
                 s =>
@@ -699,21 +745,38 @@ function applyWatchlistSearchAndSort(stocks) {
     }
 
 
+    /*
+     * MARKET FILTER
+     *
+     * Default = all markets
+     */
+    const market =
+        state.watchlistMarket ||
+        'all';
+
+
+    if (market !== 'all') {
+
+        result =
+            result.filter(
+                s =>
+                    String(
+                        s.market || ''
+                    )
+                        .toUpperCase() ===
+                    market
+            );
+    }
+
+
+    /*
+     * SORT
+     */
     switch (state.watchlistSort) {
 
-        case 'ticker-asc':
-
-            result.sort(
-                (a, b) =>
-                    String(a.ticker)
-                        .localeCompare(
-                            String(b.ticker)
-                        )
-            );
-
-            break;
-
-
+        /*
+         * NEWEST FIRST
+         */
         case 'date-desc':
 
             result.sort(
@@ -727,7 +790,140 @@ function applyWatchlistSearchAndSort(stocks) {
             );
 
             break;
+
+
+        /*
+         * TICKER A-Z
+         */
+        case 'ticker-asc':
+
+            result.sort(
+                (a, b) =>
+                    String(
+                        a.ticker || ''
+                    ).localeCompare(
+                        String(
+                            b.ticker || ''
+                        )
+                    )
+            );
+
+            break;
+
+
+        /*
+         * CONFIDENCE HIGH → LOW
+         *
+         * Stocks with N/A confidence
+         * always go to the bottom.
+         */
+        case 'confidence-desc':
+
+            result.sort(
+                (a, b) => {
+
+                    const aScore =
+                        Number(
+                            a.confidenceLevel?.score
+                        );
+
+                    const bScore =
+                        Number(
+                            b.confidenceLevel?.score
+                        );
+
+                    const aValid =
+                        Number.isFinite(
+                            aScore
+                        );
+
+                    const bValid =
+                        Number.isFinite(
+                            bScore
+                        );
+
+
+                    if (
+                        !aValid &&
+                        !bValid
+                    ) {
+                        return 0;
+                    }
+
+
+                    if (!aValid) {
+                        return 1;
+                    }
+
+
+                    if (!bValid) {
+                        return -1;
+                    }
+
+
+                    return bScore - aScore;
+                }
+            );
+
+            break;
+
+
+        /*
+         * CONFIDENCE LOW → HIGH
+         *
+         * N/A still stays at the bottom.
+         */
+        case 'confidence-asc':
+
+            result.sort(
+                (a, b) => {
+
+                    const aScore =
+                        Number(
+                            a.confidenceLevel?.score
+                        );
+
+                    const bScore =
+                        Number(
+                            b.confidenceLevel?.score
+                        );
+
+                    const aValid =
+                        Number.isFinite(
+                            aScore
+                        );
+
+                    const bValid =
+                        Number.isFinite(
+                            bScore
+                        );
+
+
+                    if (
+                        !aValid &&
+                        !bValid
+                    ) {
+                        return 0;
+                    }
+
+
+                    if (!aValid) {
+                        return 1;
+                    }
+
+
+                    if (!bValid) {
+                        return -1;
+                    }
+
+
+                    return aScore - bScore;
+                }
+            );
+
+            break;
     }
+
 
     return result;
 }
@@ -1819,6 +2015,48 @@ function clearAllActivity() {
         }
     );
 }
+
+function updateGreeting() {
+
+    const greetingEl =
+        document.getElementById(
+            'greetingText'
+        );
+
+    if (!greetingEl) return;
+
+    const hour =
+        new Date().getHours();
+
+    let greeting;
+
+    if (hour < 12) {
+        greeting = 'Good Morning,';
+    } else if (hour < 17) {
+        greeting = 'Good Afternoon,';
+    } else {
+        greeting = 'Good Evening,';
+    }
+
+    greetingEl.textContent =
+        greeting;
+}
+
+
+/*
+ * Set greeting immediately
+ */
+updateGreeting();
+
+
+/*
+ * Keep it live while the app is open.
+ * Checks once every minute.
+ */
+setInterval(
+    updateGreeting,
+    60 * 1000
+);
 
 
 /* ============================================
@@ -3775,6 +4013,9 @@ function syncCurrencyToggleUI() {
 
     requestAnimationFrame(update);
 }
+
+
+
    
    
 
@@ -3938,130 +4179,372 @@ function updatePortfolioCard() {
     }
 
 
-    let topPerformer = null;
-    let topPercent = -Infinity;
 
 
-    portfolio.forEach(
-        stock => {
-
-            if (
-                !stock.buyPrice ||
-                stock.currentPrice == null
-            ) {
-                return;
-            }
 
 
-            const percent =
-                (
+
+
+function updateTopPerformer(portfolio) {
+
+    const TIE_THRESHOLD =
+        0.01; // percentage points
+
+    const PROFIT_TIE_THRESHOLD =
+        0.01; // currency units
+
+
+    /*
+     * Build valid performance candidates
+     */
+    const candidates =
+        portfolio
+            .filter(stock => {
+
+                if (
+                    !stock.buyPrice ||
+                    stock.currentPrice == null ||
+                    !stock.quantity
+                ) {
+                    return false;
+                }
+
+                const buyPrice =
+                    Number(stock.buyPrice);
+
+                const currentPrice =
+                    Number(stock.currentPrice);
+
+                const quantity =
+                    Number(stock.quantity);
+
+                return (
+                    Number.isFinite(buyPrice) &&
+                    Number.isFinite(currentPrice) &&
+                    Number.isFinite(quantity) &&
+                    buyPrice > 0 &&
+                    quantity > 0
+                );
+            })
+            .map(stock => {
+
+                const buyPrice =
+                    Number(stock.buyPrice);
+
+                const currentPrice =
+                    Number(stock.currentPrice);
+
+                const quantity =
+                    Number(stock.quantity);
+
+                const percent =
                     (
-                        stock.currentPrice -
-                        stock.buyPrice
-                    ) /
-                    stock.buyPrice
-                ) * 100;
+                        (
+                            currentPrice -
+                            buyPrice
+                        ) /
+                        buyPrice
+                    ) * 100;
+
+                const invested =
+                    quantity *
+                    buyPrice;
+
+                const currentValue =
+                    quantity *
+                    currentPrice;
+
+                const profit =
+                    currentValue -
+                    invested;
+
+                return {
+                    stock,
+                    percent,
+                    invested,
+                    profit
+                };
+            });
 
 
-            if (
-                percent >
-                topPercent
-            ) {
+    const tickerEl =
+        document.getElementById(
+            'topPerformerTicker'
+        );
 
-                topPercent =
-                    percent;
+    const changeEl =
+        document.getElementById(
+            'topPerformerChange'
+        );
 
-                topPerformer =
-                    stock;
-            }
-        }
-    );
+    const investedEl =
+        document.getElementById(
+            'topPerformerInvested'
+        );
 
+    const gainEl =
+        document.getElementById(
+            'topPerformerGain'
+        );
 
-    if (topPerformer) {
+    const lossEl =
+        document.getElementById(
+            'topPerformerLoss'
+        );
 
-        const topInvested =
-            topPerformer.quantity *
-            topPerformer.buyPrice;
-
-
-        const topCurrent =
-            topPerformer.quantity *
-            topPerformer.currentPrice;
-
-
-        const topGain =
-            topCurrent -
-            topInvested;
-
-
-        const currencySign =
-            topPerformer.market === 'US'
-                ? '$'
-                : '₦';
+    const subtitleEl =
+        document.getElementById(
+            'topPerformerSubtitle'
+        );
 
 
-        const tickerEl =
-            document.getElementById(
-                'topPerformerTicker'
-            );
-
-
-        const changeEl =
-            document.getElementById(
-                'topPerformerChange'
-            );
-
-
-        const investedEl =
-            document.getElementById(
-                'topPerformerInvested'
-            );
-
-
-        const gainEl =
-            document.getElementById(
-                'topPerformerGain'
-            );
-
+    /*
+     * No valid holdings
+     */
+    if (!candidates.length) {
 
         if (tickerEl) {
             tickerEl.textContent =
-                topPerformer.ticker;
+                '—';
         }
-
 
         if (changeEl) {
-
             changeEl.textContent =
-                `${topPercent.toFixed(
-                    2
-                )}%`;
+                '—';
+            changeEl.style.color =
+                'rgba(255, 255, 255, 0.7)';
         }
 
+        if (subtitleEl) {
+            subtitleEl.textContent =
+                'No valid holdings';
+        }
 
         if (investedEl) {
-
             investedEl.textContent =
-                `Invested: ${currencySign}${formatNumber(
-                    topInvested
-                )}`;
+                '—';
         }
-
 
         if (gainEl) {
-
             gainEl.textContent =
-                `Gain: ${
-                    topGain >= 0
-                        ? '+'
-                        : ''
-                }${currencySign}${formatNumber(
-                    topGain
-                )}`;
+                '—';
         }
+
+        if (lossEl) {
+            lossEl.textContent =
+                '—';
+        }
+
+        return;
     }
 
+
+    /*
+     * Find the highest percentage return
+     */
+    const highestPercent =
+        Math.max(
+            ...candidates.map(
+                candidate =>
+                    candidate.percent
+            )
+        );
+
+
+    /*
+     * Keep every stock that is effectively
+     * tied for the highest percentage return.
+     */
+    const percentLeaders =
+        candidates.filter(
+            candidate =>
+                Math.abs(
+                    candidate.percent -
+                    highestPercent
+                ) <= TIE_THRESHOLD
+        );
+
+
+    /*
+     * Among percentage leaders,
+     * find the highest absolute P/L.
+     */
+    const highestProfit =
+        Math.max(
+            ...percentLeaders.map(
+                candidate =>
+                    candidate.profit
+            )
+        );
+
+
+    /*
+     * Keep every stock that is also effectively
+     * tied on absolute P/L.
+     */
+    const finalLeaders =
+        percentLeaders.filter(
+            candidate =>
+                Math.abs(
+                    candidate.profit -
+                    highestProfit
+                ) <= PROFIT_TIE_THRESHOLD
+        );
+
+
+    /*
+     * If more than one stock remains,
+     * there is genuinely no standout.
+     */
+    if (finalLeaders.length > 1) {
+
+        if (tickerEl) {
+            tickerEl.textContent =
+                'No standout';
+        }
+
+        if (changeEl) {
+            changeEl.textContent =
+                '—';
+
+            changeEl.style.color =
+                'rgba(255, 255, 255, 0.7)';
+        }
+
+        if (subtitleEl) {
+            subtitleEl.textContent =
+                'All holdings are tied';
+        }
+
+        if (investedEl) {
+            investedEl.textContent =
+                '—';
+        }
+
+        if (gainEl) {
+            gainEl.textContent =
+                '—';
+        }
+
+        if (lossEl) {
+            lossEl.textContent =
+                '—';
+        }
+
+        return;
+    }
+
+
+    /*
+     * Exactly one stock stands out.
+     */
+    const topPerformer =
+        finalLeaders[0].stock;
+
+    const topPercent =
+        finalLeaders[0].percent;
+
+    const topInvested =
+        finalLeaders[0].invested;
+
+    const topGain =
+        finalLeaders[0].profit;
+
+
+    const currencySign =
+        topPerformer.market === 'US'
+            ? '$'
+            : '₦';
+
+
+    /*
+     * Ticker
+     */
+    if (tickerEl) {
+        tickerEl.textContent =
+            topPerformer.ticker;
+    }
+
+
+    /*
+     * Percentage return
+     */
+    if (changeEl) {
+
+        changeEl.textContent =
+            `${
+                topPercent >= 0
+                    ? '+'
+                    : ''
+            }${topPercent.toFixed(2)}%`;
+
+        changeEl.style.color =
+            topPercent >= 0
+                ? '#A7F3C7'
+                : '#FFB8C5';
+    }
+
+
+    /*
+     * Subtitle
+     */
+    if (subtitleEl) {
+        subtitleEl.textContent =
+            'Best return since entry';
+    }
+
+
+    /*
+     * Invested
+     */
+    if (investedEl) {
+
+        investedEl.textContent =
+            `${currencySign}${formatNumber(
+                topInvested
+            )}`;
+    }
+
+
+    /*
+     * Gain
+     */
+    if (gainEl) {
+
+        gainEl.textContent =
+            topGain > 0
+                ? `+${currencySign}${formatNumber(
+                    topGain
+                )}`
+                : `+${currencySign}0`;
+    }
+
+
+    /*
+     * Loss
+     */
+    if (lossEl) {
+
+        lossEl.textContent =
+            topGain < 0
+                ? `-${currencySign}${formatNumber(
+                    Math.abs(topGain)
+                )}`
+                : `-${currencySign}0`;
+    }
+}
+console.log(
+    'TOP PERFORMER INPUT:',
+    portfolio.map(stock => ({
+        ticker: stock.ticker,
+        buyPrice: stock.buyPrice,
+        currentPrice: stock.currentPrice,
+        quantity: stock.quantity,
+        market: stock.market
+    }))
+);
+
+updateTopPerformer(portfolio);
 
     const sectors = {};
 
@@ -4206,48 +4689,157 @@ function updatePortfolioCard() {
     }
 
 
-    const goalAmount =
-        Number(
-            state.settings.goalAmount
-        ) || 1000000;
+  const goalAmountNGN =
+    Number(
+        state.settings.goalAmount
+    ) || 1000000;
 
 
-    const progressPercent =
+/*
+ * The goal is stored internally in NGN.
+ * Convert it only for display when USD is selected.
+ */
+const goalAmount =
+    displayInUSD
+        ? goalAmountNGN / rate
+        : goalAmountNGN;
+
+
+/*
+ * Portfolio value in the same currency
+ * currently displayed to the user.
+ */
+const progressValue =
+    displayInUSD
+        ? totalCurrent / rate
+        : totalCurrent;
+
+
+/*
+ * Calculate progress.
+ */
+const progressPercent =
+    Math.min(
+        (
+            progressValue /
+            goalAmount
+        ) * 100,
+        100
+    );
+
+
+const goalProgress =
+    document.getElementById(
+        'goalProgress'
+    );
+
+
+const goalAmountText =
+    document.getElementById(
+        'goalAmountText'
+    );
+
+
+const goalPercent =
+    document.getElementById(
+        'goalPercent'
+    );
+
+
+const goalRemaining =
+    document.getElementById(
+        'goalRemaining'
+    );
+
+
+const goalCurrencySign =
+    displayInUSD
+        ? '$'
+        : '₦';
+
+
+/*
+ * Progress bar
+ */
+if (goalProgress) {
+
+    goalProgress.style.width =
+        `${progressPercent}%`;
+}
+
+
+/*
+ * Achieved amount / goal amount
+ */
+if (goalAmountText) {
+
+    const achieved =
         Math.min(
-            (
-                totalCurrent /
-                goalAmount
-            ) * 100,
-            100
+            Math.max(
+                progressValue,
+                0
+            ),
+            goalAmount
         );
 
+    goalAmountText.textContent =
+        `${goalCurrencySign}${formatNumber(
+            achieved
+        )} of ${goalCurrencySign}${formatNumber(
+            goalAmount
+        )}`;
+}
 
-    const goalProgress =
-        document.getElementById(
-            'goalProgress'
+
+/*
+ * Percentage
+ */
+if (goalPercent) {
+
+    goalPercent.textContent =
+        `${Math.round(
+            progressPercent
+        )}%`;
+}
+
+
+/*
+ * Remaining amount
+ */
+if (goalRemaining) {
+
+    const remaining =
+        Math.max(
+            goalAmount -
+            progressValue,
+            0
         );
 
+    goalRemaining.textContent =
+        remaining > 0
+            ? `${goalCurrencySign}${formatNumber(
+                remaining
+            )} remaining`
+            : 'Goal reached';
+}
+}
 
-    const goalPercent =
-        document.getElementById(
-            'goalPercent'
-        );
+const goalSection =
+    document.getElementById(
+        'goalSection'
+    );
 
+if (goalSection) {
 
-    if (goalProgress) {
+    goalSection.addEventListener(
+        'click',
+        () => {
 
-        goalProgress.style.width =
-            `${progressPercent}%`;
-    }
-
-
-    if (goalPercent) {
-
-        goalPercent.textContent =
-            `${Math.round(
-                progressPercent
-            )}% achieved`;
-    }
+            goalSection.classList.toggle(
+                'show-remaining'
+            );
+        }
+    );
 }
 
 
