@@ -3,6 +3,10 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 const cors = require('cors');
 
+const {
+    startConfidenceScheduler
+} = require('./services/confidenceScheduler');
+
 const app = express();
 
 // Middleware
@@ -54,15 +58,17 @@ async function startServer() {
             process.env.MONGODB_URI
         );
 
-        console.log(
-            '✓ MongoDB connected'
-        );
+       console.log(
+    '✓ MongoDB connected'
+);
 
-        app.listen(PORT, () => {
-            console.log(
-                `✓ Server running on port ${PORT}`
-            );
-        });
+startConfidenceScheduler();
+
+app.listen(PORT, () => {
+    console.log(
+        `✓ Server running on port ${PORT}`
+    );
+});
 
     } catch (err) {
         console.error(

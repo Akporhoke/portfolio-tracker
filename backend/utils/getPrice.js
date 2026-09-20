@@ -1,6 +1,9 @@
 const axios = require('axios');
 const PriceSnapshot = require('../models/PriceSnapshot');
+const PriceHistory = require('../models/PriceHistory');
 const ProviderState = require('../models/ProviderState');
+
+
 // ============================================================
 // API CONFIG
 // ============================================================
@@ -467,6 +470,187 @@ function cacheSet(
         timestamp: Date.now(),
         ttl
     });
+}
+
+// ============================================================
+// PERSISTENT PRICE HISTORY
+// ============================================================
+
+async function savePriceHistory(
+    ticker,
+    market,
+    rows,
+    source
+) {
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    if (!Array.isArray(rows) || !rows.length) {
+        return;
+    }
+
+    const operations =
+        rows
+            .filter(row =>
+                row &&
+                row.date &&
+                isValidPrice(row.close)
+            )
+            .map(row => ({
+                updateOne: {
+                    filter: {
+                        ticker: symbol,
+                        market: normalizedMarket,
+                        date: row.date
+                    },
+
+                    update: {
+                        $set: {
+                            ticker: symbol,
+                            market: normalizedMarket,
+                            date: row.date,
+                            open:
+                                parseNumber(row.open),
+                            high:
+                                parseNumber(row.high),
+                            low:
+                                parseNumber(row.low),
+                            close:
+                                Number(row.close),
+                            volume:
+                                parseNumber(row.volume),
+                            source:
+                                source || 'unknown'
+                        }
+                    },
+
+                    upsert: true
+                }
+            }));
+
+    if (!operations.length) {
+        return;
+    }
+
+    try {
+        await PriceHistory.bulkWrite(
+            operations,
+            {
+                ordered: false
+            }
+        );
+
+        console.log(
+            `💾 Saved ${operations.length} historical rows for ${symbol} (${normalizedMarket})`
+        );
+
+    } catch (error) {
+        console.error(
+            `[savePriceHistory] ${symbol}:`,
+            error.message
+        );
+    }
+}
+
+async function getStoredPriceHistory(
+    ticker,
+    market,
+    days,
+    endDate
+) {
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    const safeDays =
+        Math.min(
+            Math.max(
+                Number(days) || 30,
+                1
+            ),
+            365
+        );
+
+    const end =
+        endDate
+            ? dateOnly(endDate)
+            : todayStr();
+
+    if (!end) {
+        return [];
+    }
+
+    const historyDays =
+        Math.max(
+            safeDays,
+            60
+        );
+
+    const calendarWindow =
+        Math.max(
+            30,
+            historyDays * 3
+        );
+
+    const start =
+        subtractDays(
+            end,
+            calendarWindow
+        );
+
+    try {
+        const rows =
+            await PriceHistory.find({
+                ticker: symbol,
+                market: normalizedMarket,
+                date: {
+                    $gte: start,
+                    $lte: end
+                }
+            })
+                .sort({
+                    date: 1
+                })
+                .lean();
+
+        const normalized =
+            normalizeHistoricalRows(
+                rows
+            );
+
+        if (
+            normalized.length >=
+            safeDays
+        ) {
+            console.log(
+                `✓ MongoDB history for ${symbol} (${normalizedMarket}): ${normalized.length} real trading days`
+            );
+
+            return normalized.slice(
+                -safeDays
+            );
+        }
+
+        if (normalized.length) {
+            console.log(
+                `ℹ️ MongoDB history for ${symbol} (${normalizedMarket}) only has ${normalized.length}/${safeDays} days`
+            );
+        }
+
+        return [];
+    } catch (error) {
+        console.error(
+            `[getStoredPriceHistory] ${symbol}:`,
+            error.message
+        );
+
+        return [];
+    }
 }
 
 // ============================================================
@@ -1068,7 +1252,8 @@ async function getFinnhubPrice(
 async function getInvestoHistory(
     ticker,
     days = 30,
-    endDate = null
+    endDate = null,
+    forceRefresh = false
 ) {
     const symbol =
         normalizeTicker(ticker);
@@ -1122,24 +1307,42 @@ async function getInvestoHistory(
             calendarWindow
         );
 
+    // --------------------------------------------------------
+    // CACHE KEY
+    // --------------------------------------------------------
+
     const cacheKey =
         `investo-history:${symbol}:${safeDays}:${from}:${end}`;
 
-    const cached =
-        cacheGet(
-            historyCache,
-            cacheKey
-        );
+    // --------------------------------------------------------
+    // MEMORY CACHE
+    // --------------------------------------------------------
 
-    if (cached) {
-        return cached;
+    if (!forceRefresh) {
+        const cached =
+            cacheGet(
+                historyCache,
+                cacheKey
+            );
+
+        if (cached) {
+            console.log(
+                `✓ Cached Investo history for ${symbol}: ${cached.length} real trading days`
+            );
+
+            return cached;
+        }
     }
 
     // --------------------------------------------------------
-    // SHARE IDENTICAL IN-FLIGHT HISTORY REQUESTS
+    // SHARE IDENTICAL IN-FLIGHT REQUESTS
     // --------------------------------------------------------
 
-    if (investoHistoryInFlight.has(cacheKey)) {
+    if (
+        investoHistoryInFlight.has(
+            cacheKey
+        )
+    ) {
         console.log(
             `↳ Sharing in-flight Investo history request for ${symbol}`
         );
@@ -1148,6 +1351,10 @@ async function getInvestoHistory(
             cacheKey
         );
     }
+
+    // --------------------------------------------------------
+    // REQUEST
+    // --------------------------------------------------------
 
     const requestPromise =
         (async () => {
@@ -1165,10 +1372,12 @@ async function getInvestoHistory(
                                 to: end,
                                 provenance: 1
                             },
+
                             headers: {
                                 Authorization:
                                     `Bearer ${token}`
                             },
+
                             timeout: 20000
                         }
                     );
@@ -1176,7 +1385,13 @@ async function getInvestoHistory(
                 const body =
                     response.data;
 
-                if (body?.ok === false) {
+                // ------------------------------------------------
+                // API RESPONSE ERRORS
+                // ------------------------------------------------
+
+                if (
+                    body?.ok === false
+                ) {
                     const code =
                         body?.error?.code;
 
@@ -1184,6 +1399,7 @@ async function getInvestoHistory(
                         code === 'rate_limited'
                     ) {
                         await activateInvestoCooldown();
+
                         return [];
                     }
 
@@ -1221,10 +1437,18 @@ async function getInvestoHistory(
                     return [];
                 }
 
+                // ------------------------------------------------
+                // FIND RAW HISTORY ARRAY
+                // ------------------------------------------------
+
                 const rawRows =
-                    Array.isArray(body?.data)
+                    Array.isArray(
+                        body?.data
+                    )
                         ? body.data
-                        : Array.isArray(body)
+                        : Array.isArray(
+                            body
+                        )
                             ? body
                             : Array.isArray(
                                 body?.history
@@ -1236,7 +1460,11 @@ async function getInvestoHistory(
                                     ? body.results
                                     : [];
 
-                const rows =
+                // ------------------------------------------------
+                // NORMALIZE ALL REAL ROWS
+                // ------------------------------------------------
+
+                const allRows =
                     normalizeHistoricalRows(
                         rawRows
                     )
@@ -1250,8 +1478,31 @@ async function getInvestoHistory(
                                 a.date.localeCompare(
                                     b.date
                                 )
-                        )
-                        .slice(-safeDays);
+                        );
+
+                // ------------------------------------------------
+                // SAVE ALL AVAILABLE HISTORY
+                // ------------------------------------------------
+
+                await savePriceHistory(
+                    symbol,
+                    'NGX',
+                    allRows,
+                    'investo'
+                );
+
+                // ------------------------------------------------
+                // RETURN ONLY REQUESTED NUMBER OF DAYS
+                // ------------------------------------------------
+
+                const rows =
+                    allRows.slice(
+                        -safeDays
+                    );
+
+                // ------------------------------------------------
+                // MEMORY CACHE
+                // ------------------------------------------------
 
                 cacheSet(
                     historyCache,
@@ -1268,9 +1519,15 @@ async function getInvestoHistory(
                     'investo'
                 );
 
-                if (rows.length) {
+                if (
+                    rows.length
+                ) {
                     console.log(
-                        `  ↳ ${rows[0].date} → ${rows[rows.length - 1].date}`
+                        `  ↳ ${rows[0].date} → ${
+                            rows[
+                                rows.length - 1
+                            ].date
+                        }`
                     );
                 }
 
@@ -1283,12 +1540,20 @@ async function getInvestoHistory(
                 const errorCode =
                     responseData?.error?.code;
 
+                // ------------------------------------------------
+                // RATE LIMIT
+                // ------------------------------------------------
+
                 if (
                     error.response?.status === 429 ||
                     errorCode === 'rate_limited'
                 ) {
                     await activateInvestoCooldown();
                 }
+
+                // ------------------------------------------------
+                // UNKNOWN SYMBOL
+                // ------------------------------------------------
 
                 if (
                     error.response?.status === 404 ||
@@ -1300,6 +1565,10 @@ async function getInvestoHistory(
 
                     return [];
                 }
+
+                // ------------------------------------------------
+                // AUTHORIZATION
+                // ------------------------------------------------
 
                 if (
                     error.response?.status === 401 ||
@@ -1313,6 +1582,10 @@ async function getInvestoHistory(
 
                     return [];
                 }
+
+                // ------------------------------------------------
+                // OTHER ERRORS
+                // ------------------------------------------------
 
                 console.error(
                     `[getInvestoHistory] ${symbol}:`,
@@ -1345,7 +1618,8 @@ async function getInvestoHistory(
 async function getTwelveDataHistory(
     ticker,
     days = 30,
-    endDate = null
+    endDate = null,
+    forceRefresh = false
 ) {
     const token =
         getTwelveDataToken();
@@ -1379,12 +1653,9 @@ async function getTwelveDataHistory(
         return [];
     }
 
-    // Always obtain at least 60 trading days.
+    // Fetch the number of trading days requested.
     const historyDays =
-        Math.max(
-            safeDays,
-            60
-        );
+    safeDays;
 
     const calendarWindow =
         Math.max(
@@ -1402,6 +1673,7 @@ async function getTwelveDataHistory(
     const cacheKey =
         `twelvedata-history:${symbol}:${end}`;
 
+    if (!forceRefresh) {
     const cached =
         cacheGet(
             historyCache,
@@ -1418,6 +1690,7 @@ async function getTwelveDataHistory(
 
         return result;
     }
+}
 
     // --------------------------------------------------------
     // Request deduplication
@@ -1497,48 +1770,57 @@ async function getTwelveDataHistory(
                     return [];
                 }
 
-                const rows =
-                    data.values
-                        .map(row => ({
-                            date:
-                                row.datetime,
-                            open:
-                                parseNumber(
-                                    row.open
-                                ),
-                            high:
-                                parseNumber(
-                                    row.high
-                                ),
-                            low:
-                                parseNumber(
-                                    row.low
-                                ),
-                            close:
-                                parseNumber(
-                                    row.close
-                                ),
-                            volume:
-                                parseNumber(
-                                    row.volume
-                                )
-                        }))
-                        .filter(
-                            row =>
-                                row.date &&
-                                isValidPrice(
-                                    row.close
-                                )
-                        )
-                        .sort(
-                            (a, b) =>
-                                a.date.localeCompare(
-                                    b.date
-                                )
-                        )
-                        .slice(
-                            -historyDays
-                        );
+                const allRows =
+    data.values
+        .map(row => ({
+            date:
+                row.datetime,
+            open:
+                parseNumber(
+                    row.open
+                ),
+            high:
+                parseNumber(
+                    row.high
+                ),
+            low:
+                parseNumber(
+                    row.low
+                ),
+            close:
+                parseNumber(
+                    row.close
+                ),
+            volume:
+                parseNumber(
+                    row.volume
+                )
+        }))
+        .filter(
+            row =>
+                row.date &&
+                isValidPrice(
+                    row.close
+                )
+        )
+        .sort(
+            (a, b) =>
+                a.date.localeCompare(
+                    b.date
+                )
+        );
+
+await savePriceHistory(
+    symbol,
+    'US',
+    allRows,
+    'twelvedata'
+);
+
+const rows =
+    allRows.slice(
+        -historyDays
+    );
 
                 cacheSet(
                     historyCache,
@@ -1815,12 +2097,12 @@ async function getSnapshotHistory(
 // ============================================================
 // PUBLIC HISTORY FUNCTION
 // ============================================================
-
 async function getPriceHistory(
     ticker,
     days = 30,
     market = 'NGX',
-    endDate = null
+    endDate = null,
+    forceRefresh = false
 ) {
     const symbol =
         normalizeTicker(ticker);
@@ -1846,17 +2128,48 @@ async function getPriceHistory(
         return [];
     }
 
+    // --------------------------------------------------------
+    // CACHE KEY
+    // --------------------------------------------------------
+
     const cacheKey =
         `history:${normalizedMarket}:${symbol}:${safeDays}:${end}`;
 
-    const cached =
-        cacheGet(
-            historyCache,
-            cacheKey
-        );
+    // --------------------------------------------------------
+    // NORMAL REQUEST
+    //
+    // Memory cache + MongoDB first.
+    // --------------------------------------------------------
 
-    if (cached) {
-        return cached;
+    if (!forceRefresh) {
+        const cached =
+            cacheGet(
+                historyCache,
+                cacheKey
+            );
+
+        if (cached) {
+            return cached;
+        }
+
+        const storedHistory =
+            await getStoredPriceHistory(
+                symbol,
+                normalizedMarket,
+                safeDays,
+                end
+            );
+
+        if (storedHistory.length) {
+            cacheSet(
+                historyCache,
+                cacheKey,
+                storedHistory,
+                HISTORY_CACHE_TTL
+            );
+
+            return storedHistory;
+        }
     }
 
     let history = [];
@@ -1872,7 +2185,8 @@ async function getPriceHistory(
             await getTwelveDataHistory(
                 symbol,
                 safeDays,
-                end
+                end,
+                forceRefresh
             );
     }
 
@@ -1885,8 +2199,17 @@ async function getPriceHistory(
             await getInvestoHistory(
                 symbol,
                 safeDays,
-                end
+                end,
+                forceRefresh
             );
+
+        /*
+         * Snapshot fallback is still allowed when
+         * Investo returns no historical data.
+         *
+         * This fallback uses only real observed
+         * snapshots already stored by Gaze.
+         */
 
         if (!history.length) {
             history =
@@ -1898,10 +2221,18 @@ async function getPriceHistory(
         }
     }
 
+    // --------------------------------------------------------
+    // NORMALIZE RESULT
+    // --------------------------------------------------------
+
     const normalized =
         normalizeHistoricalRows(
             history
         );
+
+    // --------------------------------------------------------
+    // SAVE TO MEMORY CACHE
+    // --------------------------------------------------------
 
     cacheSet(
         historyCache,

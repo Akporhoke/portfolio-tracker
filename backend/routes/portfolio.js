@@ -1541,7 +1541,6 @@ function emptyConfidence() {
 // ============================================================
 // WATCHLIST CONFIDENCE
 // ============================================================
-
 async function buildWatchlistConfidence(stock) {
     const ticker =
         normalizeTicker(
@@ -1575,29 +1574,27 @@ async function buildWatchlistConfidence(stock) {
             : stock.confidenceLevel;
     }
 
-    /*
-     * Use the current completed calendar date.
-     *
-     * Only rows strictly before this date are used so
-     * today's potentially incomplete candle is excluded.
-     */
+    // --------------------------------------------------------
+    // Current completed calendar date
+    // --------------------------------------------------------
 
-    const today = dateOnly(new Date(), market);
+    const today =
+        dateOnly(
+            new Date(),
+            market
+        );
 
     let history = [];
 
     try {
         /*
-         * We deliberately request a large enough window to
-         * contain BOTH:
+         * Request enough history to contain:
          *
-         *   7 trading days before the stock was added
+         * 7 trading days before adding the stock
          *
-         *   +
+         * +
          *
-         *   7 trading days after the stock was added
-         *
-         * This is critical for progressive observation.
+         * 7 trading days after adding the stock
          */
 
         history =
@@ -1628,6 +1625,13 @@ async function buildWatchlistConfidence(stock) {
             row =>
                 row.date < today
         );
+
+    const latestCompletedDate =
+        completedHistory.length
+            ? completedHistory[
+                completedHistory.length - 1
+            ].date
+            : null;
 
     console.log(
         `[Confidence] ${ticker} ` +
@@ -1671,7 +1675,9 @@ async function buildWatchlistConfidence(stock) {
         `${observationRows.length}/7 post-add`
     );
 
-    if (baselineRows.length) {
+    if (
+        baselineRows.length
+    ) {
         console.log(
             `  ↳ Baseline: ` +
             `${baselineRows[0].date} → ` +
@@ -1681,7 +1687,9 @@ async function buildWatchlistConfidence(stock) {
         );
     }
 
-    if (observationRows.length) {
+    if (
+        observationRows.length
+    ) {
         console.log(
             `  ↳ Observation: ` +
             `${observationRows[0].date} → ` +
@@ -1726,37 +1734,50 @@ async function buildWatchlistConfidence(stock) {
                 new Date();
         }
     }
-// --------------------------------------------------------
-// FREEZE AFTER DAY 7
-// --------------------------------------------------------
 
-if (
-    confidence.postAddDays >=
-    MAX_POST_ADD_DAYS
-) {
-    confidence.postAddDays =
-        MAX_POST_ADD_DAYS;
+    // --------------------------------------------------------
+    // FREEZE AFTER DAY 7
+    // --------------------------------------------------------
 
-    confidence.dataDays =
-        MAX_POST_ADD_DAYS;
+    if (
+        confidence.postAddDays >=
+        MAX_POST_ADD_DAYS
+    ) {
+        confidence.postAddDays =
+            MAX_POST_ADD_DAYS;
 
-    confidence.status =
-        'complete';
+        confidence.dataDays =
+            MAX_POST_ADD_DAYS;
 
-    confidence.isFinal =
-        true;
+        confidence.status =
+            'complete';
 
-    confidence.completedAt =
-    confidence.completedAt ||
-    new Date();
+        confidence.isFinal =
+            true;
 
-confidence.finalDate =
-    confidence.finalDate ||
-    new Date();
+        confidence.completedAt =
+            confidence.completedAt ||
+            new Date();
+
+        confidence.finalDate =
+            confidence.finalDate ||
+            new Date();
+    }
+
+    // --------------------------------------------------------
+    // REMEMBER LAST COMPLETED DAY PROCESSED
+    // --------------------------------------------------------
+
+    if (
+        latestCompletedDate
+    ) {
+        stock.lastProcessedDate =
+            latestCompletedDate;
+    }
+
+    return confidence;
 }
 
-return confidence;
-}
 
 
 // ============================================================
@@ -1764,7 +1785,8 @@ return confidence;
 // ============================================================
 
 async function updateWatchlistConfidence(
-    portfolio
+    portfolio,
+    targetStock = null
 ) {
     if (!portfolio) {
         return false;
@@ -1780,17 +1802,22 @@ async function updateWatchlistConfidence(
 
     let changed = false;
 
+    const stocks =
+        targetStock
+            ? [targetStock]
+            : portfolio.watchlist;
+
     for (
-        const stock of
-        portfolio.watchlist
+        const stock of stocks
     ) {
         if (!stock) {
             continue;
         }
+
         console.log(
-    `[Confidence Debug] ${stock.ticker}:`,
-    stock.confidenceLevel
-);
+            `[Confidence Debug] ${stock.ticker}:`,
+            stock.confidenceLevel
+        );
 
         // ----------------------------------------------------
         // Never touch frozen confidence
@@ -2522,31 +2549,31 @@ router.post(
             // Try initial confidence calculation
             // ------------------------------------------------
 
-            try {
-                await updateWatchlistConfidence(
-                    portfolio
-                );
-
-                await portfolio.save();
-
-            } catch (error) {
-                console.error(
-                    '[Watchlist] Initial confidence update failed:',
-                    error.message
-                );
-            }
-
             const added =
-                portfolio.watchlist[
-                    portfolio.watchlist.length - 1
-                ];
+    portfolio.watchlist[
+        portfolio.watchlist.length - 1
+    ];
 
-            res.status(201).json({
-                success: true,
+try {
+    await updateWatchlistConfidence(
+        portfolio,
+        added
+    );
 
-                watchlistItem:
-                    added
-            });
+    await portfolio.save();
+
+} catch (error) {
+    console.error(
+        '[Watchlist] Initial confidence update failed:',
+        error.message
+    );
+}
+
+res.status(201).json({
+    success: true,
+    watchlistItem:
+        added
+});
 
         } catch (error) {
             console.error(
@@ -3346,5 +3373,8 @@ router.post(
 // ============================================================
 // EXPORT
 // ============================================================
+
+router.updateWatchlistConfidence =
+    updateWatchlistConfidence;
 
 module.exports = router;

@@ -297,6 +297,11 @@ index: true
                 default: () => ({})
             },
 
+            lastProcessedDate: {
+              type: String,
+              default: null
+           },
+
             dateAdded: {
                 type: Date,
                 default: Date.now,
