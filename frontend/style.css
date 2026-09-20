@@ -2881,3 +2881,40 @@ body {
         width: 112px;
     }
 }
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 10px 0;
+    color: #667085;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.time-pulse {
+    width: 3px;
+    height:3px;
+    border-radius: 50%;
+    background: #008751;
+    box-shadow: 0 0 0 0 rgba(0, 135, 81, 0.4);
+    animation: timePulse 2s infinite;
+}
+
+@keyframes timePulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 135, 81, 0.4);
+        transform: scale(1);
+    }
+
+    50% {
+        box-shadow: 0 0 0 7px rgba(0, 135, 81, 0);
+        transform: scale(1.15);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 135, 81, 0);
+        transform: scale(1);
+    }
+} 
