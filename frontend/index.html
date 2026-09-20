@@ -11,20 +11,17 @@
 
     <!-- Network Warning Banner -->
     <div id="networkWarning" class="network-warning hidden">
-        <span>📡</span> No internet connection - viewing cached data
+        <span><i class="fa-solid fa-satellite-dish"></i></span> No internet connection - viewing cached data
     </div>
 
     <!-- Offline Mode Banner -->
     <div id="offlineBanner" class="offline-banner hidden">
-        <span>⚠️</span> You're offline. Last updated <span id="lastUpdated">now</span>.
-    </div>
-
-    <!-- Pull to Refresh Indicator -->
-    <div class="pull-to-refresh" id="pullToRefresh">
-        ↓ Pull to refresh
-    </div>
+    <span><i class="fa-regular fa-triangle-exclamation"></i></span>
+    You're offline. Last updated <span id="lastUpdated">now</span>.
+</div>
 
      <div class="status-bar">
+             <span class="time-pulse"></span>
         <span id="currentTime">00:00</span>
     </div>
 
@@ -469,7 +466,7 @@
     <div class="modal" id="confirmModal">
         <div class="modal-content modal-small">
             <div style="text-align: center; padding: 20px;">
-                <p style="font-size: 36px; margin: 0 0 12px;">⚠️</p>
+                <p style="font-size: 36px; margin: 0 0 12px;">     <i class="fa-regular fa-triangle-exclamation"></i> </p>
                 <h3 id="confirmTitle">Confirm Action</h3>
                 <p id="confirmMessage" style="color: #666; margin: 12px 0;">Are you sure?</p>
                 <div style="background: #f5f5f5; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
@@ -495,7 +492,7 @@
                     <!-- stock rows injected here -->
                 </div>
                 <div class="empty-state" id="marketStockEmpty" style="display:none;">
-                    <p style="font-size: 32px;">📭</p>
+                    <p style="font-size: 32px;"><i class="fa-solid fa-box-open"></i></p>
                     <p style="font-weight: 600;">No stocks in this market yet</p>
                 </div>
             </div>
