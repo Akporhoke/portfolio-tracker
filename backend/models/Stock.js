@@ -81,9 +81,25 @@ isSP500: {
         // ========================================================
 
         active: {
-            type: Boolean,
-            default: true
-        },
+    type: Boolean,
+    default: true
+},
+
+lastStatusCheck: {
+    type: Date,
+    default: null
+},
+
+historyStatus: {
+    type: String,
+    enum: [
+        'available',
+        'unavailable',
+        'unknown'
+    ],
+    default: 'unknown'
+},
+
 
 
         // ========================================================

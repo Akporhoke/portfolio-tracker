@@ -7,7 +7,8 @@ const PriceHistory =
     require('../models/PriceHistory');
 
 const {
-    getPriceHistory
+    getPriceHistory,
+    getHistoricalProviderStatus
 } = require('../utils/getPrice');
 
 const {
@@ -16,6 +17,9 @@ const {
 
 const portfolioRoutes =
     require('../routes/portfolio');
+
+const Stock =
+    require('../models/Stock');
 
 
 // ============================================================
@@ -74,6 +78,12 @@ const INITIAL_HISTORY_DAYS =
  */
 const MAX_HISTORY_FETCHES_PER_RUN =
     5;
+    /*
+ * Recheck stocks whose historical data is
+ * currently unavailable once every week.
+ */
+const HISTORY_RECHECK_CRON =
+    '0 2 * * 0';
 
 
 // ============================================================
@@ -252,24 +262,95 @@ async function runHistorySync() {
             }
         }
 
-        /*
+                /*
          * --------------------------------------------------------
          * Determine which stocks need history
          * --------------------------------------------------------
          */
 
+        let initialFetches = 0;
+        let incrementalFetches = 0;
+        let failed = 0;
+        let totalFetches = 0;
+
+
+        const stockKeys =
+    Array.from(
+        uniqueStocks.values()
+    ).map(stock => ({
+        ticker: stock.ticker,
+        market: stock.market
+    }));
+
+const directoryStocks =
+    await Stock.find({
+        $or: stockKeys
+    })
+        .select({
+            ticker: 1,
+            market: 1,
+            active: 1,
+            historyStatus: 1
+        })
+        .lean();
+
+const directoryMap =
+    new Map();
+
+for (const stock of directoryStocks) {
+    directoryMap.set(
+        `${stock.ticker}|${stock.market}`,
+        stock
+    );
+}
+
         const candidates = [];
 
         let alreadyCurrent = 0;
+
+        let skipped = 0;
 
         for (
             const stock of
             uniqueStocks.values()
         ) {
+
+           const stockRecord =
+    directoryMap.get(
+        `${stock.ticker}|${stock.market}`
+    );
+
+if (
+    stockRecord?.historyStatus ===
+    'unavailable'
+) {
+    console.log(
+        `⏭️ ${stock.ticker} (${stock.market}) skipped: historical data unavailable`
+    );
+
+    skipped++;
+    continue;
+}
             const today =
                 marketToday(
                     stock.market
                 );
+
+
+            const status =
+                await getHistoryStatus(
+                    stock.ticker,
+                    stock.market
+                );
+
+
+            const count =
+                status.count;
+
+
+            const latestDate =
+                status.latestDate;
+
 
             const existingToday =
                 await PriceHistory.exists({
@@ -283,7 +364,23 @@ async function runHistorySync() {
                         today
                 });
 
-            if (existingToday) {
+
+            /*
+             * ----------------------------------------------------
+             * 60+ history rows
+             * ----------------------------------------------------
+             *
+             * A fully populated stock that already has
+             * today's completed history does not need another
+             * provider request.
+             */
+
+            if (
+                count >=
+                INITIAL_HISTORY_DAYS &&
+                existingToday
+            ) {
+
                 console.log(
                     `✓ ${stock.ticker} (${stock.market}) already has ${today} history`
                 );
@@ -293,11 +390,20 @@ async function runHistorySync() {
                 continue;
             }
 
-            const status =
-                await getHistoryStatus(
-                    stock.ticker,
-                    stock.market
-                );
+
+            /*
+             * ----------------------------------------------------
+             * Candidate
+             * ----------------------------------------------------
+             *
+             * Important:
+             *
+             * A stock with fewer than 60 rows remains a
+             * candidate even when it already has today's row.
+             *
+             * This allows newly listed stocks such as AVACAP
+             * to continue accumulating history.
+             */
 
             candidates.push({
                 ticker:
@@ -307,10 +413,15 @@ async function runHistorySync() {
                     stock.market,
 
                 count:
-                    status.count,
+                    count,
 
                 latestDate:
-                    status.latestDate
+                    latestDate,
+
+                existingToday:
+                    Boolean(
+                        existingToday
+                    )
             });
         }
 
@@ -371,11 +482,7 @@ async function runHistorySync() {
          * --------------------------------------------------------
          */
 
-        let initialFetches = 0;
-        let incrementalFetches = 0;
-        let skipped = 0;
-        let failed = 0;
-        let totalFetches = 0;
+        
 
         for (
             const candidate of
@@ -403,26 +510,43 @@ async function runHistorySync() {
                 latestDate
             } = candidate;
 
-            let historyDays;
+                        let historyDays;
             let fetchType;
 
+
             /*
-             * Initial population.
+             * ----------------------------------------------------
+             * INITIAL HISTORY
+             * ----------------------------------------------------
+             *
+             * No stored history at all.
              */
 
             if (
                 count === 0
             ) {
+
                 historyDays =
                     INITIAL_HISTORY_DAYS;
 
                 fetchType =
                     'initial';
 
-            } else {
-                /*
-                 * Incremental update.
-                 */
+            }
+
+
+            /*
+             * ----------------------------------------------------
+             * PARTIAL / EXISTING HISTORY
+             * ----------------------------------------------------
+             *
+             * Any stock that already has real history uses
+             * the small incremental window.
+             *
+             * This includes newly listed stocks such as AVACAP.
+             */
+
+            else {
 
                 historyDays =
                     INCREMENTAL_HISTORY_DAYS;
@@ -454,21 +578,173 @@ async function runHistorySync() {
                 );
             }
 
-            try {
-                const rows =
-                    await getPriceHistory(
+            
+
+                                   try {
+
+
+                                    // ------------------------------------------------------------
+// Missing Stock directory record
+// ------------------------------------------------------------
+
+const directoryStock =
+    await Stock.findOne({
+        ticker,
+        market
+    }).lean();
+
+if (!directoryStock) {
+    console.log(
+        `⏸️ ${ticker} (${market}): no Stock directory record; skipping history sync`
+    );
+
+    skipped += 1;
+
+    continue;
+}
+
+                const result =
+                    await getHistoricalProviderStatus(
                         ticker,
                         historyDays,
                         market,
-                        null,
-                        true
+                        null
                     );
 
-                console.log(
-                    `✓ ${ticker} (${market}): ${rows.length} history rows returned`
-                );
+                /*
+                 * Real provider history is available.
+                 */
+
+               if (
+    result.status ===
+    'available'
+) {
+    const rows =
+        result.rows || [];
+
+    console.log(
+        `✓ ${ticker} (${market}): ${rows.length} real provider history rows returned`
+    );
+
+    if (rows.length > 0) {
+        const historyOperations =
+            rows.map(row => ({
+                updateOne: {
+                    filter: {
+                        ticker,
+                        market,
+                        date: row.date
+                    },
+
+                    update: {
+                        $set: {
+                            open:
+                                row.open,
+
+                            high:
+                                row.high,
+
+                            low:
+                                row.low,
+
+                            close:
+                                row.close,
+
+                            volume:
+                                row.volume,
+
+                            source:
+                                market === 'US'
+                                    ? 'finnhub'
+                                    : 'investo'
+                        }
+                    },
+
+                    upsert: true
+                }
+            }));
+
+        await PriceHistory.bulkWrite(
+            historyOperations,
+            {
+                ordered: false
+            }
+        );
+
+        console.log(
+            `✓ ${ticker} (${market}): ${rows.length} provider history rows saved`
+        );
+    }
+
+    await Stock.updateOne(
+        {
+            ticker,
+            market
+        },
+        {
+            $set: {
+                historyStatus:
+                    'available',
+
+                lastStatusCheck:
+                    new Date()
+            }
+        }
+    );
+}
+
+                /*
+                 * Provider responded successfully,
+                 * but has no historical data.
+                 *
+                 * This is the condition that freezes
+                 * future daily historical requests.
+                 */
+
+                else if (
+                    result.status ===
+                    'no_data'
+                ) {
+
+                    console.log(
+                        `⏸️ ${ticker} (${market}): provider has no historical data`
+                    );
+
+                    await Stock.updateOne(
+                        {
+                            ticker,
+                            market
+                        },
+                        {
+                            $set: {
+                                historyStatus:
+                                    'unavailable',
+
+                                lastStatusCheck:
+                                    new Date()
+                            }
+                        }
+                    );
+
+                }
+
+                /*
+                 * Provider failure / quota / cooldown.
+                 *
+                 * Do NOT change historyStatus.
+                 */
+
+                else {
+
+                    failed++;
+
+                    console.log(
+                        `⚠️ ${ticker} (${market}): historical provider unavailable`
+                    );
+                }
 
             } catch (error) {
+
                 failed++;
 
                 console.error(
@@ -516,6 +792,198 @@ async function runHistorySync() {
     } catch (error) {
         console.error(
             '[HistorySync] Fatal error:',
+            error.message
+        );
+    }
+}
+
+// ============================================================
+// WEEKLY HISTORY RECHECK
+// ============================================================
+
+async function runHistoryRecheck() {
+    console.log('');
+    console.log(
+        '================================'
+    );
+    console.log(
+        'GAZE WEEKLY HISTORY RECHECK'
+    );
+    console.log(
+        '================================'
+    );
+
+    try {
+        /*
+         * Only recheck securities that:
+         *
+         * 1. are still active securities
+         * 2. have historical data marked unavailable
+         *
+         * Live prices are NOT affected by this status.
+         */
+
+        const stocks =
+            await Stock.find({
+                active: true,
+                historyStatus:
+                    'unavailable'
+            })
+                .select({
+                    ticker: 1,
+                    market: 1
+                })
+                .lean();
+
+        console.log(
+            `Historical-data stocks to recheck: ${stocks.length}`
+        );
+
+        let recovered = 0;
+        let stillUnavailable = 0;
+        let failed = 0;
+
+        for (const stock of stocks) {
+
+            const ticker =
+                normalizeTicker(
+                    stock.ticker
+                );
+
+            const market =
+                normalizeMarket(
+                    stock.market
+                );
+
+            if (!ticker) {
+                continue;
+            }
+
+            console.log(
+                `→ Rechecking ${ticker} (${market}) history`
+            );
+
+            try {
+
+                const result =
+    await getHistoricalProviderStatus(
+        ticker,
+        INCREMENTAL_HISTORY_DAYS,
+        market,
+        null
+    );
+
+                /*
+                 * Provider successfully responded.
+                 *
+                 * Any real rows mean historical data
+                 * is available again.
+                 */
+
+                if (
+    result.status ===
+    'available'
+) {
+
+    await Stock.updateOne(
+        {
+            ticker,
+            market
+        },
+        {
+            $set: {
+                historyStatus:
+                    'available',
+
+                lastStatusCheck:
+                    new Date()
+            }
+        }
+    );
+
+    recovered++;
+
+    console.log(
+        `✅ ${ticker} (${market}) history recovered`
+    );
+
+} else if (
+    result.status ===
+    'no_data'
+) {
+
+    await Stock.updateOne(
+        {
+            ticker,
+            market
+        },
+        {
+            $set: {
+                historyStatus:
+                    'unavailable',
+
+                lastStatusCheck:
+                    new Date()
+            }
+        }
+    );
+
+    stillUnavailable++;
+
+    console.log(
+        `⏭️ ${ticker} (${market}) still has no historical data`
+    );
+
+} else {
+
+    failed++;
+
+    console.log(
+        `⚠️ ${ticker} (${market}): provider failed during history recheck`
+    );
+}
+
+            } catch (error) {
+
+                failed++;
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Do not change historyStatus when
+                 * the provider itself fails.
+                 */
+
+                console.error(
+                    `[HistoryRecheck] ${ticker} (${market}):`,
+                    error.message
+                );
+            }
+        }
+
+        console.log('');
+        console.log(
+            `Recovered:           ${recovered}`
+        );
+
+        console.log(
+            `Still unavailable:   ${stillUnavailable}`
+        );
+
+        console.log(
+            `Provider failures:   ${failed}`
+        );
+
+        console.log(
+            '================================'
+        );
+
+        console.log('');
+
+    } catch (error) {
+
+        console.error(
+            '[HistoryRecheck] Fatal error:',
             error.message
         );
     }
@@ -757,16 +1225,18 @@ async function runRetention() {
 // ============================================================
 
 let historyTask = null;
+let historyRecheckTask = null;
 let confidenceTask = null;
 let retentionTask = null;
 
 
 function startConfidenceScheduler() {
     if (
-        historyTask ||
-        confidenceTask ||
-        retentionTask
-    ) {
+    historyTask ||
+    historyRecheckTask ||
+    confidenceTask ||
+    retentionTask
+) {
         console.log(
             '⚠️ Gaze scheduler already running.'
         );
@@ -790,6 +1260,27 @@ function startConfidenceScheduler() {
                     true
             }
         );
+
+        /*
+ * Weekly recheck for frozen historical data.
+ */
+
+historyRecheckTask =
+    cron.schedule(
+        HISTORY_RECHECK_CRON,
+        runHistoryRecheck,
+        {
+            timezone:
+                TIME_ZONE,
+
+            noOverlap:
+                true
+        }
+    );
+
+    console.log(
+    `  ↳ Frozen history recheck: Sunday 02:00 (${TIME_ZONE})`
+);
 
     /*
      * Five confidence checks per day.
@@ -857,6 +1348,12 @@ function stopConfidenceScheduler() {
         historyTask = null;
     }
 
+    if (historyRecheckTask) {
+    historyRecheckTask.stop();
+
+    historyRecheckTask = null;
+}
+
     if (confidenceTask) {
         confidenceTask.stop();
 
@@ -883,6 +1380,7 @@ module.exports = {
     startConfidenceScheduler,
     stopConfidenceScheduler,
     runHistorySync,
+    runHistoryRecheck,
     runConfidenceCheck,
     runRetention
 };

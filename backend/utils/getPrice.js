@@ -4,6 +4,7 @@ const PriceHistory = require('../models/PriceHistory');
 const ProviderState = require('../models/ProviderState');
 
 
+
 // ============================================================
 // API CONFIG
 // ============================================================
@@ -340,6 +341,14 @@ function getFinnhubToken() {
         process.env.FINNHUB_TOKEN ||
         ''
     ).trim();
+}
+
+function getInvestoToken() {
+    return (
+        process.env.INVESTO_API_KEY ||
+        process.env.INVESTO_API_TOKEN ||
+        ''
+    );
 }
 
 function getTwelveDataToken() {
@@ -1246,25 +1255,16 @@ async function getFinnhubPrice(
 }
 
 // ============================================================
-// INVESTO — NGX HISTORY
+// NGX HISTORY — INVESTO
 // ============================================================
 
 async function getInvestoHistory(
     ticker,
     days = 30,
-    endDate = null,
-    forceRefresh = false
+    endDate = null
 ) {
     const symbol =
         normalizeTicker(ticker);
-
-    if (await isInvestoCoolingDown()) {
-        console.log(
-            `⏸️ Investo cooldown active. Skipping history for ${symbol}`
-        );
-
-        return [];
-    }
 
     const token =
         getInvestoToken();
@@ -1272,6 +1272,14 @@ async function getInvestoHistory(
     if (!token) {
         console.error(
             '❌ INVESTO_API_KEY is missing from .env'
+        );
+
+        return [];
+    }
+
+    if (await isInvestoCoolingDown()) {
+        console.log(
+            `⏸️ Investo cooldown active. Skipping history for ${symbol}`
         );
 
         return [];
@@ -1295,6 +1303,10 @@ async function getInvestoHistory(
         return [];
     }
 
+    /*
+     * Request more calendar days than trading days
+     * because weekends and holidays do not count.
+     */
     const calendarWindow =
         Math.max(
             30,
@@ -1307,307 +1319,133 @@ async function getInvestoHistory(
             calendarWindow
         );
 
-    // --------------------------------------------------------
-    // CACHE KEY
-    // --------------------------------------------------------
-
     const cacheKey =
         `investo-history:${symbol}:${safeDays}:${from}:${end}`;
 
-    // --------------------------------------------------------
-    // MEMORY CACHE
-    // --------------------------------------------------------
-
-    if (!forceRefresh) {
-        const cached =
-            cacheGet(
-                historyCache,
-                cacheKey
-            );
-
-        if (cached) {
-            console.log(
-                `✓ Cached Investo history for ${symbol}: ${cached.length} real trading days`
-            );
-
-            return cached;
-        }
-    }
-
-    // --------------------------------------------------------
-    // SHARE IDENTICAL IN-FLIGHT REQUESTS
-    // --------------------------------------------------------
-
-    if (
-        investoHistoryInFlight.has(
-            cacheKey
-        )
-    ) {
-        console.log(
-            `↳ Sharing in-flight Investo history request for ${symbol}`
-        );
-
-        return await investoHistoryInFlight.get(
+    const cached =
+        cacheGet(
+            historyCache,
             cacheKey
         );
+
+    if (cached) {
+        return cached;
     }
-
-    // --------------------------------------------------------
-    // REQUEST
-    // --------------------------------------------------------
-
-    const requestPromise =
-        (async () => {
-            try {
-                console.log(
-                    `→ Requesting Investo history for ${symbol}: ${from} → ${end}`
-                );
-
-                const response =
-                    await axios.get(
-                        `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                        {
-                            params: {
-                                from,
-                                to: end,
-                                provenance: 1
-                            },
-
-                            headers: {
-                                Authorization:
-                                    `Bearer ${token}`
-                            },
-
-                            timeout: 20000
-                        }
-                    );
-
-                const body =
-                    response.data;
-
-                // ------------------------------------------------
-                // API RESPONSE ERRORS
-                // ------------------------------------------------
-
-                if (
-                    body?.ok === false
-                ) {
-                    const code =
-                        body?.error?.code;
-
-                    if (
-                        code === 'rate_limited'
-                    ) {
-                        await activateInvestoCooldown();
-
-                        return [];
-                    }
-
-                    if (
-                        code === 'unknown_symbol'
-                    ) {
-                        console.warn(
-                            `⚠️ Investo has no historical data for ${symbol}.`
-                        );
-
-                        return [];
-                    }
-
-                    if (
-                        code ===
-                            'missing_api_key' ||
-                        code ===
-                            'invalid_api_key' ||
-                        code ===
-                            'revoked_api_key'
-                    ) {
-                        console.error(
-                            `❌ Investo authentication error while loading ${symbol}:`,
-                            body.error?.message
-                        );
-
-                        return [];
-                    }
-
-                    console.error(
-                        `[getInvestoHistory] ${symbol}:`,
-                        body.error || body
-                    );
-
-                    return [];
-                }
-
-                // ------------------------------------------------
-                // FIND RAW HISTORY ARRAY
-                // ------------------------------------------------
-
-                const rawRows =
-                    Array.isArray(
-                        body?.data
-                    )
-                        ? body.data
-                        : Array.isArray(
-                            body
-                        )
-                            ? body
-                            : Array.isArray(
-                                body?.history
-                            )
-                                ? body.history
-                                : Array.isArray(
-                                    body?.results
-                                )
-                                    ? body.results
-                                    : [];
-
-                // ------------------------------------------------
-                // NORMALIZE ALL REAL ROWS
-                // ------------------------------------------------
-
-                const allRows =
-                    normalizeHistoricalRows(
-                        rawRows
-                    )
-                        .filter(
-                            row =>
-                                row.date >= from &&
-                                row.date <= end
-                        )
-                        .sort(
-                            (a, b) =>
-                                a.date.localeCompare(
-                                    b.date
-                                )
-                        );
-
-                // ------------------------------------------------
-                // SAVE ALL AVAILABLE HISTORY
-                // ------------------------------------------------
-
-                await savePriceHistory(
-                    symbol,
-                    'NGX',
-                    allRows,
-                    'investo'
-                );
-
-                // ------------------------------------------------
-                // RETURN ONLY REQUESTED NUMBER OF DAYS
-                // ------------------------------------------------
-
-                const rows =
-                    allRows.slice(
-                        -safeDays
-                    );
-
-                // ------------------------------------------------
-                // MEMORY CACHE
-                // ------------------------------------------------
-
-                cacheSet(
-                    historyCache,
-                    cacheKey,
-                    rows,
-                    HISTORY_CACHE_TTL
-                );
-
-                console.log(
-                    `✓ Investo history for ${symbol}: ${rows.length} real trading days`
-                );
-
-                await clearProviderCooldown(
-                    'investo'
-                );
-
-                if (
-                    rows.length
-                ) {
-                    console.log(
-                        `  ↳ ${rows[0].date} → ${
-                            rows[
-                                rows.length - 1
-                            ].date
-                        }`
-                    );
-                }
-
-                return rows;
-
-            } catch (error) {
-                const responseData =
-                    error.response?.data;
-
-                const errorCode =
-                    responseData?.error?.code;
-
-                // ------------------------------------------------
-                // RATE LIMIT
-                // ------------------------------------------------
-
-                if (
-                    error.response?.status === 429 ||
-                    errorCode === 'rate_limited'
-                ) {
-                    await activateInvestoCooldown();
-                }
-
-                // ------------------------------------------------
-                // UNKNOWN SYMBOL
-                // ------------------------------------------------
-
-                if (
-                    error.response?.status === 404 ||
-                    errorCode === 'unknown_symbol'
-                ) {
-                    console.warn(
-                        `⚠️ Investo has no historical data for ${symbol}.`
-                    );
-
-                    return [];
-                }
-
-                // ------------------------------------------------
-                // AUTHORIZATION
-                // ------------------------------------------------
-
-                if (
-                    error.response?.status === 401 ||
-                    error.response?.status === 403
-                ) {
-                    console.error(
-                        `❌ Investo authentication/permission error for ${symbol}:`,
-                        responseData ||
-                        error.message
-                    );
-
-                    return [];
-                }
-
-                // ------------------------------------------------
-                // OTHER ERRORS
-                // ------------------------------------------------
-
-                console.error(
-                    `[getInvestoHistory] ${symbol}:`,
-                    responseData ||
-                    error.message
-                );
-
-                return [];
-            }
-        })();
-
-    investoHistoryInFlight.set(
-        cacheKey,
-        requestPromise
-    );
 
     try {
-        return await requestPromise;
-    } finally {
-        investoHistoryInFlight.delete(
-            cacheKey
+        const response =
+            await axios.get(
+                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                {
+                    params: {
+                        from,
+                        to: end
+                    },
+
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`
+                    },
+
+                    timeout: 20000
+                }
+            );
+
+        const data =
+            response.data;
+
+        /*
+         * Investo returns:
+         *
+         * {
+         *   ok: true,
+         *   data: [...]
+         * }
+         */
+
+        if (
+            data?.ok === false
+        ) {
+            const errorCode =
+                data?.error?.code ||
+                'unknown';
+
+            if (
+                errorCode ===
+                'rate_limited'
+            ) {
+                activateInvestoCooldown();
+            }
+
+            console.warn(
+                `⚠️ Investo history error for ${symbol}: ${errorCode}`
+            );
+
+            return [];
+        }
+
+        const rawRows =
+            Array.isArray(data)
+                ? data
+                : Array.isArray(data?.data)
+                    ? data.data
+                    : Array.isArray(data?.history)
+                        ? data.history
+                        : Array.isArray(data?.results)
+                            ? data.results
+                            : [];
+
+        const rows =
+            normalizeHistoricalRows(
+                rawRows
+            )
+                .filter(row =>
+                    row.date >= from &&
+                    row.date <= end
+                )
+                .sort(
+                    (a, b) =>
+                        a.date.localeCompare(
+                            b.date
+                        )
+                )
+                .slice(-safeDays);
+
+        cacheSet(
+            historyCache,
+            cacheKey,
+            rows,
+            HISTORY_CACHE_TTL
         );
+
+        console.log(
+            `✓ Investo history for ${symbol}: ${rows.length} real trading days`
+        );
+
+        return rows;
+
+    } catch (error) {
+        const responseData =
+            error.response?.data;
+
+        const status =
+            error.response?.status;
+
+        if (
+            status === 429 ||
+            responseData?.error?.code ===
+                'rate_limited'
+        ) {
+            activateInvestoCooldown();
+        }
+
+        console.error(
+            `[getInvestoHistory] ${symbol}:`,
+            responseData ||
+            error.message
+        );
+
+        return [];
     }
 }
 
@@ -2094,6 +1932,310 @@ async function getSnapshotHistory(
     }
 }
 
+
+
+// ============================================================
+// HISTORICAL PROVIDER STATUS
+// ============================================================
+//
+// Used ONLY by the scheduler.
+//
+// This deliberately does NOT use PriceSnapshot fallback.
+// Therefore:
+//
+// available     = provider returned real history
+// no_data       = provider responded successfully but had
+//                 no historical rows
+// provider_error = provider request failed
+//
+// IMPORTANT:
+// getPriceHistory() remains unchanged and can still use
+// PriceSnapshot for "Observed by Gaze" charts.
+// ============================================================
+
+// ============================================================
+// HISTORICAL PROVIDER STATUS
+// ============================================================
+
+async function getHistoricalProviderStatus(
+    ticker,
+    days = 10,
+    market = 'NGX',
+    endDate = null
+) {
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    const safeDays =
+        Math.min(
+            Math.max(
+                Number(days) || 10,
+                1
+            ),
+            365
+        );
+
+    const end =
+        endDate
+            ? dateOnly(endDate)
+            : todayStr();
+
+    if (!end) {
+        return {
+            status: 'provider_error',
+            rows: []
+        };
+    }
+
+    // ========================================================
+    // US — FINNHUB
+    // ========================================================
+
+    // ========================================================
+// US — FINNHUB
+// ========================================================
+
+if (normalizedMarket === 'US') {
+    try {
+        /*
+         * getPriceHistory() already routes US history
+         * to Finnhub and does not use the NGX snapshot
+         * fallback.
+         */
+        const rows =
+            await getPriceHistory(
+                symbol,
+                safeDays,
+                'US',
+                end
+            );
+
+        return {
+            status:
+                rows.length > 0
+                    ? 'available'
+                    : 'no_data',
+
+            rows
+        };
+
+    } catch (error) {
+        console.error(
+            `[HistoricalProviderStatus] ${symbol} (${normalizedMarket}):`,
+            error.message
+        );
+
+        return {
+            status: 'provider_error',
+            rows: []
+        };
+    }
+}
+    // ========================================================
+    // NGX — INVESTO
+    // ========================================================
+
+    const token =
+        getInvestoToken();
+
+    if (!token) {
+        console.error(
+            '❌ INVESTO_API_KEY is missing from .env'
+        );
+
+        return {
+            status: 'provider_error',
+            rows: []
+        };
+    }
+
+    if (
+        await isInvestoCoolingDown()
+    ) {
+        console.log(
+            `⏸️ Investo cooldown active. Skipping provider status for ${symbol}`
+        );
+
+        return {
+            status: 'provider_error',
+            rows: []
+        };
+    }
+
+    /*
+     * Request extra calendar days because NGX has
+     * weekends and market holidays.
+     */
+
+    const calendarWindow =
+        Math.max(
+            30,
+            safeDays * 3
+        );
+
+    const from =
+        subtractDays(
+            end,
+            calendarWindow
+        );
+
+    try {
+        const response =
+            await axios.get(
+                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                {
+                    params: {
+                        from,
+                        to: end
+                    },
+
+                    headers: {
+                        Authorization:
+                            `Bearer ${token}`
+                    },
+
+                    timeout: 20000
+                }
+            );
+
+        const data =
+            response.data;
+
+        /*
+         * Explicit API error response.
+         */
+
+        if (
+            data?.ok === false
+        ) {
+            const errorCode =
+                data?.error?.code ||
+                'unknown';
+
+            if (
+                errorCode ===
+                'rate_limited'
+            ) {
+                await activateInvestoCooldown();
+            }
+
+            console.warn(
+                `[HistoricalProviderStatus] ${symbol}: Investo error ${errorCode}`
+            );
+
+            return {
+                status:
+                    errorCode ===
+                    'unknown_symbol'
+                        ? 'no_data'
+                        : 'provider_error',
+
+                rows: []
+            };
+        }
+
+        const rawRows =
+            Array.isArray(data)
+                ? data
+                : Array.isArray(data?.data)
+                    ? data.data
+                    : Array.isArray(data?.history)
+                        ? data.history
+                        : Array.isArray(data?.results)
+                            ? data.results
+                            : [];
+
+        const rows =
+            normalizeHistoricalRows(
+                rawRows
+            )
+                .filter(row =>
+                    row.date >= from &&
+                    row.date <= end
+                )
+                .sort(
+                    (a, b) =>
+                        a.date.localeCompare(
+                            b.date
+                        )
+                )
+                .slice(-safeDays);
+
+        if (rows.length > 0) {
+            console.log(
+                `✓ Investo provider status for ${symbol}: ${rows.length} real trading days available`
+            );
+
+            return {
+                status: 'available',
+                rows
+            };
+        }
+
+        console.log(
+            `⏸️ Investo provider status for ${symbol}: no historical data`
+        );
+
+        return {
+            status: 'no_data',
+            rows: []
+        };
+
+    } catch (error) {
+        const responseStatus =
+            error.response?.status;
+
+        const responseData =
+            error.response?.data;
+
+        /*
+         * 404 means Investo has no recognized historical
+         * dataset for this symbol. Treat it as no_data,
+         * not as a provider outage.
+         */
+
+        if (
+            responseStatus === 404
+        ) {
+            console.log(
+                `⏸️ Investo provider status for ${symbol}: no historical data`
+            );
+
+            return {
+                status: 'no_data',
+                rows: []
+            };
+        }
+
+        /*
+         * Rate limit.
+         */
+
+        if (
+            responseStatus === 429 ||
+            responseData?.error?.code ===
+                'rate_limited'
+        ) {
+            await activateInvestoCooldown();
+        }
+
+        console.error(
+            `[HistoricalProviderStatus] ${symbol} (${normalizedMarket}):`,
+            responseStatus || '',
+            responseData?.error ||
+            error.message
+        );
+
+        return {
+            status: 'provider_error',
+            rows: []
+        };
+    }
+}
+
 // ============================================================
 // PUBLIC HISTORY FUNCTION
 // ============================================================
@@ -2360,6 +2502,6 @@ module.exports = {
     getPrice,
     getPriceHistory,
     getInvestoHistory,
-    getQuote,
-    getNGNMarketCompanies
+    getHistoricalProviderStatus,
+    getQuote
 };
