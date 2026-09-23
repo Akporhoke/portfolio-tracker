@@ -1,2 +1,7 @@
 .env
 node_modules/
+# Local testing / diagnostic scripts
+checkHistoryCoverage.js
+runHistorySyncOnce.js
+runUSHistorySyncOnce.js
+testInvestoHistory.js
