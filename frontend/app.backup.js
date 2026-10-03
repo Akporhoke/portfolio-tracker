@@ -5758,6 +5758,9 @@ function renderWatchlist() {
 
                                     <div class="watchlist-analysis-actions">
 
+
+                                    <div class="watchlist-analysis-actions">
+
                                         <button
                                             class="btn-add watchlist-analysis-btn"
                                             onclick="event.stopPropagation(); openWatchlistToPortfolioModal('${safeTicker}')"
@@ -8987,85 +8990,4 @@ function renderConfidenceHistory(container, data) {
             <span><i style="background:#6366f1"></i>Daily score</span>
         </div>
     `;
-}
-
-/* ============================================
-   QUICK STATS COUNT-UP
-   ============================================ */
-
-function animateCount(element, targetValue, duration = 900) {
-
-    if (!element) {
-        return;
-    }
-
-    const endValue =
-        Math.max(0, Math.round(Number(targetValue) || 0));
-
-    // Where the last animation finished (0 on first load)
-    let startValue =
-        Number(element.dataset.value) || 0;
-
-    // If an animation is still running, continue from what is on screen
-    if (element._countFrame) {
-        cancelAnimationFrame(element._countFrame);
-        element._countFrame = null;
-        startValue = Number(element.textContent) || 0;
-    }
-
-    // Nothing changed: show the value, no animation
-    if (startValue === endValue) {
-        element.textContent = endValue;
-        element.dataset.value = endValue;
-        return;
-    }
-
-    const startTime = performance.now();
-
-    function update(now) {
-
-        const progress =
-            Math.min((now - startTime) / duration, 1);
-
-        // Ease-out, same feel as the portfolio value
-        const eased =
-            1 - Math.pow(1 - progress, 3);
-
-        element.textContent =
-            Math.round(startValue + (endValue - startValue) * eased);
-
-        if (progress < 1) {
-
-            element._countFrame =
-                requestAnimationFrame(update);
-
-        } else {
-
-            element.textContent = endValue;
-            element.dataset.value = endValue;
-            element._countFrame = null;
-        }
-    }
-
-    element._countFrame = requestAnimationFrame(update);
-}
-
-
-// Replaces the earlier updateQuickStats above
-function updateQuickStats() {
-
-    animateCount(
-        document.getElementById('statWatching'),
-        state.watchlist.stocks?.length || 0
-    );
-
-    animateCount(
-        document.getElementById('statHeld'),
-        state.portfolio.stocks?.length || 0
-    );
-
-    animateCount(
-        document.getElementById('statSold'),
-        state.sold.stocks?.length || 0
-    );
 }

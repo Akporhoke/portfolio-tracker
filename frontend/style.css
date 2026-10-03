@@ -3310,3 +3310,49 @@ button:last-child:active {
         transform: rotate(360deg);
     }
 }
+
+/* ============================================
+   LIST SPACING FIX
+   ============================================ */
+
+.watchlist-list,
+.portfolio-list,
+.sold-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Cards keep their own height instead of shrinking */
+.watchlist-list > .watchlist-card,
+.portfolio-list > .stock-item,
+.sold-list > .stock-item {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+/* ============================================
+   QUICK STATS COLORS
+   ============================================ */
+
+/* Watching (teal) */
+.quick-stats .stat:nth-child(1) .stat-label,
+.quick-stats .stat:nth-child(1) .stat-number {
+    color: #087F73;
+}
+
+/* Held (blue) */
+.quick-stats .stat:nth-child(3) .stat-label,
+.quick-stats .stat:nth-child(3) .stat-number {
+    color: #1E4F9A;
+}
+
+/* Sold (mauve) */
+.quick-stats .stat:nth-child(5) .stat-label,
+.quick-stats .stat:nth-child(5) .stat-number {
+    color: #9A6070;
+}
+
+.quick-stats .stat-label {
+    font-weight: 700;
+}

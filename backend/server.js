@@ -6,6 +6,8 @@ const cors = require('cors');
 const {
     startConfidenceScheduler
 } = require('./services/confidenceScheduler');
+const schedulerRoutes =
+    require('./routes/scheduler');
 
 const app = express();
 
@@ -37,6 +39,10 @@ app.use(
     '/api/stocks',
     stockRoutes
 );
+app.use(
+    '/api/scheduler',
+    schedulerRoutes
+);
 
 // Server Port
 const PORT =
@@ -62,13 +68,13 @@ async function startServer() {
     '✓ MongoDB connected'
 );
 
-startConfidenceScheduler();
-
 app.listen(PORT, () => {
     console.log(
         `✓ Server running on port ${PORT}`
     );
 });
+
+startConfidenceScheduler();
 
     } catch (err) {
         console.error(

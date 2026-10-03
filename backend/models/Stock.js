@@ -101,6 +101,52 @@ historyStatus: {
 },
 
 
+historyLastUpdated: {
+    type: Date,
+    default: null
+},
+
+historySyncStatus: {
+    type: String,
+    enum: [
+        'current',
+        'stale',
+        'updating',
+        'failed'
+    ],
+    default: 'stale'
+},
+
+historyLatestDate: {
+    type: String,
+    default: null
+},
+lastHistoryDate: {
+    type: String,
+    default: null
+},
+
+lastCheckedDate: {
+    type: String,
+    default: null
+},
+
+lastAttemptAt: {
+    type: Date,
+    default: null
+},
+
+failCount: {
+    type: Number,
+    default: 0
+},
+
+nextRetryAt: {
+    type: Date,
+    default: null
+},
+
+
 
         // ========================================================
         // DATA SOURCE

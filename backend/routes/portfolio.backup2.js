@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 
 const ConfidenceSnapshot =
@@ -373,12 +373,7 @@ function calculateMomentumScore(
     const improvement =
         observationAverage - baselineAverage;
 
-    // Early days are noisy: day 1 counts 1/7, day 7 counts fully
-    const reliability =
-        Math.min(observationRows.length, MAX_POST_ADD_DAYS) /
-        MAX_POST_ADD_DAYS;
-
-    return clamp(50 + improvement * 33 * reliability);
+    return clamp(50 + improvement * 33);
 }
 
 
@@ -1089,7 +1084,7 @@ async function updateWatchlistConfidence(
             changed = true;
 
             console.log(
-                `âœ“ Confidence ${stock.ticker}: ` +
+                `✓ Confidence ${stock.ticker}: ` +
                 `${
                     confidence.score !== null
                         ? confidence.score
@@ -1584,7 +1579,7 @@ router.post(
             await portfolio.save();
 
             console.log(
-                `âœ“ Added ${normalizedTicker} to portfolio`
+                `✓ Added ${normalizedTicker} to portfolio`
             );
 
             res.status(201).json({
@@ -1852,7 +1847,7 @@ res.status(201).json({
 
 
 // ============================================================
-// WATCHLIST â†’ PORTFOLIO
+// WATCHLIST → PORTFOLIO
 // ============================================================
 
 // ============================================================
@@ -2383,7 +2378,7 @@ router.post(
             await portfolio.save();
 
             console.log(
-                `âœ“ Sold ${sellQuantity} ${normalizedTicker} at ${sellPrice}`
+                `✓ Sold ${sellQuantity} ${normalizedTicker} at ${sellPrice}`
             );
 
             // ------------------------------------------------
@@ -2579,7 +2574,7 @@ router.post(
             await portfolio.save();
 
             console.log(
-                `âœ“ Edited ${normalizedTicker}: ` +
+                `✓ Edited ${normalizedTicker}: ` +
                 `${newQuantity} shares @ ${newBuyPrice}`
             );
 
@@ -2616,91 +2611,6 @@ router.post(
 // ============================================================
 // EXPORT
 // ============================================================
-
-// ============================================================
-// CONFIDENCE HISTORY
-// ============================================================
-//
-// GET /api/portfolio/:userId/confidence-history/:ticker?market=NGX
-//
-// Returns this user's saved confidence points for one stock,
-// oldest first: initial (0/7) through final (7/7).
-// ============================================================
-
-router.get(
-    '/:userId/confidence-history/:ticker',
-    async (req, res) => {
-        try {
-            const { userId } = req.params;
-
-            const ticker = normalizeTicker(req.params.ticker);
-
-            if (!ticker) {
-                return res.status(400).json({
-                    error: 'ticker is required'
-                });
-            }
-
-            // Only filter by market if the caller sent one
-            const filter = { userId, ticker };
-
-            if (req.query.market) {
-                filter.market = normalizeMarket(req.query.market);
-            }
-
-            const rows = await ConfidenceSnapshot
-                .find(filter)
-                .sort({ date: 1 })
-                .select({
-                    _id: 0,
-                    date: 1,
-                    score: 1,
-                    signal: 1,
-                    postAddDays: 1,
-                    isFinal: 1,
-                    breakdown: 1,
-                    market: 1
-                })
-                .lean();
-
-            const last = rows[rows.length - 1] || null;
-
-            res.json({
-                ticker,
-                market: last ? last.market : (filter.market || null),
-
-                // A full cycle is 8 points: initial + 7 trading days
-                expectedPoints: MAX_POST_ADD_DAYS + 1,
-                savedPoints: rows.length,
-
-                isFinal: Boolean(last && last.isFinal),
-                latestScore: last ? last.score : null,
-
-                points: rows.map(row => ({
-                    date: row.date,
-                    score: row.score,
-                    signal: row.signal,
-                    postAddDays: row.postAddDays,
-                    isFinal: row.isFinal,
-                    breakdown: row.breakdown
-                }))
-            });
-
-        } catch (error) {
-            console.error(
-                '[GET /:userId/confidence-history/:ticker] Error:',
-                error
-            );
-
-            res.status(500).json({
-                error: 'Failed to load confidence history',
-                message: error.message
-            });
-        }
-    }
-);
-
-
 
 router.updateWatchlistConfidence =
     updateWatchlistConfidence;

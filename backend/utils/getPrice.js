@@ -343,13 +343,6 @@ function getFinnhubToken() {
     ).trim();
 }
 
-function getInvestoToken() {
-    return (
-        process.env.INVESTO_API_KEY ||
-        process.env.INVESTO_API_TOKEN ||
-        ''
-    );
-}
 
 function getTwelveDataToken() {
     return (
@@ -1648,6 +1641,11 @@ async function getTwelveDataHistory(
                 )
         );
 
+        console.log(
+    `📅 Twelve Data ${symbol} dates:`,
+    allRows.map(row => row.date)
+);
+
 await savePriceHistory(
     symbol,
     'US',
@@ -2010,7 +2008,8 @@ if (normalizedMarket === 'US') {
                 symbol,
                 safeDays,
                 'US',
-                end
+                end,
+                true
             );
 
         return {
@@ -2053,17 +2052,18 @@ if (normalizedMarket === 'US') {
     }
 
     if (
-        await isInvestoCoolingDown()
-    ) {
-        console.log(
-            `⏸️ Investo cooldown active. Skipping provider status for ${symbol}`
-        );
+    await isInvestoCoolingDown()
+) {
+    console.log(
+        `⏸️ Investo cooldown active. Skipping provider status for ${symbol}`
+    );
 
-        return {
-            status: 'provider_error',
-            rows: []
-        };
-    }
+    return {
+        status: 'cooldown',
+        rows: [],
+        requestMade: false
+    };
+}
 
     /*
      * Request extra calendar days because NGX has
@@ -2127,14 +2127,15 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-                status:
-                    errorCode ===
-                    'unknown_symbol'
-                        ? 'no_data'
-                        : 'provider_error',
+    status:
+        errorCode ===
+        'unknown_symbol'
+            ? 'no_data'
+            : 'provider_error',
 
-                rows: []
-            };
+    rows: [],
+    requestMade: true
+};
         }
 
         const rawRows =
@@ -2170,9 +2171,10 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-                status: 'available',
-                rows
-            };
+    status: 'available',
+    rows,
+    requestMade: true
+};
         }
 
         console.log(
@@ -2180,9 +2182,10 @@ if (normalizedMarket === 'US') {
         );
 
         return {
-            status: 'no_data',
-            rows: []
-        };
+    status: 'no_data',
+    rows: [],
+    requestMade: true
+};
 
     } catch (error) {
         const responseStatus =
@@ -2205,9 +2208,10 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-                status: 'no_data',
-                rows: []
-            };
+    status: 'no_data',
+    rows: [],
+    requestMade: true
+};
         }
 
         /*
@@ -2230,9 +2234,10 @@ if (normalizedMarket === 'US') {
         );
 
         return {
-            status: 'provider_error',
-            rows: []
-        };
+    status: 'provider_error',
+    rows: [],
+    requestMade: true
+};
     }
 }
 
