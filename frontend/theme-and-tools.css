@@ -1,0 +1,238 @@
+/* ============================================
+   GAZE — THEME + TOOLS
+   Load this AFTER style.css
+   ============================================ */
+
+
+/* --------------------------------------------
+   THEME VARIABLES
+   JS sets data-theme="light" or "dark" on <html>.
+   These beat the old prefers-color-scheme block,
+   so you do not need to delete it.
+   -------------------------------------------- */
+
+:root[data-theme="light"] {
+    --bg-main: #F6F8FA;
+    --bg-card: #ffffff;
+    --bg-hover: #f9f9f9;
+    --text-primary: #333;
+    --text-secondary: #999;
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    --bg-main: #141616;
+    --bg-card: #232626;
+    --bg-hover: #2c3030;
+    --text-primary: #F1F5F4;
+    --text-secondary: #9AA5A3;
+    color-scheme: dark;
+}
+
+
+/* --------------------------------------------
+   DARK MODE FIXES
+   (places where the old CSS hardcodes colours)
+   -------------------------------------------- */
+
+:root[data-theme="dark"] .pull-to-refresh,
+:root[data-theme="dark"] .status-bar {
+    background: transparent;
+}
+
+/* Quick stats */
+:root[data-theme="dark"] .quick-stats {
+    background: linear-gradient(135deg, #1B2A28 0%, #1B2430 100%);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+:root[data-theme="dark"] .quick-stats .stat:nth-child(1) .stat-label,
+:root[data-theme="dark"] .quick-stats .stat:nth-child(1) .stat-number {
+    color: #3FBFB0;
+}
+
+:root[data-theme="dark"] .quick-stats .stat:nth-child(3) .stat-label,
+:root[data-theme="dark"] .quick-stats .stat:nth-child(3) .stat-number {
+    color: #7FB0F5;
+}
+
+:root[data-theme="dark"] .quick-stats .stat:nth-child(5) .stat-label,
+:root[data-theme="dark"] .quick-stats .stat:nth-child(5) .stat-number {
+    color: #D79AAA;
+}
+
+:root[data-theme="dark"] .quick-stats .divider {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Search / sort toolbars */
+:root[data-theme="dark"] .list-toolbar input,
+:root[data-theme="dark"] .list-toolbar select {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+}
+
+/* Charts */
+:root[data-theme="dark"] .chart,
+:root[data-theme="dark"] .stock-history-chart {
+    background: #1B1E1E;
+}
+
+:root[data-theme="dark"] .chart-range-label,
+:root[data-theme="dark"] .chart-change {
+    color: #F1F5F4;
+}
+
+:root[data-theme="dark"] .chart-change.positive {
+    color: #4ADE80;
+}
+
+:root[data-theme="dark"] .chart-change.negative {
+    color: #F87171;
+}
+
+:root[data-theme="dark"] .chart-axis {
+    stroke: #3A4040;
+}
+
+:root[data-theme="dark"] .confidence-metric-track {
+    background: #3A4040;
+}
+
+/* Skeleton loaders */
+:root[data-theme="dark"] .skeleton-block {
+    background: linear-gradient(90deg, #2A2E2E 25%, #343939 37%, #2A2E2E 63%);
+    background-size: 400% 100%;
+}
+
+/* Toasts */
+:root[data-theme="dark"] .toast.success {
+    background: #1B3326;
+}
+
+:root[data-theme="dark"] .toast.error {
+    background: #3A1F1F;
+}
+
+:root[data-theme="dark"] .toast.warning {
+    background: #3A2E18;
+}
+
+/* Lists and borders */
+:root[data-theme="dark"] .tabs,
+:root[data-theme="dark"] .modal-header,
+:root[data-theme="dark"] .settings-row,
+:root[data-theme="dark"] .settings-row.settings-link,
+:root[data-theme="dark"] .calc-result-row,
+:root[data-theme="dark"] .detail-stats .stat-row,
+:root[data-theme="dark"] .autocomplete-item {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .watchlist-analysis-inner,
+:root[data-theme="dark"] .watchlist-confidence-section {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Buttons that were hardcoded white */
+:root[data-theme="dark"] .currency-btn {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+:root[data-theme="dark"] .currency-btn.active {
+    background: #667eea;
+    color: #fff;
+    border-color: #667eea;
+}
+
+:root[data-theme="dark"] .watchlist-analysis-actions .btn-delete,
+:root[data-theme="dark"] .watchlist-analysis-actions button:last-child {
+    background: var(--bg-card);
+    color: #F87171;
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+/* Confirm modal inline grey box */
+:root[data-theme="dark"] #confirmModal div[style*="f5f5f5"] {
+    background: #2C3030 !important;
+}
+
+:root[data-theme="dark"] #confirmMessage {
+    color: var(--text-secondary) !important;
+}
+
+
+/* --------------------------------------------
+   SECTOR BAR — "Other" segment
+   -------------------------------------------- */
+
+.sector-other {
+    flex: 0 0 0%;
+    background: #B0BEC5;
+}
+
+
+/* --------------------------------------------
+   SETTINGS EXTRAS
+   -------------------------------------------- */
+
+.segmented.two {
+    grid-template-columns: 1fr 1fr;
+}
+
+
+/* --------------------------------------------
+   CALCULATOR
+   -------------------------------------------- */
+
+.tool-container {
+    padding-bottom: 24px;
+}
+
+.calc-results {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 4px 16px;
+    margin-bottom: 12px;
+}
+
+.calc-result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+
+.calc-result-row:last-child {
+    border-bottom: none;
+}
+
+.calc-result-row > span {
+    color: var(--text-secondary);
+}
+
+.calc-result-row > strong {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.calc-result-row > strong.positive {
+    color: #00a651;
+}
+
+.calc-result-row > strong.negative {
+    color: var(--error);
+}
+
+.calc-result-row.calc-main > strong {
+    font-size: 17px;
+}

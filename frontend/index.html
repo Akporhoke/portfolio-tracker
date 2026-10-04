@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Portfolio Tracker</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="theme-and-tools.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
-</head> 
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+</head>
 <body>
 
 
@@ -37,11 +38,11 @@
                 <h1 class="name" id="userName">Guest</h1>
             </div>
             <div class="header-actions">
-    <button class="tab-btn header-icon-btn" data-tab="settings" aria-label="Settings">
-        <i class="fa-solid fa-gear"></i>
-    </button>
-    <div class="avatar" id="avatar">G</div>
-</div>
+                <button class="tab-btn header-icon-btn" data-tab="settings" aria-label="Settings">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                <div class="avatar" id="avatar">G</div>
+            </div>
         </div>
 
         <!-- Quick Stats -->
@@ -135,11 +136,13 @@
                     <div class="sector-finance" id="sectorFinance"></div>
                     <div class="sector-tech" id="sectorTech"></div>
                     <div class="sector-consumer" id="sectorConsumer"></div>
+                    <div class="sector-other" id="sectorOther"></div>
                 </div>
                 <div class="sector-legend">
                     <span>Finance <span id="financePercent">0</span>%</span>
                     <span>Tech <span id="techPercent">0</span>%</span>
                     <span>Consumer <span id="consumerPercent">0</span>%</span>
+                    <span>Other <span id="otherPercent">0</span>%</span>
                 </div>
             </div>
 
@@ -216,12 +219,11 @@
                 <p>Watchlist</p>
             </button>
             <button class="tab-btn" data-tab="study">
-    <span><i class="fa-solid fa-graduation-cap"></i></span>
-    <p>Study</p>
-</button>
-           
+                <span><i class="fa-solid fa-graduation-cap"></i></span>
+                <p>Study</p>
+            </button>
         </div>
-""
+
         <!-- TAB: HOME (Portfolio Performance & Activity) -->
         <div class="tab-content active" id="homeTab">
             <!-- Portfolio Performance Chart -->
@@ -372,57 +374,228 @@
         </div>
 
         <!-- TAB: SETTINGS -->
+        <div class="tab-content" id="settingsTab">
+            <div class="settings-container">
+                <h2 class="settings-title">Settings</h2>
 
-<div class="tab-content" id="settingsTab">
-    <div class="settings-container">
-        <h2 class="settings-title">Settings</h2>
+                <div class="settings-profile-card">
+                    <div class="avatar" id="settingsAvatar">G</div>
+                    <div>
+                        <p class="settings-profile-name" id="settingsProfileName">Guest</p>
+                        <p class="settings-profile-sub">Gaze investor</p>
+                    </div>
+                </div>
 
-        <div class="settings-profile-card">
-            <div class="avatar" id="settingsAvatar">G</div>
-            <div>
-                <p class="settings-profile-name" id="settingsProfileName">Guest</p>
-                <p class="settings-profile-sub">Gaze investor</p>
+                <p class="settings-section-label">Account</p>
+                <div class="settings-group">
+                    <label class="settings-row" for="settingName">
+                        <i class="fa-regular fa-circle-user settings-row-icon"></i>
+                        <span class="settings-row-label">Name</span>
+                        <input type="text" id="settingName" class="settings-row-input" placeholder="Your name">
+                    </label>
+
+                    <button type="button" class="settings-row settings-link" onclick="showToast('Coming with login', 'warning')">
+                        <i class="fa-solid fa-lock settings-row-icon"></i>
+                        <span class="settings-row-label">Password &amp; Security</span>
+                        <span class="settings-soon">Soon</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+
+                    <button type="button" class="settings-row settings-link" onclick="showToast('Coming soon', 'warning')">
+                        <i class="fa-regular fa-bell settings-row-icon"></i>
+                        <span class="settings-row-label">Notifications</span>
+                        <span class="settings-soon">Soon</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+                </div>
+
+                <p class="settings-section-label">Preferences</p>
+                <div class="settings-group">
+                    <label class="settings-row" for="settingGoal">
+                        <i class="fa-solid fa-bullseye settings-row-icon"></i>
+                        <span class="settings-row-label">Portfolio Goal (₦)</span>
+                        <input type="number" id="settingGoal" class="settings-row-input" placeholder="1000000">
+                    </label>
+
+                    <div class="settings-row settings-row-stack">
+                        <div class="settings-row-top">
+                            <i class="fa-solid fa-coins settings-row-icon"></i>
+                            <span class="settings-row-label">Display Total In</span>
+                        </div>
+                        <div class="currency-toggle">
+                            <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Naira</button>
+                            <button class="currency-btn" data-currency="USD" id="currencyUSD">$ Dollar</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-row settings-row-stack">
+                        <div class="settings-row-top">
+                            <i class="fa-solid fa-circle-half-stroke settings-row-icon"></i>
+                            <span class="settings-row-label">Theme</span>
+                        </div>
+                        <div class="segmented" id="themeToggle">
+                            <button type="button" class="segmented-btn" data-theme-choice="light">Light</button>
+                            <button type="button" class="segmented-btn" data-theme-choice="dark">Dark</button>
+                            <button type="button" class="segmented-btn" data-theme-choice="system">System</button>
+                        </div>
+                    </div>
+
+                    <label class="settings-row" for="settingLanguage">
+                        <i class="fa-solid fa-language settings-row-icon"></i>
+                        <span class="settings-row-label">Language</span>
+                        <select id="settingLanguage" class="settings-row-select">
+                            <option value="en">English</option>
+                            <option value="fr">Français</option>
+                        </select>
+                    </label>
+                </div>
+
+                <p class="settings-section-label">Tools</p>
+                <div class="settings-group">
+                    <button type="button" class="settings-row settings-link" onclick="switchTab('explorer')">
+                        <i class="fa-regular fa-compass settings-row-icon"></i>
+                        <span class="settings-row-label">Stock Explorer</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+
+                    <button type="button" class="settings-row settings-link" onclick="switchTab('calculator')">
+                        <i class="fa-solid fa-calculator settings-row-icon"></i>
+                        <span class="settings-row-label">Profit / Loss Calculator</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+                </div>
+
+                <p class="settings-section-label">Support</p>
+                <div class="settings-group">
+                    <button type="button" class="settings-row settings-link" onclick="document.getElementById('aboutModal').classList.add('active')">
+                        <i class="fa-solid fa-circle-info settings-row-icon"></i>
+                        <span class="settings-row-label">About Us</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+                </div>
+
+                <button class="btn-primary settings-save" id="saveSetting">Save Settings</button>
             </div>
         </div>
 
-        <p class="settings-section-label">Account</p>
-        <div class="settings-group">
-            <label class="settings-row" for="settingName">
-                <i class="fa-regular fa-circle-user settings-row-icon"></i>
-                <span class="settings-row-label">Name</span>
-                <input type="text" id="settingName" class="settings-row-input" placeholder="Your name">
-            </label>
-        </div>
+        <!-- TAB: STOCK EXPLORER -->
+        <div class="tab-content" id="explorerTab">
+            <div class="tool-container">
+                <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+                <h2 class="settings-title">Stock Explorer</h2>
 
-        <p class="settings-section-label">Preferences</p>
-        <div class="settings-group">
-            <label class="settings-row" for="settingGoal">
-                <i class="fa-solid fa-bullseye settings-row-icon"></i>
-                <span class="settings-row-label">Portfolio Goal (₦)</span>
-                <input type="number" id="settingGoal" class="settings-row-input" placeholder="1000000">
-            </label>
+                <input type="search" id="exSearch" class="ex-search" placeholder="Search name or ticker" aria-label="Search stocks" autocomplete="off">
 
-            <div class="settings-row settings-row-stack">
-                <div class="settings-row-top">
-                    <i class="fa-solid fa-coins settings-row-icon"></i>
-                    <span class="settings-row-label">Display Total In</span>
+                <div class="ex-filters">
+                    <select id="exMarket" aria-label="Filter by market">
+                        <option value="">All markets</option>
+                        <option value="NGX">Nigeria (NGX)</option>
+                        <option value="US">United States</option>
+                    </select>
+
+                    <select id="exSector" aria-label="Filter by sector">
+                        <option value="">All sectors</option>
+                        <option value="Financial Services">Financial Services</option>
+                        <option value="Technology">Technology</option>
+                        <option value="Consumer Cyclical">Consumer Cyclical</option>
+                        <option value="Consumer Defensive">Consumer Defensive</option>
+                        <option value="Energy">Energy</option>
+                        <option value="Healthcare">Healthcare</option>
+                        <option value="Industrials">Industrials</option>
+                        <option value="Basic Materials">Basic Materials</option>
+                        <option value="Communication Services">Communication Services</option>
+                        <option value="Real Estate">Real Estate</option>
+                        <option value="Utilities">Utilities</option>
+                    </select>
+
+                    <button type="button" id="exSp500" class="ex-chip">S&amp;P 500</button>
                 </div>
-                <div class="currency-toggle">
-                    <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Naira</button>
-                    <button class="currency-btn" data-currency="USD" id="currencyUSD">$ Dollar</button>
-                </div>
+
+                <p class="ex-count" id="exCount"></p>
+
+                <div class="ex-list" id="exList"></div>
+
+                <button type="button" id="exMore" class="btn-secondary ex-more hidden">Load more</button>
             </div>
         </div>
 
-        <button class="btn-primary settings-save" id="saveSetting">Save Settings</button>
-    </div>
-</div>
-<div class="tab-content" id="studyTab">
-    <div class="study-container">
-        <h2>Study</h2>
-        <p style="text-align:center; color:#999; margin-top:40px;">Coming soon</p>
-    </div>
-</div>
+        <!-- TAB: CALCULATOR -->
+        <div class="tab-content" id="calculatorTab">
+            <div class="tool-container">
+                <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+                <h2 class="settings-title">Profit / Loss Calculator</h2>
+
+                <div class="settings-group">
+                    <div class="settings-row settings-row-stack">
+                        <div class="settings-row-top">
+                            <i class="fa-solid fa-earth-africa settings-row-icon"></i>
+                            <span class="settings-row-label">Market</span>
+                        </div>
+                        <div class="segmented two">
+                            <button type="button" class="segmented-btn active" data-calc-market="NGX">₦ NGX</button>
+                            <button type="button" class="segmented-btn" data-calc-market="US">$ US</button>
+                        </div>
+                    </div>
+
+                    <label class="settings-row" for="calcShares">
+                        <i class="fa-solid fa-layer-group settings-row-icon"></i>
+                        <span class="settings-row-label">Shares</span>
+                        <input type="number" id="calcShares" class="settings-row-input" placeholder="100" inputmode="decimal" min="0">
+                    </label>
+
+                    <label class="settings-row" for="calcBuy">
+                        <i class="fa-solid fa-tag settings-row-icon"></i>
+                        <span class="settings-row-label">Buy price</span>
+                        <input type="number" id="calcBuy" class="settings-row-input" placeholder="0.00" inputmode="decimal" step="0.01" min="0">
+                    </label>
+
+                    <label class="settings-row" for="calcSell">
+                        <i class="fa-solid fa-bullseye settings-row-icon"></i>
+                        <span class="settings-row-label">Target sell price</span>
+                        <input type="number" id="calcSell" class="settings-row-input" placeholder="0.00" inputmode="decimal" step="0.01" min="0">
+                    </label>
+
+                    <label class="settings-row" for="calcFee">
+                        <i class="fa-solid fa-percent settings-row-icon"></i>
+                        <span class="settings-row-label">Fee per trade (%)</span>
+                        <input type="number" id="calcFee" class="settings-row-input" placeholder="0" inputmode="decimal" step="0.01" min="0">
+                    </label>
+                </div>
+
+                <div class="calc-results">
+                    <div class="calc-result-row">
+                        <span>Invested</span>
+                        <strong id="calcInvested">—</strong>
+                    </div>
+                    <div class="calc-result-row">
+                        <span>Sale value</span>
+                        <strong id="calcProceeds">—</strong>
+                    </div>
+                    <div class="calc-result-row calc-main">
+                        <span>Profit / Loss</span>
+                        <strong id="calcProfit">—</strong>
+                    </div>
+                    <div class="calc-result-row">
+                        <span>Return</span>
+                        <strong id="calcReturn">—</strong>
+                    </div>
+                    <div class="calc-result-row">
+                        <span>Break-even price</span>
+                        <strong id="calcBreakeven">—</strong>
+                    </div>
+                </div>
+
+                <p class="form-hint calc-hint">The fee is applied to both the buy and the sell. Results are estimates only.</p>
+            </div>
+        </div>
+
+        <!-- TAB: STUDY -->
+        <div class="tab-content" id="studyTab">
+            <div class="study-container">
+                <h2>Study</h2>
+                <p style="text-align:center; color:#999; margin-top:40px;">Coming soon</p>
+            </div>
+        </div>
     </div>
 
     <!-- MODALS -->
@@ -622,6 +795,49 @@
         </div>
     </div>
 
+    <!-- About Modal -->
+    <div class="modal" id="aboutModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>About Gaze</h2>
+                <button class="close-modal" onclick="document.getElementById('aboutModal').classList.remove('active')" aria-label="Close about">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:14px; line-height:1.5;">Gaze helps you watch, analyse and track stocks on the Nigerian (NGX) and US markets.</p>
+                <p class="form-hint" style="margin-top:12px;">Confidence scores are a data-based guide, not financial advice.</p>
+                <p class="form-hint">Version 1.0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explorer Stock Modal -->
+    <div class="modal" id="explorerModal">
+        <div class="modal-content modal-detail">
+            <div class="modal-header">
+                <h2 id="exModalTicker">—</h2>
+                <button class="close-modal" id="exModalClose" aria-label="Close stock details">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="stock-detail-container">
+                    <p class="ex-modal-name" id="exModalName"></p>
+
+                    <div class="detail-price">
+                        <p class="label">Current price</p>
+                        <p class="value" id="exModalPrice">—</p>
+                        <p class="ex-modal-change" id="exModalChange"></p>
+                    </div>
+
+                    <div class="detail-stats" id="exModalStats"></div>
+
+                    <div class="ex-modal-actions">
+                        <button type="button" class="btn-primary" id="exAddWatch">Add to Watchlist</button>
+                        <button type="button" class="btn-secondary" id="exAddPortfolio">Add to Portfolio</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Sync Indicator -->
     <div class="sync-indicator" id="syncIndicator">
         <span>⟳</span> Syncing...
@@ -632,7 +848,10 @@
 
     <!-- Scripts -->
     <script src="app.js"></script>
+    <script src="settings-extras.js"></script>
+    <script src="explorer.js"></script>
     <script src="quick-stats.js"></script>
     <script src="https://kit.fontawesome.com/ebc2dac530.js" crossorigin="anonymous"></script>
 </body>
 </html>
+ 

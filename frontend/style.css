@@ -3501,3 +3501,84 @@ button:last-child:active {
 .settings-save {
     margin-top: 4px;
 }
+.settings-row.settings-link {
+    width: 100%;
+    background: none;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    font-family: inherit;
+    text-align: left;
+}
+
+.settings-row.settings-link:last-child {
+    border-bottom: none;
+}
+
+.settings-chevron {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.settings-soon {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-main);
+    padding: 3px 8px;
+    border-radius: 999px;
+}
+
+.settings-row-select {
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-secondary);
+    text-align-last: right;
+    cursor: pointer;
+    outline: none;
+}
+
+.segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    background: var(--bg-main);
+    border-radius: 10px;
+    padding: 4px;
+}
+
+.segmented-btn {
+    padding: 9px 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.segmented-btn.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-sm);
+}
+
+.tool-back {
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    padding: 0;
+    margin-bottom: 12px;
+    cursor: pointer;
+}
+.container:has(:is(#settingsTab, #explorerTab, #calculatorTab).active)
+:is(.quick-stats, .portfolio-card, .mini-cards) {
+    display: none;
+}
