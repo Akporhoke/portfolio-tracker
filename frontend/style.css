@@ -61,6 +61,14 @@ html, body {
     overflow-x: hidden;
     height: 100%;
 }
+html, body {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* ...rest unchanged */
+}
+
+button, input, select, textarea {
+    font-family: inherit;
+}
 
 body {
     padding-top: 0;
@@ -2142,7 +2150,14 @@ body {
 
 .portfolio-list-item {
     background: var(--bg-card);
-    border-radius: var(--border-radius-lg);
+    border-radius: var(--border-radius-lg);html, body {
+    font-family: 'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* ...rest unchanged */
+}
+
+button, input, select, textarea {
+    font-family: inherit;
+}
     padding: var(--spacing-md);
     box-shadow: var(--shadow-sm);
     display: flex;
@@ -3355,4 +3370,134 @@ button:last-child:active {
 
 .quick-stats .stat-label {
     font-weight: 700;
+}
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tab-btn.header-icon-btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+}
+.settings-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-lg);
+}
+
+.settings-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.settings-profile-card .avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 22px;
+}
+
+.settings-profile-name {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.settings-profile-sub {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 3px 0 0;
+}
+
+.settings-section-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin: 0 0 8px 2px;
+}
+
+.settings-group {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 0 16px;
+    margin-bottom: 20px;
+}
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+}
+
+.settings-row:last-child {
+    border-bottom: none;
+}
+
+.settings-row-icon {
+    width: 22px;
+    text-align: center;
+    font-size: 18px;
+    color: var(--text-primary);
+}
+
+.settings-row-label {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.settings-row .settings-row-input {
+    width: 45%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    text-align: right;
+    font-size: 14px;
+    color: var(--text-secondary);
+    box-shadow: none;
+}
+
+.settings-row .settings-row-input:focus {
+    outline: none;
+    box-shadow: none;
+    color: var(--text-primary);
+}
+
+.settings-row-stack {
+    flex-direction: column;
+    align-items: stretch;
+    cursor: default;
+}
+
+.settings-row-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-row-stack .currency-toggle {
+    margin-top: 0;
+}
+
+.settings-save {
+    margin-top: 4px;
 }

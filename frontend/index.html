@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Stock Portfolio Tracker</title>
     <link rel="stylesheet" href="style.css">
-</head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400..800&display=swap" rel="stylesheet">
+</head> 
 <body>
 
 
@@ -33,7 +36,12 @@
                 <p class="hello" id="greetingText">Good Morning,</p>
                 <h1 class="name" id="userName">Guest</h1>
             </div>
-            <div class="avatar" id="avatar">G</div>
+            <div class="header-actions">
+    <button class="tab-btn header-icon-btn" data-tab="settings" aria-label="Settings">
+        <i class="fa-solid fa-gear"></i>
+    </button>
+    <div class="avatar" id="avatar">G</div>
+</div>
         </div>
 
         <!-- Quick Stats -->
@@ -207,12 +215,13 @@
                 <span><i class="fa-solid fa-binoculars"></i></span>
                 <p>Watchlist</p>
             </button>
-            <button class="tab-btn" data-tab="settings">
-                <span><i class="fa-solid fa-gear"></i></span>
-                <p>Settings</p>
-            </button>
+            <button class="tab-btn" data-tab="study">
+    <span><i class="fa-solid fa-graduation-cap"></i></span>
+    <p>Study</p>
+</button>
+           
         </div>
-
+""
         <!-- TAB: HOME (Portfolio Performance & Activity) -->
         <div class="tab-content active" id="homeTab">
             <!-- Portfolio Performance Chart -->
@@ -366,29 +375,52 @@
 
 <div class="tab-content" id="settingsTab">
     <div class="settings-container">
-        <h2>Settings</h2>
-        <div class="settings-form">
-            <div class="form-group">
-                <label for="settingName">Name</label>
-                <input type="text" id="settingName" placeholder="Your name">
-            </div>
+        <h2 class="settings-title">Settings</h2>
 
-            <div class="form-group">
-                <label for="settingGoal">Portfolio Goal (₦)</label>
-                <input type="number" id="settingGoal" placeholder="1000000">
+        <div class="settings-profile-card">
+            <div class="avatar" id="settingsAvatar">G</div>
+            <div>
+                <p class="settings-profile-name" id="settingsProfileName">Guest</p>
+                <p class="settings-profile-sub">Gaze investor</p>
             </div>
-
-            <div class="form-group">
-                <label>Display Total Portfolio In</label>
-                <div class="currency-toggle">
-                    <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Nigerian Naira</button>
-                    <button class="currency-btn" data-currency="USD" id="currencyUSD">$ US Dollar</button>
-                </div>
-                <p class="form-hint">Choose which currency to display your total portfolio value</p>
-            </div>
-
-            <button class="btn-primary" id="saveSetting">Save Settings</button>
         </div>
+
+        <p class="settings-section-label">Account</p>
+        <div class="settings-group">
+            <label class="settings-row" for="settingName">
+                <i class="fa-regular fa-circle-user settings-row-icon"></i>
+                <span class="settings-row-label">Name</span>
+                <input type="text" id="settingName" class="settings-row-input" placeholder="Your name">
+            </label>
+        </div>
+
+        <p class="settings-section-label">Preferences</p>
+        <div class="settings-group">
+            <label class="settings-row" for="settingGoal">
+                <i class="fa-solid fa-bullseye settings-row-icon"></i>
+                <span class="settings-row-label">Portfolio Goal (₦)</span>
+                <input type="number" id="settingGoal" class="settings-row-input" placeholder="1000000">
+            </label>
+
+            <div class="settings-row settings-row-stack">
+                <div class="settings-row-top">
+                    <i class="fa-solid fa-coins settings-row-icon"></i>
+                    <span class="settings-row-label">Display Total In</span>
+                </div>
+                <div class="currency-toggle">
+                    <button class="currency-btn active" data-currency="NGN" id="currencyNGN">₦ Naira</button>
+                    <button class="currency-btn" data-currency="USD" id="currencyUSD">$ Dollar</button>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-primary settings-save" id="saveSetting">Save Settings</button>
+    </div>
+</div>
+<div class="tab-content" id="studyTab">
+    <div class="study-container">
+        <h2>Study</h2>
+        <p style="text-align:center; color:#999; margin-top:40px;">Coming soon</p>
     </div>
 </div>
     </div>

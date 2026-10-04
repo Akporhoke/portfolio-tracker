@@ -41,6 +41,120 @@ function escapeRegex(value) {
 }
 
 // ============================================================
+// LIST / FILTER STOCK DIRECTORY (EXPLORER)
+//
+// Example:
+// GET /api/stocks?market=US&sector=Technology&page=1&limit=30
+// GET /api/stocks?q=apple
+// GET /api/stocks?sp500=true
+// ============================================================
+
+router.get('/', async (req, res) => {
+    try {
+        const market =
+            normalizeMarket(req.query.market);
+
+        const sector =
+            String(req.query.sector || '')
+                .trim();
+
+        const q =
+            String(req.query.q || '')
+                .trim();
+
+        const filter = {
+            active: true
+        };
+
+        if (VALID_MARKETS.includes(market)) {
+            filter.market = market;
+        }
+
+        if (sector) {
+            filter.sector = sector;
+        }
+
+        if (req.query.sp500 === 'true') {
+            filter.isSP500 = true;
+        }
+
+        if (q) {
+            const rx =
+                new RegExp(
+                    escapeRegex(q),
+                    'i'
+                );
+
+            filter.$or = [
+                { ticker: rx },
+                { name: rx },
+                { aliases: rx }
+            ];
+        }
+
+        const page =
+            Math.max(
+                parseInt(
+                    req.query.page,
+                    10
+                ) || 1,
+                1
+            );
+
+        const limit =
+            Math.min(
+                Math.max(
+                    parseInt(
+                        req.query.limit,
+                        10
+                    ) || 30,
+                    1
+                ),
+                100
+            );
+
+        const [results, total] =
+            await Promise.all([
+                Stock.find(filter)
+                    .select(
+                        'ticker name market sector industry marketCap isSP500'
+                    )
+                    .sort({
+                        marketCap: -1,
+                        ticker: 1
+                    })
+                    .skip(
+                        (page - 1) * limit
+                    )
+                    .limit(limit)
+                    .lean(),
+
+                Stock.countDocuments(filter)
+            ]);
+
+        return res.json({
+            results,
+            total,
+            page,
+            pages:
+                Math.ceil(total / limit)
+        });
+
+    } catch (err) {
+        console.error(
+            '[GET /stocks] Error:',
+            err
+        );
+
+        return res.status(500).json({
+            error:
+                'Failed to load stock directory'
+        });
+    }
+});
+
+
+// ============================================================
 // SEARCH STOCK DIRECTORY
 //
 // Example:
