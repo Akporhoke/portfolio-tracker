@@ -6,6 +6,10 @@
    <script src="learn-progress.js"></script>
    <script src="learn.js"></script>
 
+   Dictionary integration:
+   <script src="dictionary-data.js"></script>
+   <script src="dictionary.js"></script>
+
    Draws into <div id="learnRoot"> inside the Study tab.
    Screens: Learn home, Track (lesson list).
    The lesson reader arrives in Phase 3.
@@ -51,7 +55,7 @@
 
 
     /* ----------------------------------------
-       STYLES (use Gaze colours and theme variables)
+       STYLES
        ---------------------------------------- */
 
     function injectStyles() {
@@ -71,12 +75,45 @@
                 display: none;
             }
 
-            .learn-theme-teal   { --g1: #087F73; --g2: #126E9A; }
-            .learn-theme-blue   { --g1: #1E4F9A; --g2: #2D73C5; }
-            .learn-theme-green  { --g1: #2E7D32; --g2: #43A047; }
-            .learn-theme-mauve  { --g1: #9A6070; --g2: #C0809A; }
-            .learn-theme-amber  { --g1: #B26A00; --g2: #E8A23A; }
-            .learn-theme-indigo { --g1: #4B4FA8; --g2: #667eea; }
+
+            /* ========================================
+               LEARN THEMES
+               ======================================== */
+
+            .learn-theme-teal {
+                --g1: #087F73;
+                --g2: #126E9A;
+            }
+
+            .learn-theme-blue {
+                --g1: #1E4F9A;
+                --g2: #2D73C5;
+            }
+
+            .learn-theme-green {
+                --g1: #2E7D32;
+                --g2: #43A047;
+            }
+
+            .learn-theme-mauve {
+                --g1: #9A6070;
+                --g2: #C0809A;
+            }
+
+            .learn-theme-amber {
+                --g1: #B26A00;
+                --g2: #E8A23A;
+            }
+
+            .learn-theme-indigo {
+                --g1: #4B4FA8;
+                --g2: #667eea;
+            }
+
+
+            /* ========================================
+               HEADER
+               ======================================== */
 
             .learn-head {
                 margin-bottom: 16px;
@@ -102,7 +139,11 @@
                 margin: 20px 0 8px 2px;
             }
 
-            /* Hero card (same look as the Total Portfolio card) */
+
+            /* ========================================
+               HERO
+               ======================================== */
+
             .learn-hero {
                 position: relative;
                 overflow: hidden;
@@ -113,6 +154,7 @@
                 margin-bottom: 14px;
                 border-radius: 16px;
                 color: #fff;
+
                 background: linear-gradient(
                     120deg,
                     #043F35 0%,
@@ -120,11 +162,16 @@
                     #126E9A 72%,
                     #1E4F9A 100%
                 );
+
                 box-shadow: 0 12px 30px rgba(8, 80, 100, 0.16);
             }
 
             .learn-hero.is-track {
-                background: linear-gradient(135deg, var(--g1), var(--g2));
+                background: linear-gradient(
+                    135deg,
+                    var(--g1),
+                    var(--g2)
+                );
             }
 
             .learn-hero-body {
@@ -168,12 +215,12 @@
             }
 
             .learn-hero img {
-    width: 84px;
-    height: 84px;
-    object-fit: contain;
-    transform: scale(2.35);
-    flex-shrink: 0;
-}
+                width: 84px;
+                height: 84px;
+                object-fit: contain;
+                transform: scale(2.35);
+                flex-shrink: 0;
+            }
 
             .learn-hero .learn-bar {
                 background: rgba(255, 255, 255, 0.25);
@@ -184,7 +231,79 @@
                 background: #fff;
             }
 
-            /* Overall progress */
+
+            /* ========================================
+               INVESTING DICTIONARY
+               ======================================== */
+
+            .learn-dictionary {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                width: 100%;
+                padding: 15px;
+                margin-bottom: 4px;
+                border: none;
+                border-radius: 16px;
+                background: var(--bg-card);
+                box-shadow: var(--shadow-sm);
+                color: var(--text-primary);
+                font-family: inherit;
+                text-align: left;
+                cursor: pointer;
+                transition: transform 0.15s ease;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .learn-dictionary:active {
+                transform: scale(0.99);
+            }
+
+            .learn-dictionary-icon {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 46px;
+                height: 46px;
+                flex-shrink: 0;
+                border-radius: 14px;
+                background: linear-gradient(
+                    135deg,
+                    #087F73,
+                    #126E9A
+                );
+                color: #fff;
+                font-size: 19px;
+            }
+
+            .learn-dictionary-body {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .learn-dictionary-title {
+                font-size: 15px;
+                font-weight: 700;
+                margin: 0;
+            }
+
+            .learn-dictionary-sub {
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin: 4px 0 0;
+            }
+
+            .learn-dictionary-chevron {
+                color: var(--text-secondary);
+                font-size: 12px;
+                flex-shrink: 0;
+            }
+
+
+            /* ========================================
+               OVERALL PROGRESS
+               ======================================== */
+
             .learn-summary {
                 background: var(--bg-card);
                 border-radius: 16px;
@@ -206,7 +325,11 @@
                 font-weight: 500;
             }
 
-            /* Progress bar */
+
+            /* ========================================
+               PROGRESS BAR
+               ======================================== */
+
             .learn-bar {
                 height: 6px;
                 border-radius: 999px;
@@ -217,11 +340,19 @@
             .learn-bar-fill {
                 height: 100%;
                 border-radius: inherit;
-                background: linear-gradient(90deg, var(--g1, #087F73), var(--g2, #126E9A));
+                background: linear-gradient(
+                    90deg,
+                    var(--g1, #087F73),
+                    var(--g2, #126E9A)
+                );
                 transition: width 0.4s ease;
             }
 
-            /* Track cards */
+
+            /* ========================================
+               TRACKS / LESSONS
+               ======================================== */
+
             .learn-tracks,
             .learn-lessons {
                 display: flex;
@@ -266,7 +397,11 @@
                 height: 46px;
                 flex-shrink: 0;
                 border-radius: 14px;
-                background: linear-gradient(135deg, var(--g1), var(--g2));
+                background: linear-gradient(
+                    135deg,
+                    var(--g1),
+                    var(--g2)
+                );
                 color: #fff;
                 font-size: 19px;
             }
@@ -313,6 +448,11 @@
                 margin-top: 10px;
             }
 
+
+            /* ========================================
+               CHIPS
+               ======================================== */
+
             .learn-chip {
                 display: inline-block;
                 padding: 2px 8px;
@@ -337,7 +477,11 @@
                 flex-shrink: 0;
             }
 
-            /* Lesson rows */
+
+            /* ========================================
+               LESSON ROWS
+               ======================================== */
+
             .learn-lesson-num {
                 display: flex;
                 align-items: center;
@@ -364,10 +508,19 @@
             }
 
             .learn-lesson .learn-saved-num {
-                background: linear-gradient(135deg, var(--g1), var(--g2));
+                background: linear-gradient(
+                    135deg,
+                    var(--g1),
+                    var(--g2)
+                );
                 color: #fff;
                 font-size: 13px;
             }
+
+
+            /* ========================================
+               BACK BUTTON
+               ======================================== */
 
             .learn-back {
                 background: none;
@@ -398,7 +551,9 @@
 
     function findLesson(track, lessonId) {
 
-        return (track.lessons || []).find(l => l.id === lessonId) || null;
+        return (track.lessons || []).find(
+            l => l.id === lessonId
+        ) || null;
     }
 
 
@@ -418,7 +573,8 @@
         if (last) {
 
             const track = findTrack(last.trackId);
-            const lesson = track && findLesson(track, last.lessonId);
+            const lesson = track &&
+                findLesson(track, last.lessonId);
 
             if (
                 lesson &&
@@ -441,11 +597,17 @@
             );
 
             if (next) {
-                return { kind: 'start', track, lesson: next };
+                return {
+                    kind: 'start',
+                    track,
+                    lesson: next
+                };
             }
         }
 
-        return { kind: 'none' };
+        return {
+            kind: 'none'
+        };
     }
 
 
@@ -483,54 +645,135 @@
 
             return `
                 <div class="learn-hero">
+
                     <div class="learn-hero-body">
-                        <p class="learn-hero-label">Welcome</p>
-                        <p class="learn-hero-title">Start learning to invest</p>
-                        <p class="learn-hero-text">
-                            Short lessons are on the way. Take a look at what is planned.
+
+                        <p class="learn-hero-label">
+                            Welcome
                         </p>
+
+                        <p class="learn-hero-title">
+                            Start learning to invest
+                        </p>
+
+                        <p class="learn-hero-text">
+                            Short lessons are on the way.
+                            Take a look at what is planned.
+                        </p>
+
                         ${
                             firstWithLessons
-                                ? `<button type="button" class="learn-hero-btn"
-                                       data-action="open-track"
-                                       data-track="${esc(firstWithLessons.id)}">
-                                       See ${esc(firstWithLessons.title)}
-                                   </button>`
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="learn-hero-btn"
+                                        data-action="open-track"
+                                        data-track="${esc(firstWithLessons.id)}">
+
+                                        See ${esc(firstWithLessons.title)}
+
+                                    </button>
+                                `
                                 : ''
                         }
+
                     </div>
+
                     ${owl}
+
                 </div>
             `;
         }
+
 
         const label =
             target.kind === 'continue'
                 ? 'Continue learning'
                 : 'Start here';
 
+
         return `
             <div class="learn-hero">
+
                 <div class="learn-hero-body">
-                    <p class="learn-hero-label">${label}</p>
-                    <p class="learn-hero-title">${esc(target.lesson.title)}</p>
+
+                    <p class="learn-hero-label">
+                        ${label}
+                    </p>
+
+                    <p class="learn-hero-title">
+                        ${esc(target.lesson.title)}
+                    </p>
+
                     <p class="learn-hero-text">
-                        ${esc(target.track.title)} • ${
+
+                        ${esc(target.track.title)}
+                        •
+                        ${
                             target.kind === 'continue' &&
                             Array.isArray(target.lesson.sections)
-                                ? `Section ${Math.min(target.section + 1, target.lesson.sections.length)} of ${target.lesson.sections.length}`
+
+                                ? `Section ${Math.min(
+                                    target.section + 1,
+                                    target.lesson.sections.length
+                                  )} of ${target.lesson.sections.length}`
+
                                 : `${esc(target.lesson.minutes)} min`
                         }
+
                     </p>
-                    <button type="button" class="learn-hero-btn"
+
+                    <button
+                        type="button"
+                        class="learn-hero-btn"
                         data-action="open-lesson"
                         data-track="${esc(target.track.id)}"
                         data-lesson="${esc(target.lesson.id)}">
-                        ${target.kind === 'continue' ? 'Continue' : 'Start lesson'}
+
+                        ${
+                            target.kind === 'continue'
+                                ? 'Continue'
+                                : 'Start lesson'
+                        }
+
                     </button>
+
                 </div>
+
                 ${owl}
+
             </div>
+        `;
+    }
+
+
+    function dictionaryCardHtml() {
+
+        return `
+            <button
+                type="button"
+                class="learn-dictionary"
+                data-action="open-dictionary">
+
+                <div class="learn-dictionary-icon">
+                    <i class="fa-solid fa-book-open"></i>
+                </div>
+
+                <div class="learn-dictionary-body">
+
+                    <p class="learn-dictionary-title">
+                        Investing Dictionary
+                    </p>
+
+                    <p class="learn-dictionary-sub">
+                        Look up stock-market terms in simple language.
+                    </p>
+
+                </div>
+
+                <i class="fa-solid fa-chevron-right learn-dictionary-chevron"></i>
+
+            </button>
         `;
     }
 
@@ -545,13 +788,26 @@
 
         return `
             <div class="learn-summary">
+
                 <div class="learn-summary-top">
+
                     <span>Your progress</span>
-                    <span>${o.done} of ${o.total} lessons</span>
+
+                    <span>
+                        ${o.done} of ${o.total} lessons
+                    </span>
+
                 </div>
+
                 <div class="learn-bar">
-                    <div class="learn-bar-fill" style="width: ${o.percent}%"></div>
+
+                    <div
+                        class="learn-bar-fill"
+                        style="width: ${o.percent}%">
+                    </div>
+
                 </div>
+
             </div>
         `;
     }
@@ -563,7 +819,8 @@
         const isSoon = p.planned === 0;
 
         return `
-            <button type="button"
+            <button
+                type="button"
                 class="learn-track learn-theme-${esc(track.theme)} ${isSoon ? 'is-soon' : ''}"
                 data-action="${isSoon ? 'soon' : 'open-track'}"
                 data-track="${esc(track.id)}">
@@ -573,24 +830,42 @@
                 </div>
 
                 <div class="learn-track-body">
+
                     <p class="learn-track-title">
+
                         ${esc(track.title)}
-                        <span class="learn-chip">${esc(track.level)}</span>
+
+                        <span class="learn-chip">
+                            ${esc(track.level)}
+                        </span>
+
                     </p>
-                    <p class="learn-track-sub">${esc(track.summary)}</p>
+
+                    <p class="learn-track-sub">
+                        ${esc(track.summary)}
+                    </p>
 
                     ${
                         p.total > 0
-                            ? `<div class="learn-bar">
-                                   <div class="learn-bar-fill" style="width: ${p.percent}%"></div>
-                               </div>`
+                            ? `
+                                <div class="learn-bar">
+                                    <div
+                                        class="learn-bar-fill"
+                                        style="width: ${p.percent}%">
+                                    </div>
+                                </div>
+                            `
                             : ''
                     }
 
-                    <p class="learn-track-meta">${esc(trackMeta(track, p))}</p>
+                    <p class="learn-track-meta">
+                        ${esc(trackMeta(track, p))}
+                    </p>
+
                 </div>
 
                 <i class="fa-solid fa-chevron-right learn-chevron"></i>
+
             </button>
         `;
     }
@@ -606,7 +881,10 @@
                     const lesson = findLesson(track, id);
 
                     if (lesson) {
-                        return { track, lesson };
+                        return {
+                            track,
+                            lesson
+                        };
                     }
                 }
 
@@ -614,16 +892,23 @@
             })
             .filter(Boolean);
 
+
         if (items.length === 0) {
             return '';
         }
 
+
         return `
-            <p class="learn-label">Saved lessons</p>
+            <p class="learn-label">
+                Saved lessons
+            </p>
 
             <div class="learn-lessons">
+
                 ${items.map(({ track, lesson }) => `
-                    <button type="button"
+
+                    <button
+                        type="button"
                         class="learn-lesson learn-theme-${esc(track.theme)} ${lesson.status === 'ready' ? '' : 'is-soon'}"
                         data-action="open-lesson"
                         data-track="${esc(track.id)}"
@@ -634,13 +919,25 @@
                         </div>
 
                         <div class="learn-lesson-body">
-                            <p class="learn-lesson-title">${esc(lesson.title)}</p>
-                            <p class="learn-lesson-meta">${esc(track.title)} • ${esc(lesson.minutes)} min</p>
+
+                            <p class="learn-lesson-title">
+                                ${esc(lesson.title)}
+                            </p>
+
+                            <p class="learn-lesson-meta">
+                                ${esc(track.title)}
+                                •
+                                ${esc(lesson.minutes)} min
+                            </p>
+
                         </div>
 
                         <i class="fa-solid fa-chevron-right learn-chevron"></i>
+
                     </button>
+
                 `).join('')}
+
             </div>
         `;
     }
@@ -650,17 +947,31 @@
 
         return `
             <div class="learn-head">
-                <h2 class="learn-title">Learn</h2>
-                <p class="learn-sub">Build your investing knowledge, one short lesson at a time.</p>
+
+                <h2 class="learn-title">
+                    Learn
+                </h2>
+
+                <p class="learn-sub">
+                    Build your investing knowledge, one short lesson at a time.
+                </p>
+
             </div>
 
             ${heroHtml()}
+
+            ${dictionaryCardHtml()}
+
             ${summaryHtml()}
 
-            <p class="learn-label">Tracks</p>
+            <p class="learn-label">
+                Tracks
+            </p>
 
             <div class="learn-tracks">
+
                 ${content.tracks.map(trackCardHtml).join('')}
+
             </div>
 
             ${savedHtml()}
@@ -677,37 +988,57 @@
         const done = progress.isCompleted(lesson.id);
         const ready = lesson.status === 'ready';
 
+
         const right =
             done
                 ? '<span class="learn-chip is-done">Done</span>'
+
                 : ready
                     ? '<i class="fa-solid fa-chevron-right learn-chevron"></i>'
+
                     : '<span class="learn-chip">Soon</span>';
 
+
         return `
-            <button type="button"
+            <button
+                type="button"
                 class="learn-lesson ${done ? 'is-done' : ''} ${ready ? '' : 'is-soon'}"
                 data-action="open-lesson"
                 data-track="${esc(track.id)}"
                 data-lesson="${esc(lesson.id)}">
 
                 <div class="learn-lesson-num">
-                    ${done ? '<i class="fa-solid fa-check"></i>' : index + 1}
+
+                    ${
+                        done
+                            ? '<i class="fa-solid fa-check"></i>'
+                            : index + 1
+                    }
+
                 </div>
 
                 <div class="learn-lesson-body">
+
                     <p class="learn-lesson-title">
+
                         ${esc(lesson.title)}
+
                         ${
                             progress.isBookmarked(lesson.id)
                                 ? '<i class="fa-solid fa-bookmark learn-saved-mark"></i>'
                                 : ''
                         }
+
                     </p>
-                    <p class="learn-lesson-meta">${esc(lesson.minutes)} min read</p>
+
+                    <p class="learn-lesson-meta">
+                        ${esc(lesson.minutes)} min read
+                    </p>
+
                 </div>
 
                 ${right}
+
             </button>
         `;
     }
@@ -718,31 +1049,76 @@
         const p = progress.trackProgress(track);
 
         return `
-            <button type="button" class="learn-back" data-action="back">‹ Back</button>
+
+            <button
+                type="button"
+                class="learn-back"
+                data-action="back">
+
+                ‹ Back
+
+            </button>
+
 
             <div class="learn-hero is-track learn-theme-${esc(track.theme)}">
+
                 <div class="learn-hero-body">
-                    <p class="learn-hero-label">${esc(track.level)}</p>
-                    <p class="learn-hero-title">${esc(track.title)}</p>
-                    <p class="learn-hero-text">${esc(track.summary)}</p>
+
+                    <p class="learn-hero-label">
+                        ${esc(track.level)}
+                    </p>
+
+                    <p class="learn-hero-title">
+                        ${esc(track.title)}
+                    </p>
+
+                    <p class="learn-hero-text">
+                        ${esc(track.summary)}
+                    </p>
 
                     ${
                         p.total > 0
-                            ? `<div class="learn-bar">
-                                   <div class="learn-bar-fill" style="width: ${p.percent}%"></div>
-                               </div>
-                               <p class="learn-hero-text">${p.done} of ${p.total} lessons done</p>`
-                            : '<p class="learn-hero-text">Lessons are coming soon.</p>'
+
+                            ? `
+                                <div class="learn-bar">
+
+                                    <div
+                                        class="learn-bar-fill"
+                                        style="width: ${p.percent}%">
+                                    </div>
+
+                                </div>
+
+                                <p class="learn-hero-text">
+                                    ${p.done} of ${p.total} lessons done
+                                </p>
+                            `
+
+                            : `
+                                <p class="learn-hero-text">
+                                    Lessons are coming soon.
+                                </p>
+                            `
                     }
+
                 </div>
+
             </div>
 
-            <p class="learn-label">Lessons</p>
+
+            <p class="learn-label">
+                Lessons
+            </p>
+
 
             <div class="learn-lessons">
+
                 ${(track.lessons || [])
-                    .map((lesson, i) => lessonRowHtml(track, lesson, i))
+                    .map((lesson, i) =>
+                        lessonRowHtml(track, lesson, i)
+                    )
                     .join('')}
+
             </div>
         `;
     }
@@ -760,16 +1136,20 @@
             return;
         }
 
+
         const track =
             ui.view === 'track'
                 ? findTrack(ui.trackId)
                 : null;
 
+
         // Missing content fails gracefully: go back home
         if (ui.view === 'track' && !track) {
+
             ui.view = 'home';
             ui.trackId = null;
         }
+
 
         root.innerHTML =
             track
@@ -781,15 +1161,20 @@
     function openTrack(trackId) {
 
         if (!findTrack(trackId)) {
+
             toast('That track is not available yet');
+
             return;
         }
 
+
         ui.homeScroll = window.scrollY || 0;
+
         ui.view = 'track';
         ui.trackId = trackId;
 
         render();
+
         window.scrollTo(0, 0);
     }
 
@@ -800,41 +1185,73 @@
         ui.trackId = null;
 
         render();
-        window.scrollTo(0, ui.homeScroll || 0);
+
+        window.scrollTo(
+            0,
+            ui.homeScroll || 0
+        );
     }
 
 
     function openLesson(trackId, lessonId) {
 
         const track = findTrack(trackId);
-        const lesson = track && findLesson(track, lessonId);
+        const lesson = track &&
+            findLesson(track, lessonId);
+
 
         if (!lesson) {
+
             toast('That lesson is not available');
+
             return;
         }
 
+
         if (lesson.status !== 'ready') {
+
             toast('This lesson is coming soon');
+
             return;
         }
+
 
         // Phase 3 plugs the reader in here
         if (typeof api.onOpenLesson === 'function') {
+
             api.onOpenLesson(track, lesson);
+
             return;
         }
 
-        toast('The lesson reader arrives in the next update');
+
+        toast(
+            'The lesson reader arrives in the next update'
+        );
     }
 
 
+    /* ----------------------------------------
+       PUBLIC API
+       ---------------------------------------- */
+
     const api = {
+
         render,
+
+        /*
+         * Dictionary uses this when the user
+         * taps "Back to Learn".
+         */
+        showHome: backHome,
+
         openTrack,
+
         openLesson,
+
         onOpenLesson: null
     };
+
 
     window.GazeLearnUI = api;
 
@@ -847,41 +1264,86 @@
 
         const root = byId('learnRoot');
 
+
         if (!root || !progress) {
             return;
         }
 
+
         injectStyles();
+
 
         root.addEventListener('click', e => {
 
             const el = e.target.closest('[data-action]');
 
+
             if (!el) {
                 return;
             }
 
+
             switch (el.dataset.action) {
 
-                case 'open-track':
-                    openTrack(el.dataset.track);
+                case 'open-dictionary':
+
+                    if (
+                        window.GazeDictionaryUI &&
+                        typeof window.GazeDictionaryUI.open === 'function'
+                    ) {
+
+                        window.GazeDictionaryUI.open();
+
+                    } else {
+
+                        toast(
+                            'Dictionary is not available yet'
+                        );
+                    }
+
                     break;
+
+
+                case 'open-track':
+
+                    openTrack(
+                        el.dataset.track
+                    );
+
+                    break;
+
 
                 case 'open-lesson':
-                    openLesson(el.dataset.track, el.dataset.lesson);
+
+                    openLesson(
+                        el.dataset.track,
+                        el.dataset.lesson
+                    );
+
                     break;
+
 
                 case 'back':
+
                     backHome();
+
                     break;
+
 
                 case 'soon':
-                    toast('This track is coming soon');
+
+                    toast(
+                        'This track is coming soon'
+                    );
+
                     break;
             }
+
         });
 
+
         render();
+
     });
 
 })();

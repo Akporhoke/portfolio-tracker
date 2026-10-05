@@ -11,6 +11,10 @@
    Opens when a ready lesson is tapped. It draws into the
    same #learnRoot as the Learn screens, and closing it
    returns to whichever screen you came from.
+
+   Phase 3A: **bold** words that match a Dictionary term
+   become tappable and open the Dictionary, with a
+   "Back to lesson" button that returns to the same place.
    ============================================ */
 
 (function () {
@@ -46,6 +50,100 @@
             /\*\*(.+?)\*\*/g,
             '<strong>$1</strong>'
         );
+
+    // Like fmt(), but **bold** words matching a Dictionary term
+    // become tappable. Each term links once per screen.
+    let linkedThisScreen = new Set();
+
+    function fmtLinked(value) {
+
+        const dict = window.GazeDictionaryUI;
+
+        const canLink =
+            dict &&
+            typeof dict.resolveTerm === 'function' &&
+            typeof dict.openTerm === 'function';
+
+        return esc(value).replace(
+            /\*\*(.+?)\*\*/g,
+            (m, inner) => {
+
+                const name = canLink ? dict.resolveTerm(inner) : null;
+
+                if (!name || linkedThisScreen.has(name)) {
+                    return `<strong>${inner}</strong>`;
+                }
+
+                linkedThisScreen.add(name);
+
+                return `<button type="button" class="rd-term" data-rd="term" data-term="${esc(name)}">${inner}</button>`;
+            }
+        );
+    }
+
+    // Phase 3B: Dictionary terms a lesson teaches, found from its
+    // own **bold** words. Only real Dictionary matches, in the
+    // order they appear, no duplicates, at most 6.
+    function lessonTerms(lesson) {
+
+        const dict = window.GazeDictionaryUI;
+
+        if (!dict || typeof dict.resolveTerm !== 'function') {
+            return [];
+        }
+
+        const found = [];
+
+        (lesson.sections || []).forEach(section => {
+
+            const texts = []
+                .concat(section.body || [])
+                .concat(section.bullets || [])
+                .concat(section.example ? [section.example.text] : []);
+
+            texts.forEach(text => {
+
+                String(text || '').replace(
+                    /\*\*(.+?)\*\*/g,
+                    (m, inner) => {
+
+                        const name = dict.resolveTerm(inner);
+
+                        if (name && !found.includes(name)) {
+                            found.push(name);
+                        }
+
+                        return m;
+                    }
+                );
+            });
+        });
+
+        return found.slice(0, 6);
+    }
+
+
+    function exploreHtml() {
+
+        const names = lessonTerms(rd.lesson);
+
+        if (names.length === 0) {
+            return '';
+        }
+
+        return `
+            <div class="rd-explore">
+                <p class="rd-explore-label">Explore these concepts</p>
+                <div class="rd-chips">
+                    ${names.map(name => `
+                        <button type="button" class="rd-chip"
+                            data-rd="term" data-term="${esc(name)}">${esc(name)}</button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
 
     function toast(message, type) {
 
@@ -520,6 +618,68 @@
             .rd-result .rd-actions {
                 flex-direction: column;
             }
+
+            /* Dictionary links inside lessons */
+
+            .rd-card .rd-term {
+                display: inline;
+                padding: 0;
+                border: none;
+                border-bottom: 1.5px dotted var(--g1);
+                background: none;
+                font: inherit;
+                font-weight: 700;
+                color: var(--g1);
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .rd-card .rd-hint {
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin: 4px 0 0;
+            }
+
+            /* Explore these concepts (Phase 3B) */
+
+            .rd-explore {
+                margin-top: 16px;
+                padding-top: 12px;
+                border-top: 1px solid rgba(128, 128, 128, 0.25);
+            }
+
+            .rd-card .rd-explore-label {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--text-secondary);
+                margin: 0 0 8px;
+            }
+
+            .rd-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .rd-result .rd-chips {
+                justify-content: center;
+                margin-bottom: 14px;
+            }
+
+            .rd-chip {
+                padding: 8px 12px;
+                border: 1.5px solid var(--g1);
+                border-radius: 999px;
+                background: transparent;
+                color: var(--g1);
+                font-family: inherit;
+                font-size: 13px;
+                font-weight: 700;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+            }
         `;
 
         document.head.appendChild(style);
@@ -621,6 +781,8 @@
 
     function sectionHtml() {
 
+        linkedThisScreen = new Set();
+
         const lesson = rd.lesson;
         const section = lesson.sections[rd.step];
         const isLast = rd.step === lesson.sections.length - 1;
@@ -638,13 +800,13 @@
                 <h3>${esc(section.title)}</h3>
 
                 ${(section.body || [])
-                    .map(p => `<p>${fmt(p)}</p>`)
+                    .map(p => `<p>${fmtLinked(p)}</p>`)
                     .join('')}
 
                 ${
                     Array.isArray(section.bullets) && section.bullets.length
                         ? `<ul>${section.bullets
-                              .map(b => `<li>${fmt(b)}</li>`)
+                              .map(b => `<li>${fmtLinked(b)}</li>`)
                               .join('')}</ul>`
                         : ''
                 }
@@ -653,7 +815,7 @@
                     section.example
                         ? `<div class="rd-example">
                                <p class="rd-example-label">${esc(section.example.label || 'Example')}</p>
-                               <p>${fmt(section.example.text)}</p>
+                               <p>${fmtLinked(section.example.text)}</p>
                            </div>`
                         : ''
                 }
@@ -666,6 +828,14 @@
                            </button>`
                         : ''
                 }
+
+                ${
+                    linkedThisScreen.size
+                        ? '<p class="rd-hint">Tap an underlined word to see it in the Dictionary.</p>'
+                        : ''
+                }
+
+                ${isLast ? exploreHtml() : ''}
 
                 ${isLast ? sourcesHtml(lesson) : ''}
 
@@ -773,6 +943,8 @@
                     ${owl}
                     <h3>Lesson complete!</h3>
                     <span class="rd-score">${rd.score} of ${total} correct</span>
+
+                    ${exploreHtml()}
 
                     <div class="rd-actions">
                         ${
@@ -982,6 +1154,34 @@
         progress.setLast(rd.track.id, rd.lesson.id, 0);
 
         goTo('section');
+    }
+
+
+    // Open a Dictionary term from a lesson. "Back to lesson"
+    // redraws the same screen at the same scroll position.
+    function openDictionaryTerm(name) {
+
+        const dict = window.GazeDictionaryUI;
+
+        if (!dict || !rd) {
+            return;
+        }
+
+        const resumeAt = window.scrollY || 0;
+
+        dict.openTerm(name, {
+            label: 'Back to lesson',
+            onBack: function () {
+
+                if (!rd) {
+                    ui.render();
+                    return;
+                }
+
+                draw();
+                window.scrollTo(0, resumeAt);
+            }
+        });
     }
 
 
@@ -1253,6 +1453,10 @@
 
                 case 'tryit':
                     tryIt();
+                    break;
+
+                case 'term':
+                    openDictionaryTerm(el.dataset.term);
                     break;
             }
         });
