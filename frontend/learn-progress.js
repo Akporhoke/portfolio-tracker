@@ -9,7 +9,8 @@
    {
      completed: { "lesson-id": "2026-10-05T10:00:00.000Z" },
      bookmarks: [ "lesson-id" ],
-     last: { trackId, lessonId, section }
+     last: { trackId, lessonId, section },
+     seen: { "lesson-id": [ "question-id" ] }
    }
    ============================================ */
 
@@ -26,7 +27,8 @@ window.GazeLearnProgress = (function () {
         return {
             completed: {},
             bookmarks: [],
-            last: null
+            last: null,
+            seen: {}
         };
     }
 
@@ -55,7 +57,13 @@ window.GazeLearnProgress = (function () {
                         ? parsed.bookmarks
                         : [],
 
-                last: parsed.last || null
+                last: parsed.last || null,
+
+                seen:
+                    parsed.seen &&
+                    typeof parsed.seen === 'object'
+                        ? parsed.seen
+                        : {}
             };
 
         } catch (err) {
@@ -138,6 +146,69 @@ window.GazeLearnProgress = (function () {
     }
 
 
+    /* ------------- question rotation -------------
+       Each attempt draws `count` questions the learner
+       has not seen yet. When fewer than `count` unseen
+       remain, the cycle restarts: the leftover unseen
+       questions are used first, then the rest are
+       topped up from the full bank. */
+
+    function shuffle(list) {
+
+        const copy = list.slice();
+
+        for (let i = copy.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+
+        return copy;
+    }
+
+
+    function drawQuestions(lessonId, questions, count) {
+
+        const size = Math.min(count, questions.length);
+        const seen = new Set(data.seen[lessonId] || []);
+
+        const unseen = shuffle(
+            questions.filter(q => !seen.has(q.id))
+        );
+
+        let picked = unseen.slice(0, size);
+
+        if (picked.length < size) {
+
+            // Bank used up: start a new cycle
+            const pickedIds = new Set(picked.map(q => q.id));
+
+            const rest = shuffle(
+                questions.filter(q => !pickedIds.has(q.id))
+            );
+
+            picked = picked.concat(rest.slice(0, size - picked.length));
+
+            data.seen[lessonId] = [];
+            save();
+        }
+
+        return shuffle(picked);
+    }
+
+
+    function markSeen(lessonId, questionId) {
+
+        if (!data.seen[lessonId]) {
+            data.seen[lessonId] = [];
+        }
+
+        if (!data.seen[lessonId].includes(questionId)) {
+            data.seen[lessonId].push(questionId);
+            save();
+        }
+    }
+
+
     /* ------------- calculations -------------
        Only published ('ready') lessons count.
        Progress comes from real completion records. */
@@ -206,6 +277,8 @@ window.GazeLearnProgress = (function () {
         getBookmarks,
         setLast,
         getLast,
+        drawQuestions,
+        markSeen,
         trackProgress,
         overallProgress,
         reset

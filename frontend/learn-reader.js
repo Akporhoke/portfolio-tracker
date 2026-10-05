@@ -67,19 +67,87 @@
     let returnTo = null;
 
 
-    function hasCheck(lesson) {
+    // A question the quiz can safely show
+    function validQuestion(q) {
 
         return Boolean(
-            lesson.check &&
-            Array.isArray(lesson.check.questions) &&
-            lesson.check.questions.length > 0
+            q &&
+            q.q &&
+            Array.isArray(q.options) &&
+            q.options.length >= 2 &&
+            Number.isInteger(q.answer) &&
+            q.answer >= 0 &&
+            q.answer < q.options.length
         );
+    }
+
+
+    function validQuestions(lesson) {
+
+        return lesson.check && Array.isArray(lesson.check.questions)
+            ? lesson.check.questions.filter(validQuestion)
+            : [];
+    }
+
+
+    function hasCheck(lesson) {
+
+        return validQuestions(lesson).length > 0;
+    }
+
+
+    // How many questions each attempt asks
+    function sessionSize(lesson) {
+
+        const total = validQuestions(lesson).length;
+        const size = Number(lesson.check.perSession);
+
+        return Number.isFinite(size) && size > 0
+            ? Math.min(size, total)
+            : total;
+    }
+
+
+    // Copy a question with its answer options shuffled
+    function shuffled(question) {
+
+        const order = question.options.map((_, i) => i);
+
+        for (let i = order.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [order[i], order[j]] = [order[j], order[i]];
+        }
+
+        return {
+            id: question.id,
+            q: question.q,
+            explain: question.explain,
+            options: order.map(i => question.options[i]),
+            answer: order.indexOf(question.answer)
+        };
+    }
+
+
+    function startQuiz() {
+
+        rd.set = progress
+            .drawQuestions(
+                rd.lesson.id,
+                validQuestions(rd.lesson),
+                sessionSize(rd.lesson)
+            )
+            .map(shuffled);
+
+        rd.q = 0;
+        rd.picked = null;
+        rd.score = 0;
+        rd.passed = false;
     }
 
 
     function passMark(lesson) {
 
-        const total = lesson.check.questions.length;
+        const total = sessionSize(lesson);
         const mark = Number(lesson.check.passMark);
 
         return Number.isFinite(mark) && mark > 0
@@ -157,7 +225,7 @@
                 display: none;
                 position: fixed;
                 left: 50%;
-                bottom: 96px;
+                bottom: calc(96px + env(safe-area-inset-bottom, 0px));
                 z-index: 1500;
                 transform: translateX(-50%);
                 padding: 11px 18px;
@@ -258,6 +326,61 @@
                 text-transform: uppercase;
                 color: var(--g1);
                 margin: 0 0 4px;
+            }
+
+            .rd-sources {
+                margin-top: 16px;
+                padding-top: 12px;
+                border-top: 1px solid rgba(128, 128, 128, 0.25);
+                font-size: 12px;
+                opacity: 0.85;
+            }
+
+            .rd-card .rd-sources p {
+                font-size: 12px;
+                margin: 0 0 6px;
+            }
+
+            .rd-sources a {
+                color: var(--g1);
+                text-decoration: underline;
+            }
+
+            .rd-sources ul {
+                margin: 4px 0 0;
+                padding-left: 18px;
+            }
+
+            .rd-sources li {
+                font-size: 12px;
+                margin-bottom: 2px;
+            }
+
+            .rd-card,
+            .rd-opt,
+            .rd-feedback {
+                overflow-wrap: anywhere;
+            }
+
+            .rd-opt {
+                min-height: 48px;
+            }
+
+            @media (max-width: 360px) {
+
+                .rd-card {
+                    padding: 16px;
+                }
+
+                .rd-card h3 {
+                    font-size: 18px;
+                }
+
+                .rd-opt {
+                    padding: 12px;
+                    gap: 10px;
+                    font-size: 13px;
+                }
             }
 
             .rd-actions {
@@ -425,7 +548,7 @@
             current = sections + 1;
 
             label =
-                `Question ${rd.q + 1} of ${rd.lesson.check.questions.length}`;
+                `Question ${rd.q + 1} of ${rd.set.length}`;
 
         } else {
 
@@ -462,6 +585,37 @@
 
             <p class="rd-lesson">${esc(rd.lesson.title)}</p>
         `;
+    }
+
+
+    function sourcesHtml(lesson) {
+
+        const attr = lesson.attribution;
+
+        const links = (lesson.sources || []).filter(
+            src => !(attr && src.url === attr.url)
+        );
+
+        if (!attr && links.length === 0) {
+            return '';
+        }
+
+        const link = (url, text) =>
+            `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(text)}</a>`;
+
+        const credit = attr
+            ? `<p>Source: ${esc(attr.by)}, ${
+                  attr.url ? link(attr.url, attr.name) : esc(attr.name)
+              }. Licensed ${esc(attr.license)}. Simplified and adapted for Gaze.</p>`
+            : '';
+
+        const further = links.length
+            ? `<p>Further reading</p><ul>${links
+                  .map(src => `<li>${link(src.url, src.label || src.url)}</li>`)
+                  .join('')}</ul>`
+            : '';
+
+        return `<div class="rd-sources">${credit}${further}</div>`;
     }
 
 
@@ -513,6 +667,8 @@
                         : ''
                 }
 
+                ${isLast ? sourcesHtml(lesson) : ''}
+
             </div>
 
             <div class="rd-actions">
@@ -529,7 +685,7 @@
 
     function quizHtml() {
 
-        const questions = rd.lesson.check.questions;
+        const questions = rd.set;
         const question = questions[rd.q];
         const answered = rd.picked !== null;
 
@@ -601,7 +757,7 @@
 
     function resultHtml() {
 
-        const total = rd.lesson.check.questions.length;
+        const total = rd.set.length;
         const mark = passMark(rd.lesson);
 
         const owl =
@@ -634,7 +790,7 @@
             <div class="rd-card rd-result">
                 ${owl}
                 <h3>Not quite yet</h3>
-                <p>You need ${mark} correct to pass.</p>
+                <p>You need ${mark} correct to pass. Your next try brings new questions.</p>
                 <span class="rd-score">${rd.score} of ${total} correct</span>
 
                 <div class="rd-actions">
@@ -707,6 +863,7 @@
             lesson,
             mode: 'section',
             step: start,
+            set: [],
             q: 0,
             picked: null,
             score: 0,
@@ -744,9 +901,7 @@
 
         if (hasCheck(rd.lesson)) {
 
-            rd.q = 0;
-            rd.picked = null;
-            rd.score = 0;
+            startQuiz();
             goTo('quiz');
             return;
         }
@@ -775,9 +930,10 @@
             return;
         }
 
-        const question = rd.lesson.check.questions[rd.q];
+        const question = rd.set[rd.q];
 
         rd.picked = index;
+        progress.markSeen(rd.lesson.id, question.id);
 
         if (index === question.answer) {
             rd.score += 1;
@@ -789,7 +945,7 @@
 
     function nextQuestion() {
 
-        const total = rd.lesson.check.questions.length;
+        const total = rd.set.length;
 
         rd.q += 1;
         rd.picked = null;
@@ -812,10 +968,7 @@
 
     function retry() {
 
-        rd.q = 0;
-        rd.picked = null;
-        rd.score = 0;
-        rd.passed = false;
+        startQuiz();
 
         goTo('quiz');
     }

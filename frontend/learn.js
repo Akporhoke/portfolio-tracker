@@ -168,11 +168,12 @@
             }
 
             .learn-hero img {
-                width: 84px;
-                height: 84px;
-                object-fit: contain;
-                flex-shrink: 0;
-            }
+    width: 84px;
+    height: 84px;
+    object-fit: contain;
+    transform: scale(2.35);
+    flex-shrink: 0;
+}
 
             .learn-hero .learn-bar {
                 background: rgba(255, 255, 255, 0.25);
@@ -281,6 +282,18 @@
                 font-size: 15px;
                 font-weight: 600;
                 margin: 0;
+                overflow-wrap: anywhere;
+            }
+
+            @media (max-width: 360px) {
+
+                .learn-title {
+                    font-size: 20px;
+                }
+
+                .learn-lesson-title {
+                    font-size: 14px;
+                }
             }
 
             .learn-track-sub {
@@ -459,7 +472,7 @@
         const target = pickTarget();
 
         const owl =
-            '<img src="owl_x5f_waving.svg" alt="" ' +
+            '<img src="owl_x5f_graduation.svg" alt="" ' +
             'onerror="this.style.display=\'none\'">';
 
         if (target.kind === 'none') {
