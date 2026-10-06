@@ -30,7 +30,8 @@
     const STORAGE = {
         saved: 'gaze_dictionary_saved_terms',
         recent: 'gaze_dictionary_recent_terms',
-        checks: 'gaze_dictionary_checks'
+        checks: 'gaze_dictionary_checks',
+        viewed: 'gaze_dictionary_viewed'
     };
 
     const ui = {
@@ -43,6 +44,7 @@
         section: 'all',
         checkAnswered: false,
         checkCorrect: false,
+        checkState: null,
         returnTo: null
     };
 
@@ -87,6 +89,25 @@
     if (!checkResults || typeof checkResults !== 'object') {
         checkResults = {};
     }
+
+    /*
+     * Every term the learner has opened (unique, no cap).
+     * "Recent" only keeps 10, so this is what "explored"
+     * counts. Terms already in Recent are included.
+     */
+    let viewedTerms = readStorage(STORAGE.viewed, []);
+
+    if (!Array.isArray(viewedTerms)) {
+        viewedTerms = [];
+    }
+
+    recentTerms.forEach(key => {
+        if (!viewedTerms.includes(key)) {
+            viewedTerms.push(key);
+        }
+    });
+
+    writeStorage(STORAGE.viewed, viewedTerms);
 
     /* =====================================================
        HELPERS
@@ -312,6 +333,129 @@
         `;
     }
 
+    /* =====================================================
+       TAUGHT IN (Dictionary -> lessons)
+
+       Finds the lessons that teach a term, using the same
+       rule as lesson links: a **bold** word in a published
+       lesson that resolves to the term. Nothing is
+       hand-written, so it stays right as lessons are added.
+       ===================================================== */
+
+    let lessonIndexCache = null;
+
+    function lessonIndex() {
+        if (lessonIndexCache) {
+            return lessonIndexCache;
+        }
+
+        const learn = window.GAZE_LEARN;
+
+        if (!learn || !Array.isArray(learn.tracks)) {
+            return {};
+        }
+
+        const index = {};
+
+        learn.tracks.forEach(track => {
+            (track.lessons || []).forEach(lesson => {
+                if (
+                    lesson.status !== 'ready' ||
+                    !Array.isArray(lesson.sections)
+                ) {
+                    return;
+                }
+
+                const texts = [];
+
+                lesson.sections.forEach(section => {
+                    (section.body || []).forEach(t => texts.push(t));
+                    (section.bullets || []).forEach(t => texts.push(t));
+
+                    if (section.example && section.example.text) {
+                        texts.push(section.example.text);
+                    }
+                });
+
+                texts.forEach(text => {
+                    String(text || '').replace(
+                        /\*\*(.+?)\*\*/g,
+                        (m, inner) => {
+                            const found = resolveTerm(inner);
+
+                            if (found) {
+                                const k = normalize(found.term);
+
+                                index[k] = index[k] || [];
+
+                                if (!index[k].some(
+                                    item => item.lesson.id === lesson.id
+                                )) {
+                                    index[k].push({ track, lesson });
+                                }
+                            }
+
+                            return m;
+                        }
+                    );
+                });
+            });
+        });
+
+        lessonIndexCache = index;
+
+        return index;
+    }
+
+    function taughtInHtml(term) {
+        const learnUI = window.GazeLearnUI;
+
+        if (!learnUI || typeof learnUI.openLesson !== 'function') {
+            return '';
+        }
+
+        const items = lessonIndex()[normalize(term.term)] || [];
+
+        if (!items.length) {
+            return '';
+        }
+
+        return `
+            <section class="gaze-dictionary-section">
+
+                <div class="gaze-dictionary-section-head">
+                    <h2 class="gaze-dictionary-section-title">
+                        Taught in
+                    </h2>
+                </div>
+
+                ${
+                    items.map(({ track, lesson }) => `
+                        <button
+                            class="gaze-dictionary-lesson"
+                            data-action="open-lesson-from-term"
+                            data-track="${esc(track.id)}"
+                            data-lesson="${esc(lesson.id)}"
+                        >
+                            <i class="fa-solid fa-graduation-cap"></i>
+
+                            <span>
+                                <strong>${esc(lesson.title)}</strong>
+                                <small>
+                                    ${esc(track.title)}
+                                    ${lesson.minutes ? ` • ${esc(lesson.minutes)} min` : ''}
+                                </small>
+                            </span>
+
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    `).join('')
+                }
+
+            </section>
+        `;
+    }
+
     function categories() {
         return [
             'All',
@@ -387,6 +531,11 @@
         recentTerms = recentTerms.slice(0, 10);
 
         writeStorage(STORAGE.recent, recentTerms);
+
+        if (!viewedTerms.includes(key)) {
+            viewedTerms.push(key);
+            writeStorage(STORAGE.viewed, viewedTerms);
+        }
     }
 
     function getSavedTerms() {
@@ -1065,6 +1214,86 @@
            ================================================= */
 
         /* =================================================
+           PROGRESS
+           ================================================= */
+
+        .gaze-dictionary-progress {
+            border: 1px solid #e0e5e8;
+            border-radius: 15px;
+            background: #fff;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .gaze-dictionary-progress-title {
+            margin-bottom: 12px;
+            color: #168447;
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .gaze-dictionary-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .gaze-dictionary-stat {
+            padding: 10px 8px;
+            border-radius: 10px;
+            background: #f5faf7;
+            text-align: center;
+        }
+
+        .gaze-dictionary-stat strong {
+            display: block;
+            font-size: 20px;
+            line-height: 1.1;
+        }
+
+        .gaze-dictionary-stat span {
+            display: block;
+            margin-top: 4px;
+            color: #68727d;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+
+        .gaze-dictionary-path-progress {
+            margin-top: 14px;
+        }
+
+        .gaze-dictionary-path-progress-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .gaze-dictionary-path-progress-top span:last-child {
+            color: #68727d;
+            font-weight: 600;
+        }
+
+        .gaze-dictionary-bar {
+            height: 6px;
+            border-radius: 999px;
+            background: #e6ebee;
+            overflow: hidden;
+        }
+
+        .gaze-dictionary-bar-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: #168447;
+            transition: width .4s ease;
+        }
+
+        /* =================================================
            LEARNING PATHS
            ================================================= */
 
@@ -1159,6 +1388,64 @@
             font-size: 13px;
             font-weight: 800;
             cursor: pointer;
+        }
+
+        /* =================================================
+           TAUGHT IN
+           ================================================= */
+
+        .gaze-dictionary-lesson {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            margin-bottom: 9px;
+            padding: 13px;
+            border: 1px solid #e0e5e8;
+            border-radius: 12px;
+            background: #fff;
+            color: #27313a;
+            font-family: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .gaze-dictionary-lesson:hover {
+            border-color: #a8cfb5;
+        }
+
+        .gaze-dictionary-lesson > i:first-child {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            border-radius: 10px;
+            background: #edf8f1;
+            color: #168447;
+        }
+
+        .gaze-dictionary-lesson > span {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .gaze-dictionary-lesson strong {
+            display: block;
+            font-size: 14px;
+        }
+
+        .gaze-dictionary-lesson small {
+            display: block;
+            margin-top: 3px;
+            color: #7a858e;
+            font-size: 11px;
+        }
+
+        .gaze-dictionary-lesson > i:last-child {
+            color: #7a858e;
+            font-size: 12px;
         }
 
         /* =================================================
@@ -1309,6 +1596,34 @@
             background: #17221b;
         }
 
+        html.dark-mode .gaze-dictionary-progress,
+        body.dark-mode .gaze-dictionary-progress,
+        [data-theme="dark"] .gaze-dictionary-progress {
+            background: #171c20;
+            border-color: #30383f;
+        }
+
+        html.dark-mode .gaze-dictionary-stat,
+        body.dark-mode .gaze-dictionary-stat,
+        [data-theme="dark"] .gaze-dictionary-stat {
+            background: #17221b;
+        }
+
+        html.dark-mode .gaze-dictionary-stat span,
+        body.dark-mode .gaze-dictionary-stat span,
+        [data-theme="dark"] .gaze-dictionary-stat span,
+        html.dark-mode .gaze-dictionary-path-progress-top span:last-child,
+        body.dark-mode .gaze-dictionary-path-progress-top span:last-child,
+        [data-theme="dark"] .gaze-dictionary-path-progress-top span:last-child {
+            color: #a8b1b9;
+        }
+
+        html.dark-mode .gaze-dictionary-bar,
+        body.dark-mode .gaze-dictionary-bar,
+        [data-theme="dark"] .gaze-dictionary-bar {
+            background: #252c31;
+        }
+
         html.dark-mode .gaze-dictionary-path,
         body.dark-mode .gaze-dictionary-path,
         [data-theme="dark"] .gaze-dictionary-path,
@@ -1340,6 +1655,20 @@
         [data-theme="dark"] .gaze-dictionary-path-step.current .gaze-dictionary-path-num {
             background: #168447;
             color: #fff;
+        }
+
+        html.dark-mode .gaze-dictionary-lesson,
+        body.dark-mode .gaze-dictionary-lesson,
+        [data-theme="dark"] .gaze-dictionary-lesson {
+            background: #171c20;
+            border-color: #30383f;
+            color: #f0f4f6;
+        }
+
+        html.dark-mode .gaze-dictionary-lesson > i:first-child,
+        body.dark-mode .gaze-dictionary-lesson > i:first-child,
+        [data-theme="dark"] .gaze-dictionary-lesson > i:first-child {
+            background: #17221b;
         }
 
         /* =================================================
@@ -1707,6 +2036,108 @@
        HOME
        ===================================================== */
 
+    /*
+     * Phase 3E: progress from real activity only.
+     * Counts, never a made-up "% understood".
+     */
+    function progressSnapshot() {
+        return {
+            totalTerms: TERMS.length,
+            explored: viewedTerms.filter(findTerm).length,
+            saved: savedTerms.length,
+            recentlyViewed: recentTerms.length,
+            checksCompleted: getCheckedTerms().length,
+            paths: LEARNING_PATHS
+                .map(path => {
+                    const steps = path.steps
+                        .map(findTerm)
+                        .filter(Boolean);
+
+                    return {
+                        title: path.title,
+                        total: steps.length,
+                        explored: steps.filter(step =>
+                            viewedTerms.includes(normalize(step.term))
+                        ).length,
+                        checked: steps.filter(step =>
+                            checkResults[normalize(step.term)] === true
+                        ).length
+                    };
+                })
+                .filter(path => path.total >= 2)
+        };
+    }
+
+    function progressHtml() {
+        if (
+            ui.query ||
+            ui.category !== 'All' ||
+            ui.level !== 'All' ||
+            ui.letter !== 'All'
+        ) {
+            return '';
+        }
+
+        const p = progressSnapshot();
+
+        if (!p.explored && !p.saved && !p.checksCompleted) {
+            return '';
+        }
+
+        const paths = p.paths.filter(path =>
+            path.explored > 0 || path.checked > 0
+        );
+
+        return `
+            <section class="gaze-dictionary-progress">
+
+                <div class="gaze-dictionary-progress-title">
+                    Your progress
+                </div>
+
+                <div class="gaze-dictionary-stats">
+
+                    <div class="gaze-dictionary-stat">
+                        <strong>${p.explored}</strong>
+                        <span>explored of ${p.totalTerms}</span>
+                    </div>
+
+                    <div class="gaze-dictionary-stat">
+                        <strong>${p.saved}</strong>
+                        <span>saved</span>
+                    </div>
+
+                    <div class="gaze-dictionary-stat">
+                        <strong>${p.checksCompleted}</strong>
+                        <span>checks passed</span>
+                    </div>
+
+                </div>
+
+                ${
+                    paths.map(path => `
+                        <div class="gaze-dictionary-path-progress">
+
+                            <div class="gaze-dictionary-path-progress-top">
+                                <span>${esc(path.title)}</span>
+                                <span>${path.checked} of ${path.total} checked</span>
+                            </div>
+
+                            <div class="gaze-dictionary-bar">
+                                <div
+                                    class="gaze-dictionary-bar-fill"
+                                    style="width: ${Math.round((path.checked / path.total) * 100)}%">
+                                </div>
+                            </div>
+
+                        </div>
+                    `).join('')
+                }
+
+            </section>
+        `;
+    }
+
     function homeHtml() {
         let body = '';
 
@@ -1786,6 +2217,8 @@
             <div class="gaze-dictionary">
 
                 ${headerHtml()}
+
+                ${progressHtml()}
 
                 ${controlsHtml()}
 
@@ -1868,49 +2301,88 @@
             term.definition ||
             '';
 
+        /*
+         * Wrong answers come from the SAME category first, then
+         * the same level, then anything else. Same-category
+         * terms sound alike, so the question tests real
+         * understanding instead of being easy to guess.
+         */
+        const key = normalize(term.term);
+
+        const tier = item =>
+            item.category === term.category
+                ? 0
+                : item.level === term.level
+                    ? 1
+                    : 2;
+
         const candidates = TERMS
             .filter(item =>
-                normalize(item.term) !== normalize(term.term)
+                normalize(item.term) !== key &&
+                (item.simpleExplanation || item.definition)
             )
             .map(item => ({
                 text:
                     item.simpleExplanation ||
-                    item.definition ||
-                    '',
-                term: item.term
+                    item.definition,
+                term: item.term,
+                tier: tier(item)
             }))
-            .filter(item => item.text);
+            .filter(item =>
+                normalize(item.text) !== normalize(correct)
+            )
+            .sort((a, b) =>
+                a.tier - b.tier ||
+                a.term.localeCompare(b.term)
+            );
+
+        let pool = candidates.filter(item => item.tier === 0);
+
+        if (pool.length < 2) {
+            pool = candidates.filter(item => item.tier <= 1);
+        }
+
+        if (pool.length < 2) {
+            pool = candidates;
+        }
 
         /*
          * Deterministic selection so the question does not
          * randomly change every render.
          */
-        const seed = normalize(term.term)
+        const seed = key
             .split('')
             .reduce(
                 (total, char) => total + char.charCodeAt(0),
                 0
             );
 
+        const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+        // A step that is coprime with the pool size always
+        // visits different items, so we never repeat one.
+        let step = (7 % pool.length) || 1;
+
+        while (pool.length > 1 && gcd(step, pool.length) !== 1) {
+            step++;
+        }
+
         const distractors = [];
 
-        for (let i = 0; i < candidates.length && distractors.length < 2; i++) {
-            const index =
-                (seed + i * 7) % candidates.length;
-
-            const candidate = candidates[index];
+        for (
+            let i = 0;
+            i < pool.length && distractors.length < 2;
+            i++
+        ) {
+            const candidate = pool[(seed + i * step) % pool.length];
 
             if (
                 candidate &&
-                normalize(candidate.text) !== normalize(correct)
+                !distractors.some(
+                    item => item.text === candidate.text
+                )
             ) {
-                if (
-                    !distractors.some(
-                        item => item.text === candidate.text
-                    )
-                ) {
-                    distractors.push(candidate);
-                }
+                distractors.push(candidate);
             }
         }
 
@@ -1964,6 +2436,17 @@
             return '';
         }
 
+        /*
+         * If this term's check was already answered (for
+         * example the user then saved the term, which redraws
+         * the page), draw it in its answered state.
+         */
+        const answered =
+            ui.checkState &&
+            normalize(ui.checkState.term) === normalize(term.term)
+                ? ui.checkState
+                : null;
+
         return `
             <section class="gaze-dictionary-check">
 
@@ -1979,10 +2462,19 @@
                     ${
                         question.options.map((option, index) => `
                             <button
-                                class="gaze-dictionary-option"
+                                class="gaze-dictionary-option ${
+                                    answered
+                                        ? option.correct
+                                            ? 'correct'
+                                            : answered.index === index
+                                                ? 'wrong'
+                                                : ''
+                                        : ''
+                                }"
                                 data-action="answer-check"
                                 data-index="${index}"
                                 data-correct="${option.correct}"
+                                ${answered ? 'disabled' : ''}
                             >
                                 ${esc(option.text)}
                             </button>
@@ -1993,7 +2485,18 @@
                 <div
                     class="gaze-dictionary-check-result"
                     id="gazeDictionaryCheckResult"
-                ></div>
+                    ${
+                        answered
+                            ? `style="color: ${answered.correct ? '#168447' : '#a53d3d'}"`
+                            : ''
+                    }
+                >${
+                    answered
+                        ? answered.correct
+                            ? 'Correct. You understand the core idea.'
+                            : 'Not quite. The correct explanation is highlighted above. Review the term and try again later.'
+                        : ''
+                }</div>
 
             </section>
         `;
@@ -2200,6 +2703,8 @@
                             : ''
                     }
 
+                    ${taughtInHtml(term)}
+
                     ${pathsHtml(term)}
 
                     ${knowledgeCheckHtml(term)}
@@ -2278,6 +2783,7 @@
 
         ui.checkAnswered = false;
         ui.checkCorrect = false;
+        ui.checkState = null;
 
         render();
 
@@ -2396,6 +2902,12 @@
 
         const correct =
             button.dataset.correct === 'true';
+
+        ui.checkState = {
+            term: term.term,
+            index: Number(button.dataset.index),
+            correct
+        };
 
         const container =
             button.closest(
@@ -2609,6 +3121,26 @@
                KNOWLEDGE CHECK
                --------------------------------------------- */
 
+            if (action === 'open-lesson-from-term') {
+                const learnUI = window.GazeLearnUI;
+
+                if (
+                    learnUI &&
+                    typeof learnUI.openLesson === 'function'
+                ) {
+                    learnUI.openLesson(
+                        target.dataset.track,
+                        target.dataset.lesson
+                    );
+
+                    ui.returnTo = null;
+                    ui.view = 'home';
+                    ui.selectedTerm = null;
+                }
+
+                return;
+            }
+
             if (action === 'answer-check') {
                 answerCheck(target);
                 return;
@@ -2653,11 +3185,7 @@
         },
 
         getProgress: function () {
-            return {
-                saved: savedTerms.length,
-                recentlyViewed: recentTerms.length,
-                checksCompleted: getCheckedTerms().length
-            };
+            return progressSnapshot();
         }
     };
 

@@ -1,5 +1,5 @@
 /* ============================================
-   GAZE LEARN — SCREENS (Phases 1 and 2)
+   GAZE LEARN — SCREENS (Phases 1 and 2, + 3C)
 
    Load AFTER app.js and the two data files:
    <script src="learn-content.js"></script>
@@ -12,7 +12,9 @@
 
    Draws into <div id="learnRoot"> inside the Study tab.
    Screens: Learn home, Track (lesson list).
-   The lesson reader arrives in Phase 3.
+   The lesson reader is in learn-reader.js.
+
+   Phase 3C: "Today's concept" card on the Learn home.
    ============================================ */
 
 (function () {
@@ -233,6 +235,62 @@
 
 
             /* ========================================
+               TODAY'S CONCEPT (Phase 3C)
+               ======================================== */
+
+            .learn-today {
+                display: block;
+                width: 100%;
+                padding: 15px;
+                margin-bottom: 12px;
+                border: none;
+                border-radius: 16px;
+                background: var(--bg-card);
+                box-shadow: var(--shadow-sm);
+                color: var(--text-primary);
+                font-family: inherit;
+                text-align: left;
+                cursor: pointer;
+                transition: transform 0.15s ease;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .learn-today:active {
+                transform: scale(0.99);
+            }
+
+            .learn-today-label {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: #087F73;
+                margin: 0 0 6px;
+            }
+
+            .learn-today-term {
+                font-size: 17px;
+                font-weight: 700;
+                margin: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .learn-today-text {
+                font-size: 13px;
+                line-height: 1.5;
+                color: var(--text-secondary);
+                margin: 6px 0 0;
+            }
+
+            .learn-today-cta {
+                font-size: 13px;
+                font-weight: 700;
+                color: #087F73;
+                margin: 10px 0 0;
+            }
+
+
+            /* ========================================
                INVESTING DICTIONARY
                ======================================== */
 
@@ -298,6 +356,7 @@
                 font-size: 12px;
                 flex-shrink: 0;
             }
+
 
 
             /* ========================================
@@ -625,6 +684,70 @@
     }
 
 
+    /*
+     * Phase 3C: today's concept.
+     *
+     * One Beginner Dictionary term per day. The pick is
+     * based on the local calendar day, so it is the same
+     * all day and moves through every Beginner term in
+     * order before repeating. No randomness, no storage.
+     */
+    function termOfTheDay() {
+
+        const dictionary = window.GAZE_DICTIONARY;
+
+        if (!dictionary || !Array.isArray(dictionary.terms)) {
+            return null;
+        }
+
+        const pool = dictionary.terms
+            .filter(t =>
+                t &&
+                t.term &&
+                t.level === 'Beginner' &&
+                (t.simpleExplanation || t.definition)
+            )
+            .sort((a, b) => a.term.localeCompare(b.term));
+
+        if (pool.length === 0) {
+            return null;
+        }
+
+        const now = new Date();
+
+        const dayNumber = Math.floor(
+            Date.UTC(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate()
+            ) / 86400000
+        );
+
+        return pool[dayNumber % pool.length];
+    }
+
+
+    function openToday(termName) {
+
+        const dict = window.GazeDictionaryUI;
+
+        if (
+            !dict ||
+            typeof dict.openTerm !== 'function'
+        ) {
+            toast('Dictionary is not available yet');
+            return;
+        }
+
+        ui.homeScroll = window.scrollY || 0;
+
+        dict.openTerm(termName, {
+            label: 'Back to Learn',
+            onBack: backHome
+        });
+    }
+
+
     /* ----------------------------------------
        HOME SCREEN
        ---------------------------------------- */
@@ -743,6 +866,42 @@
                 ${owl}
 
             </div>
+        `;
+    }
+
+
+    function todayCardHtml() {
+
+        const term = termOfTheDay();
+
+        if (!term) {
+            return '';
+        }
+
+        return `
+            <button
+                type="button"
+                class="learn-today"
+                data-action="open-today"
+                data-term="${esc(term.term)}">
+
+                <p class="learn-today-label">
+                    Today's concept
+                </p>
+
+                <p class="learn-today-term">
+                    ${esc(term.term)}
+                </p>
+
+                <p class="learn-today-text">
+                    ${esc(term.simpleExplanation || term.definition)}
+                </p>
+
+                <p class="learn-today-cta">
+                    Explore term ›
+                </p>
+
+            </button>
         `;
     }
 
@@ -959,6 +1118,8 @@
             </div>
 
             ${heroHtml()}
+
+            ${todayCardHtml()}
 
             ${dictionaryCardHtml()}
 
@@ -1216,7 +1377,7 @@
         }
 
 
-        // Phase 3 plugs the reader in here
+        // The lesson reader plugs in here
         if (typeof api.onOpenLesson === 'function') {
 
             api.onOpenLesson(track, lesson);
@@ -1300,6 +1461,15 @@
                             'Dictionary is not available yet'
                         );
                     }
+
+                    break;
+
+
+                case 'open-today':
+
+                    openToday(
+                        el.dataset.term
+                    );
 
                     break;
 
