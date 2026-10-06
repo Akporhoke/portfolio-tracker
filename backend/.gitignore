@@ -1,3 +1,15 @@
 .env
 node_modules/
 # Local testing / diagnostic scripts
+
+syncUSDirectory.js
+check-tsla.js
+checkHistoryCoverage.js
+checkSpotHistory.js
+old-scheduler.js
+runHistorySyncOnce.js
+runUSHistorySyncOnce.js
+test-confidence.js
+test-finalize.js
+testEventEngine.js
+testInvestoHistory.js

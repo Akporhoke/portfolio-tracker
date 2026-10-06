@@ -1439,7 +1439,7 @@
             const el = e.target.closest('[data-action]');
 
 
-            if (!el) {
+            if (!el || el.closest('.gaze-dictionary')) {
                 return;
             }
 

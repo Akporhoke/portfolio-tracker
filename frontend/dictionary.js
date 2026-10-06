@@ -1,5 +1,5 @@
 /* =========================================================
-   GAZE DICTIONARY — PHASE 2 + 3A
+   GAZE DICTIONARY — PHASE 2 + 3A, 3D, 3E, TAUGHT IN, 3D, 3E, TAUGHT IN, 3D, 3E, TAUGHT IN
 
    Features:
    - Search
@@ -45,6 +45,7 @@
         checkAnswered: false,
         checkCorrect: false,
         checkState: null,
+        revealSimple: false,
         returnTo: null
     };
 
@@ -452,6 +453,111 @@
                     `).join('')
                 }
 
+            </section>
+        `;
+    }
+
+
+    // BLOCK: helpers
+    function hasFilters() {
+        return Boolean(
+            ui.query ||
+            ui.category !== 'All' ||
+            ui.level !== 'All' ||
+            ui.letter !== 'All'
+        );
+    }
+
+    /*
+     * Lists names used by paths, aliases and "related" that
+     * are not in dictionary-data.js. Run
+     * GazeDictionaryUI.validate() in a console, or look for
+     * the warning on load.
+     */
+    function validateData() {
+        const missing = [];
+
+        LEARNING_PATHS.forEach(path => {
+            path.steps.forEach(name => {
+                if (!findTerm(name)) {
+                    missing.push(`Path "${path.title}": ${name}`);
+                }
+            });
+        });
+
+        Object.keys(ALIASES).forEach(key => {
+            if (!findTerm(ALIASES[key])) {
+                missing.push(`Alias "${key}" -> ${ALIASES[key]}`);
+            }
+        });
+
+        TERMS.forEach(term => {
+            if (!Array.isArray(term.related)) {
+                return;
+            }
+
+            term.related.forEach(name => {
+                if (!findTerm(name)) {
+                    missing.push(`Related of "${term.term}": ${name}`);
+                }
+            });
+        });
+
+        if (missing.length) {
+            console.warn(
+                '[Gaze Dictionary] Not found in dictionary-data.js:\n' +
+                missing.join('\n')
+            );
+        }
+
+        return missing;
+    }
+
+    /*
+     * The quiz answer is the simpleExplanation (or the
+     * definition when there is no simpleExplanation). That
+     * card stays hidden until the learner answers, passed
+     * before, or taps "Show it anyway".
+     */
+    function isAnswerUnlocked(term) {
+        const key = normalize(term.term);
+
+        return (
+            ui.revealSimple ||
+            checkResults[key] === true ||
+            Boolean(
+                ui.checkState &&
+                normalize(ui.checkState.term) === key
+            ) ||
+            getQuestion(term).options.length < 2
+        );
+    }
+
+    function explanationCardHtml(term, title, text, isAnswer) {
+        if (!text) {
+            return '';
+        }
+
+        if (!isAnswer || isAnswerUnlocked(term)) {
+            return `
+                <section class="gaze-dictionary-detail-card">
+                    <h3>${esc(title)}</h3>
+                    <p>${esc(text)}</p>
+                </section>
+            `;
+        }
+
+        return `
+            <section class="gaze-dictionary-detail-card">
+                <h3>${esc(title)}</h3>
+                <p>Take the quick knowledge check below first, then this unlocks.</p>
+                <button
+                    class="gaze-dictionary-action"
+                    style="margin-top:12px"
+                    data-action="reveal-simple"
+                >
+                    Show it anyway
+                </button>
             </section>
         `;
     }
@@ -1209,10 +1315,7 @@
             font-size: 11px;
         }
 
-        /* =================================================
-           TOAST
-           ================================================= */
-
+       
         /* =================================================
            PROGRESS
            ================================================= */
@@ -1474,250 +1577,122 @@
             transform: translate(-50%, 0);
         }
 
-        /* =================================================
-           DARK MODE
+                /* =================================================
+           THEME (follows the app's own colors, like Learn)
            ================================================= */
 
-        html.dark-mode .gaze-dictionary,
-        body.dark-mode .gaze-dictionary,
-        [data-theme="dark"] .gaze-dictionary {
-            color: #edf2f4;
+        .gaze-dictionary {
+            color: var(--text-primary, #17202a);
         }
 
-        html.dark-mode .gaze-dictionary-subtitle,
-        body.dark-mode .gaze-dictionary-subtitle,
-        [data-theme="dark"] .gaze-dictionary-subtitle,
-        html.dark-mode .gaze-dictionary-summary,
-        body.dark-mode .gaze-dictionary-summary,
-        [data-theme="dark"] .gaze-dictionary-summary {
-            color: #a8b1b9;
+        /* secondary text */
+        .gaze-dictionary .gaze-dictionary-subtitle,
+        .gaze-dictionary .gaze-dictionary-summary,
+        .gaze-dictionary .gaze-dictionary-section-count,
+        .gaze-dictionary .gaze-dictionary-stat span,
+        .gaze-dictionary .gaze-dictionary-path-progress-top span:last-child,
+        .gaze-dictionary .gaze-dictionary-card p,
+        .gaze-dictionary .gaze-dictionary-detail-card p,
+        .gaze-dictionary .gaze-dictionary-related-card span,
+        .gaze-dictionary .gaze-dictionary-lesson small,
+        .gaze-dictionary .gaze-dictionary-empty,
+        .gaze-dictionary .gaze-dictionary-search i,
+        .gaze-dictionary .gaze-dictionary-badge:not(.green),
+        .gaze-dictionary .gaze-dictionary-path-step:not(.current) .gaze-dictionary-path-num:not(.done),
+        .gaze-dictionary .gaze-dictionary-save:not(.saved),
+        .gaze-dictionary .gaze-dictionary-action:not(.saved) {
+            color: var(--text-secondary, #68727d);
         }
 
-        html.dark-mode .gaze-dictionary-search input,
-        body.dark-mode .gaze-dictionary-search input,
-        [data-theme="dark"] .gaze-dictionary-search input,
-        html.dark-mode .gaze-dictionary-select,
-        body.dark-mode .gaze-dictionary-select,
-        [data-theme="dark"] .gaze-dictionary-select,
-        html.dark-mode .gaze-dictionary-pill,
-        body.dark-mode .gaze-dictionary-pill,
-        [data-theme="dark"] .gaze-dictionary-pill,
-        html.dark-mode .gaze-dictionary-nav button,
-        body.dark-mode .gaze-dictionary-nav button,
-        [data-theme="dark"] .gaze-dictionary-nav button {
-            background: #171c20;
-            border-color: #30383f;
-            color: #e8edf0;
+        /* primary text */
+        .gaze-dictionary .gaze-dictionary-card h3,
+        .gaze-dictionary .gaze-dictionary-related-card strong,
+        .gaze-dictionary .gaze-dictionary-empty h3,
+        .gaze-dictionary .gaze-dictionary-lesson,
+        .gaze-dictionary .gaze-dictionary-path-step:not(.current),
+        .gaze-dictionary .gaze-dictionary-option:not(.correct):not(.wrong),
+        .gaze-dictionary .gaze-dictionary-pill:not(.active),
+        .gaze-dictionary .gaze-dictionary-nav button:not(.active),
+        .gaze-dictionary .gaze-dictionary-letter:not(.active) {
+            color: var(--text-primary, #27313a);
         }
 
-        html.dark-mode .gaze-dictionary-card,
-        body.dark-mode .gaze-dictionary-card,
-        [data-theme="dark"] .gaze-dictionary-card,
-        html.dark-mode .gaze-dictionary-detail-card,
-        body.dark-mode .gaze-dictionary-detail-card,
-        [data-theme="dark"] .gaze-dictionary-detail-card,
-        html.dark-mode .gaze-dictionary-related-card,
-        body.dark-mode .gaze-dictionary-related-card,
-        [data-theme="dark"] .gaze-dictionary-related-card,
-        html.dark-mode .gaze-dictionary-empty,
-        body.dark-mode .gaze-dictionary-empty,
-        [data-theme="dark"] .gaze-dictionary-empty,
-        html.dark-mode .gaze-dictionary-az,
-        body.dark-mode .gaze-dictionary-az,
-        [data-theme="dark"] .gaze-dictionary-az {
-            background: #171c20;
-            border-color: #30383f;
+        /* card surfaces */
+        .gaze-dictionary .gaze-dictionary-search input,
+        .gaze-dictionary .gaze-dictionary-select,
+        .gaze-dictionary .gaze-dictionary-az,
+        .gaze-dictionary .gaze-dictionary-card,
+        .gaze-dictionary .gaze-dictionary-empty,
+        .gaze-dictionary .gaze-dictionary-detail-card,
+        .gaze-dictionary .gaze-dictionary-related-card,
+        .gaze-dictionary .gaze-dictionary-progress,
+        .gaze-dictionary .gaze-dictionary-path,
+        .gaze-dictionary .gaze-dictionary-lesson,
+        .gaze-dictionary .gaze-dictionary-path-step:not(.current),
+        .gaze-dictionary .gaze-dictionary-option:not(.correct):not(.wrong),
+        .gaze-dictionary .gaze-dictionary-pill:not(.active),
+        .gaze-dictionary .gaze-dictionary-nav button:not(.active),
+        .gaze-dictionary .gaze-dictionary-save:not(.saved),
+        .gaze-dictionary .gaze-dictionary-action:not(.saved) {
+            background: var(--bg-card, #fff);
+            border-color: rgba(128, 128, 128, 0.28);
         }
 
-        html.dark-mode .gaze-dictionary-card p,
-        body.dark-mode .gaze-dictionary-card p,
-        [data-theme="dark"] .gaze-dictionary-card p,
-        html.dark-mode .gaze-dictionary-detail-card p,
-        body.dark-mode .gaze-dictionary-detail-card p,
-        [data-theme="dark"] .gaze-dictionary-detail-card p {
-            color: #aab3ba;
+        /* neutral fills */
+        .gaze-dictionary .gaze-dictionary-letter:not(.active),
+        .gaze-dictionary .gaze-dictionary-badge:not(.green),
+        .gaze-dictionary .gaze-dictionary-path-step:not(.current) .gaze-dictionary-path-num:not(.done),
+        .gaze-dictionary .gaze-dictionary-bar {
+            background: rgba(128, 128, 128, 0.18);
         }
 
-        html.dark-mode .gaze-dictionary-card h3,
-        body.dark-mode .gaze-dictionary-card h3,
-        [data-theme="dark"] .gaze-dictionary-card h3,
-        html.dark-mode .gaze-dictionary-related-card strong,
-        body.dark-mode .gaze-dictionary-related-card strong,
-        [data-theme="dark"] .gaze-dictionary-related-card strong,
-        html.dark-mode .gaze-dictionary-empty h3,
-        body.dark-mode .gaze-dictionary-empty h3,
-        [data-theme="dark"] .gaze-dictionary-empty h3 {
-            color: #f0f4f6;
+        /* green tints */
+        .gaze-dictionary .gaze-dictionary-nav button.active,
+        .gaze-dictionary .gaze-dictionary-save.saved,
+        .gaze-dictionary .gaze-dictionary-action.saved,
+        .gaze-dictionary .gaze-dictionary-badge.green,
+        .gaze-dictionary .gaze-dictionary-path-step.current,
+        .gaze-dictionary .gaze-dictionary-path-num.done,
+        .gaze-dictionary .gaze-dictionary-lesson > i:first-child,
+        .gaze-dictionary .gaze-dictionary-stat,
+        .gaze-dictionary .gaze-dictionary-check {
+            background: rgba(22, 132, 71, 0.14);
         }
 
-        html.dark-mode .gaze-dictionary-save,
-        body.dark-mode .gaze-dictionary-save,
-        [data-theme="dark"] .gaze-dictionary-save,
-        html.dark-mode .gaze-dictionary-action,
-        body.dark-mode .gaze-dictionary-action,
-        [data-theme="dark"] .gaze-dictionary-action {
-            background: #171c20;
-            border-color: #30383f;
-            color: #c2cad0;
+        .gaze-dictionary .gaze-dictionary-check {
+            border-color: rgba(22, 132, 71, 0.30);
         }
 
-        html.dark-mode .gaze-dictionary-badge,
-        body.dark-mode .gaze-dictionary-badge,
-        [data-theme="dark"] .gaze-dictionary-badge {
-            background: #252c31;
-            color: #b8c0c6;
+        .gaze-dictionary .gaze-dictionary-detail-card.gaze-dictionary-example {
+            background: rgba(22, 132, 71, 0.10);
+            border-left-color: #168447;
         }
 
-        html.dark-mode .gaze-dictionary-letter,
-        body.dark-mode .gaze-dictionary-letter,
-        [data-theme="dark"] .gaze-dictionary-letter {
-            background: #252c31;
-            color: #c8d0d5;
+        /* answers */
+        .gaze-dictionary .gaze-dictionary-option.correct {
+            background: rgba(22, 132, 71, 0.14);
+            border-color: rgba(22, 132, 71, 0.65);
+            color: #1f9a52;
         }
 
-        html.dark-mode .gaze-dictionary-check,
-        body.dark-mode .gaze-dictionary-check,
-        [data-theme="dark"] .gaze-dictionary-check {
-            background: #17221b;
-            border-color: #2f4737;
+        .gaze-dictionary .gaze-dictionary-option.wrong {
+            background: rgba(214, 69, 69, 0.14);
+            border-color: rgba(214, 69, 69, 0.65);
+            color: #d65a5a;
         }
 
-        html.dark-mode .gaze-dictionary-option,
-        body.dark-mode .gaze-dictionary-option,
-        [data-theme="dark"] .gaze-dictionary-option {
-            background: #171c20;
-            border-color: #30383f;
-            color: #dce2e6;
+        /* hover and keyboard focus */
+        .gaze-dictionary .gaze-dictionary-card:hover,
+        .gaze-dictionary .gaze-dictionary-related-card:hover,
+        .gaze-dictionary .gaze-dictionary-lesson:hover,
+        .gaze-dictionary button.gaze-dictionary-path-step:hover {
+            border-color: rgba(22, 132, 71, 0.55);
         }
 
-        html.dark-mode .gaze-dictionary-example,
-        body.dark-mode .gaze-dictionary-example,
-        [data-theme="dark"] .gaze-dictionary-example {
-            background: #17221b;
+        .gaze-dictionary-card:focus-visible {
+            outline: 2px solid #168447;
+            outline-offset: 2px;
         }
-
-        html.dark-mode .gaze-dictionary-progress,
-        body.dark-mode .gaze-dictionary-progress,
-        [data-theme="dark"] .gaze-dictionary-progress {
-            background: #171c20;
-            border-color: #30383f;
-        }
-
-        html.dark-mode .gaze-dictionary-stat,
-        body.dark-mode .gaze-dictionary-stat,
-        [data-theme="dark"] .gaze-dictionary-stat {
-            background: #17221b;
-        }
-
-        html.dark-mode .gaze-dictionary-stat span,
-        body.dark-mode .gaze-dictionary-stat span,
-        [data-theme="dark"] .gaze-dictionary-stat span,
-        html.dark-mode .gaze-dictionary-path-progress-top span:last-child,
-        body.dark-mode .gaze-dictionary-path-progress-top span:last-child,
-        [data-theme="dark"] .gaze-dictionary-path-progress-top span:last-child {
-            color: #a8b1b9;
-        }
-
-        html.dark-mode .gaze-dictionary-bar,
-        body.dark-mode .gaze-dictionary-bar,
-        [data-theme="dark"] .gaze-dictionary-bar {
-            background: #252c31;
-        }
-
-        html.dark-mode .gaze-dictionary-path,
-        body.dark-mode .gaze-dictionary-path,
-        [data-theme="dark"] .gaze-dictionary-path,
-        html.dark-mode .gaze-dictionary-path-step,
-        body.dark-mode .gaze-dictionary-path-step,
-        [data-theme="dark"] .gaze-dictionary-path-step {
-            background: #171c20;
-            border-color: #30383f;
-            color: #e8edf0;
-        }
-
-        html.dark-mode .gaze-dictionary-path-step.current,
-        body.dark-mode .gaze-dictionary-path-step.current,
-        [data-theme="dark"] .gaze-dictionary-path-step.current {
-            background: #17221b;
-            border-color: #2f4737;
-            color: #6fd19a;
-        }
-
-        html.dark-mode .gaze-dictionary-path-num,
-        body.dark-mode .gaze-dictionary-path-num,
-        [data-theme="dark"] .gaze-dictionary-path-num {
-            background: #252c31;
-            color: #c8d0d5;
-        }
-
-        html.dark-mode .gaze-dictionary-path-step.current .gaze-dictionary-path-num,
-        body.dark-mode .gaze-dictionary-path-step.current .gaze-dictionary-path-num,
-        [data-theme="dark"] .gaze-dictionary-path-step.current .gaze-dictionary-path-num {
-            background: #168447;
-            color: #fff;
-        }
-
-        html.dark-mode .gaze-dictionary-lesson,
-        body.dark-mode .gaze-dictionary-lesson,
-        [data-theme="dark"] .gaze-dictionary-lesson {
-            background: #171c20;
-            border-color: #30383f;
-            color: #f0f4f6;
-        }
-
-        html.dark-mode .gaze-dictionary-lesson > i:first-child,
-        body.dark-mode .gaze-dictionary-lesson > i:first-child,
-        [data-theme="dark"] .gaze-dictionary-lesson > i:first-child {
-            background: #17221b;
-        }
-
-        /* =================================================
-           SYSTEM DARK MODE
-           ================================================= */
-
-        @media (prefers-color-scheme: dark) {
-            body:not(.light-mode):not([data-theme="light"]) .gaze-dictionary {
-                color: #edf2f4;
-            }
-
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-subtitle,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-summary {
-                color: #a8b1b9;
-            }
-
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-card,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-detail-card,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-related-card,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-empty,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-az {
-                background: #171c20;
-                border-color: #30383f;
-            }
-
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-card h3,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-related-card strong,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-empty h3 {
-                color: #f0f4f6;
-            }
-
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-card p,
-            body:not(.light-mode):not([data-theme="light"])
-            .gaze-dictionary-detail-card p {
-                color: #aab3ba;
-            }
-        }
-
         /* =================================================
            MOBILE
            ================================================= */
@@ -1791,7 +1766,7 @@
 
         return `
             <article
-                class="gaze-dictionary-card"
+                class="gaze-dictionary-card" role="button" tabindex="0"
                 data-action="open-term"
                 data-term="${esc(term.term)}"
             >
@@ -2142,14 +2117,14 @@
         let body = '';
 
         if (ui.section === 'saved') {
-            const saved = getSavedTerms();
+            const saved = getSavedTerms().filter(matchesFilters);
 
             body = saved.length
                 ? sectionHtml('Saved Terms', saved)
                 : `
                     <div class="gaze-dictionary-empty">
                         <i class="fa-regular fa-bookmark"></i>
-                        <h3>No saved terms yet</h3>
+                        <h3>${hasFilters() ? 'No saved terms match' : 'No saved terms yet'}</h3>
                         <p>
                             Save useful concepts while you study.
                         </p>
@@ -2170,14 +2145,14 @@
         }
 
         if (ui.section === 'recent') {
-            const recent = getRecentTerms();
+            const recent = getRecentTerms().filter(matchesFilters);
 
             body = recent.length
                 ? sectionHtml('Recently Viewed', recent)
                 : `
                     <div class="gaze-dictionary-empty">
                         <i class="fa-solid fa-clock-rotate-left"></i>
-                        <h3>No recently viewed terms</h3>
+                        <h3>${hasFilters() ? 'No recent terms match' : 'No recently viewed terms'}</h3>
                         <p>
                             Terms you open will appear here.
                         </p>
@@ -2397,42 +2372,36 @@
             }))
         ];
 
-        /*
-         * Stable shuffle.
+                /*
+         * Stable order, rotated by the seed so the correct
+         * answer is not always in the same position.
          */
+        const score = text =>
+            normalize(text)
+                .split('')
+                .reduce(
+                    (sum, char) => sum + char.charCodeAt(0),
+                    0
+                );
+
+        const ordered = options.sort(
+            (a, b) => score(a.text) - score(b.text)
+        );
+
+        const shift = seed % ordered.length;
+
         return {
             question: `Which explanation best describes "${term.term}"?`,
-            options: options.sort((a, b) => {
-                const aScore =
-                    normalize(a.text)
-                        .split('')
-                        .reduce(
-                            (sum, char) =>
-                                sum + char.charCodeAt(0),
-                            0
-                        );
-
-                const bScore =
-                    normalize(b.text)
-                        .split('')
-                        .reduce(
-                            (sum, char) =>
-                                sum + char.charCodeAt(0),
-                            0
-                        );
-
-                return (
-                    (aScore + seed) -
-                    (bScore + seed)
-                );
-            })
+            options: ordered
+                .slice(shift)
+                .concat(ordered.slice(0, shift))
         };
     }
 
     function knowledgeCheckHtml(term) {
         const question = getQuestion(term);
 
-        if (!question.options.length) {
+        if (question.options.length < 2) {
             return '';
         }
 
@@ -2651,31 +2620,9 @@
 
                     </div>
 
-                    ${
-                        term.definition
-                            ? `
-                                <section class="gaze-dictionary-detail-card">
-                                    <h3>Definition</h3>
-                                    <p>
-                                        ${esc(term.definition)}
-                                    </p>
-                                </section>
-                              `
-                            : ''
-                    }
+                                        ${explanationCardHtml(term, 'Definition', term.definition, !term.simpleExplanation)}
 
-                    ${
-                        term.simpleExplanation
-                            ? `
-                                <section class="gaze-dictionary-detail-card">
-                                    <h3>In simple terms</h3>
-                                    <p>
-                                        ${esc(term.simpleExplanation)}
-                                    </p>
-                                </section>
-                              `
-                            : ''
-                    }
+                    ${explanationCardHtml(term, 'In simple terms', term.simpleExplanation, true)}
 
                     ${
                         term.example
@@ -2784,6 +2731,7 @@
         ui.checkAnswered = false;
         ui.checkCorrect = false;
         ui.checkState = null;
+        ui.revealSimple = false;
 
         render();
 
@@ -2965,8 +2913,12 @@
                     'Not quite. The correct explanation is highlighted above. Review the term and try again later.';
                 result.style.color = '#a53d3d';
             }
-        }
+                }
+
+        // Redraw so the gated card unlocks
+        render();
     }
+    
 
     /* =====================================================
        EVENT DELEGATION
@@ -2980,7 +2932,7 @@
                     '[data-action]'
                 );
 
-            if (!target) {
+            if (!target || !target.closest('.gaze-dictionary')) {
                 return;
             }
 
@@ -3141,12 +3093,38 @@
                 return;
             }
 
+                        if (action === 'reveal-simple') {
+                ui.revealSimple = true;
+                render();
+                return;
+            }
+
             if (action === 'answer-check') {
                 answerCheck(target);
                 return;
             }
         });
+        
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Enter' && event.key !== ' ') {
+                return;
+            }
+
+            const card = event.target;
+
+            if (
+                !card.classList ||
+                !card.classList.contains('gaze-dictionary-card')
+            ) {
+                return;
+            }
+
+            event.preventDefault();
+
+            openTerm(card.dataset.term);
+        });
     }
+
 
     /* =====================================================
        PUBLIC API
@@ -3155,6 +3133,8 @@
     window.GazeDictionaryUI = {
 
         open: openDictionary,
+
+        validate: validateData,
 
         render: render,
 
@@ -3196,6 +3176,7 @@
     function init() {
         injectStyles();
         bindGlobalEvents();
+        validateData();
     }
 
     if (document.readyState === 'loading') {
