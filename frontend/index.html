@@ -90,6 +90,25 @@
                 </button>
                 <div class="avatar" id="avatar">G</div>
             </div>
+                </div>
+
+        <!-- Floating Tools Sphere -->
+        <div id="floatingToolsSphere" class="floating-tools-sphere" aria-label="Floating tools">
+            <button
+                type="button"
+                class="floating-tools-toggle"
+                id="floatingToolsToggle"
+                aria-label="Open floating tools"
+                aria-expanded="false"
+            >
+                <i class="fa-solid fa-toolbox"></i>
+            </button>
+
+            <div
+                class="floating-tools-menu"
+                id="floatingToolsMenu"
+                aria-hidden="true"
+            ></div>
         </div>
 
         <!-- Quick Stats -->
@@ -497,19 +516,81 @@
                     </label>
                 </div>
 
-                <p class="settings-section-label">Tools</p>
+                                <p class="settings-section-label">Tools</p>
+
                 <div class="settings-group">
-                    <button type="button" class="settings-row settings-link" onclick="switchTab('explorer')">
+
+                    <!-- Existing tools -->
+                    <button
+                        type="button"
+                        class="settings-row settings-link"
+                        onclick="switchTab('explorer')"
+                    >
                         <i class="fa-regular fa-compass settings-row-icon"></i>
                         <span class="settings-row-label">Stock Explorer</span>
                         <i class="fa-solid fa-chevron-right settings-chevron"></i>
                     </button>
 
-                    <button type="button" class="settings-row settings-link" onclick="switchTab('calculator')">
+                    <button
+                        type="button"
+                        class="settings-row settings-link"
+                        onclick="switchTab('calculator')"
+                    >
                         <i class="fa-solid fa-calculator settings-row-icon"></i>
                         <span class="settings-row-label">Profit / Loss Calculator</span>
                         <i class="fa-solid fa-chevron-right settings-chevron"></i>
                     </button>
+
+                    <!-- Floating Tools toggle -->
+                    <div class="settings-row floating-tools-setting-row">
+                        <div class="settings-row-top">
+                            <i class="fa-solid fa-toolbox settings-row-icon"></i>
+
+                            <div class="floating-tools-setting-copy">
+                                <span class="settings-row-label">
+                                    Floating Tools
+                                </span>
+
+                                <span class="floating-tools-setting-hint">
+                                    Quick access from anywhere
+                                </span>
+                            </div>
+                        </div>
+
+                        <label class="gaze-switch" aria-label="Enable Floating Tools">
+                            <input
+                                type="checkbox"
+                                id="floatingToolsEnabled"
+                            >
+                            <span class="gaze-switch-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Tool selection -->
+                    <div
+                        class="floating-tools-picker"
+                        id="floatingToolsPicker"
+                    >
+                        <div class="floating-tools-picker-header">
+                            <div>
+                                <strong>Choose your tools</strong>
+                                <span>Select up to 3</span>
+                            </div>
+
+                            <span
+                                class="floating-tools-count"
+                                id="floatingToolsCount"
+                            >
+                                0/3
+                            </span>
+                        </div>
+
+                        <div
+                            class="floating-tools-options"
+                            id="floatingToolsOptions"
+                        ></div>
+                    </div>
+
                 </div>
 
                 <p class="settings-section-label">Support</p>

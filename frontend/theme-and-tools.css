@@ -236,3 +236,423 @@
 .calc-result-row.calc-main > strong {
     font-size: 17px;
 }
+
+/* ============================================
+   FLOATING TOOLS SPHERE
+   ============================================ */
+
+.floating-tools-sphere {
+    position: fixed;
+    top: 76px;
+    right: 16px;
+    z-index: 900;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-tools-sphere.enabled {
+    display: flex;
+}
+
+
+/* --------------------------------------------
+   MAIN SPHERE
+   -------------------------------------------- */
+
+.floating-tools-toggle {
+    width: 46px;
+    height: 46px;
+
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+
+    background: linear-gradient(
+        135deg,
+        #043F35 0%,
+        #087F73 50%,
+        #126E9A 100%
+    );
+
+    color: #ffffff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 24px rgba(4, 63, 53, 0.25),
+        0 2px 8px rgba(0, 0, 0, 0.12);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.floating-tools-toggle:hover {
+    transform: translateY(-1px);
+
+    box-shadow:
+        0 10px 28px rgba(4, 63, 53, 0.30),
+        0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.floating-tools-toggle:active {
+    transform: scale(0.94);
+}
+
+.floating-tools-toggle i {
+    font-size: 17px;
+    transition: transform 0.25s ease;
+}
+
+.floating-tools-sphere.open .floating-tools-toggle i {
+    transform: rotate(45deg);
+}
+
+
+/* --------------------------------------------
+   EXPANDED MENU
+   -------------------------------------------- */
+
+.floating-tools-menu {
+    position: absolute;
+
+    top: 54px;
+    right: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transform: translateY(-6px) scale(0.96);
+    transform-origin: top right;
+
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease,
+        visibility 0.18s ease;
+}
+
+.floating-tools-sphere.open .floating-tools-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    transform: translateY(0) scale(1);
+}
+
+
+/* --------------------------------------------
+   INDIVIDUAL TOOL BUTTON
+   -------------------------------------------- */
+
+.floating-tool-button {
+    min-width: 154px;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 10px 12px;
+
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 13px;
+
+    background: var(--bg-card);
+    color: var(--text-primary);
+
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    white-space: nowrap;
+
+    transition:
+        transform 0.18s ease,
+        background 0.18s ease;
+}
+
+.floating-tool-button:hover {
+    transform: translateX(-2px);
+    background: var(--bg-hover);
+}
+
+.floating-tool-icon {
+    width: 30px;
+    height: 30px;
+
+    flex: 0 0 30px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 9px;
+
+    background: rgba(8, 127, 115, 0.10);
+    color: #087F73;
+}
+
+.floating-tool-label {
+    flex: 1;
+    text-align: left;
+}
+
+
+/* --------------------------------------------
+   SETTINGS — FLOATING TOOLS
+   -------------------------------------------- */
+
+.floating-tools-setting-row {
+    cursor: default;
+}
+
+.floating-tools-setting-copy {
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.floating-tools-setting-hint {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+
+/* --------------------------------------------
+   TOGGLE SWITCH
+   -------------------------------------------- */
+
+.gaze-switch {
+    position: relative;
+
+    width: 42px;
+    height: 24px;
+
+    flex: 0 0 auto;
+
+    cursor: pointer;
+}
+
+.gaze-switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.gaze-switch-slider {
+    position: absolute;
+    inset: 0;
+
+    border-radius: 999px;
+
+    background: #cfd6d4;
+
+    transition: background 0.2s ease;
+}
+
+.gaze-switch-slider::after {
+    content: "";
+
+    position: absolute;
+
+    width: 18px;
+    height: 18px;
+
+    left: 3px;
+    top: 3px;
+
+    border-radius: 50%;
+
+    background: #ffffff;
+
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.16);
+
+    transition: transform 0.2s ease;
+}
+
+.gaze-switch input:checked + .gaze-switch-slider {
+    background: #087F73;
+}
+
+.gaze-switch input:checked + .gaze-switch-slider::after {
+    transform: translateX(18px);
+}
+
+
+/* --------------------------------------------
+   TOOL PICKER
+   -------------------------------------------- */
+
+.floating-tools-picker {
+    display: none;
+
+    padding: 14px 0 6px;
+}
+
+.floating-tools-picker.visible {
+    display: block;
+}
+
+.floating-tools-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+
+    margin-bottom: 10px;
+}
+
+.floating-tools-picker-header > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.floating-tools-picker-header strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.floating-tools-picker-header span {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.floating-tools-count {
+    min-width: 38px;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    background: var(--bg-main);
+
+    color: var(--text-secondary);
+
+    font-size: 11px !important;
+    font-weight: 700;
+
+    text-align: center;
+}
+
+
+/* --------------------------------------------
+   TOOL OPTIONS
+   -------------------------------------------- */
+
+.floating-tools-options {
+    display: flex;
+    flex-direction: column;
+}
+
+.floating-tool-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 10px 0;
+
+    border-bottom: 1px solid #f0f0f0;
+
+    cursor: pointer;
+}
+
+.floating-tool-option:last-child {
+    border-bottom: none;
+}
+
+.floating-tool-option.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.floating-tool-option input {
+    width: 17px;
+    height: 17px;
+
+    margin: 0;
+
+    accent-color: #087F73;
+
+    cursor: pointer;
+}
+
+.floating-tool-option.disabled input {
+    cursor: not-allowed;
+}
+
+.floating-tool-option-icon {
+    width: 26px;
+
+    text-align: center;
+
+    color: var(--text-primary);
+}
+
+.floating-tool-option-label {
+    flex: 1;
+
+    font-size: 13px;
+    font-weight: 500;
+
+    color: var(--text-primary);
+}
+
+
+/* --------------------------------------------
+   DARK MODE
+   -------------------------------------------- */
+
+:root[data-theme="dark"] .floating-tool-button {
+    border-color: rgba(255, 255, 255, 0.08);
+
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="dark"] .floating-tool-option {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .floating-tools-count {
+    background: var(--bg-hover);
+}
+
+
+/* --------------------------------------------
+   SMALL SCREENS
+   -------------------------------------------- */
+
+@media (max-width: 480px) {
+
+    .floating-tools-sphere {
+        top: 70px;
+        right: 12px;
+    }
+
+    .floating-tools-toggle {
+        width: 42px;
+        height: 42px;
+    }
+
+    .floating-tool-button {
+        min-width: 145px;
+    }
+}

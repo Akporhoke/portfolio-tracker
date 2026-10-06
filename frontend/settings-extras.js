@@ -204,8 +204,12 @@
         'System': 'Système',
         'Language': 'Langue',
         'Tools': 'Outils',
+        'Floating Tools': 'Outils flottants',
+        'Quick access from anywhere': 'Accès rapide depuis n’importe où',
+        'Choose your tools': 'Choisissez vos outils',
+        'Select up to 3': 'Sélectionnez jusqu’à 3',
         'Stock Explorer': 'Explorateur d’actions',
-        'Profit / Loss Calculator': 'Calculateur de gains / pertes',
+        'Profit / Loss': 'Gains / Pertes',
         'Support': 'Assistance',
         'About Us': 'À propos',
         'Save Settings': 'Enregistrer les paramètres',
@@ -270,6 +274,11 @@
         ['#calculatorTab .settings-row-label'],
         ['#calculatorTab .calc-result-row > span'],
         ['#calculatorTab .calc-hint']
+
+        ['.floating-tools-setting-row .settings-row-label'],
+        ['.floating-tools-setting-hint'],
+        ['.floating-tools-picker-header strong'],
+        ['.floating-tools-picker-header span']
     ];
 
 
@@ -655,11 +664,491 @@
     }
 
 
+
+        /* ============================================
+       6. FLOATING TOOLS SPHERE
+       ============================================ */
+
+    const FLOATING_TOOLS_ENABLED_KEY =
+        'gazeFloatingToolsEnabled';
+
+    const FLOATING_TOOLS_SELECTION_KEY =
+        'gazeFloatingTools';
+
+    const MAX_FLOATING_TOOLS = 3;
+
+
+    /*
+       Only tools that actually exist in Gaze are
+       registered here.
+
+       When a new tool is built later, add it here
+       with its own open() function.
+    */
+
+    const FLOATING_TOOLS = {
+
+        explorer: {
+            id: 'explorer',
+            label: 'Stock Explorer',
+            icon: 'fa-regular fa-compass',
+
+            open() {
+                switchTab('explorer');
+            }
+        },
+
+        calculator: {
+            id: 'calculator',
+            label: 'Profit / Loss',
+            icon: 'fa-solid fa-calculator',
+
+            open() {
+                switchTab('calculator');
+            }
+        }
+
+    };
+
+
+    function getFloatingToolsEnabled() {
+
+        return store.get(
+            FLOATING_TOOLS_ENABLED_KEY
+        ) === 'true';
+    }
+
+
+    function getFloatingToolsSelection() {
+
+        let saved = [];
+
+        try {
+            saved =
+                JSON.parse(
+                    store.get(FLOATING_TOOLS_SELECTION_KEY) || '[]'
+                );
+        } catch (err) {
+            saved = [];
+        }
+
+        if (!Array.isArray(saved)) {
+            saved = [];
+        }
+
+        /*
+           Remove tools that no longer exist.
+        */
+
+        saved = saved.filter(
+            id => Boolean(FLOATING_TOOLS[id])
+        );
+
+        return saved.slice(0, MAX_FLOATING_TOOLS);
+    }
+
+
+    function saveFloatingToolsSelection(selection) {
+
+        const cleaned = selection
+            .filter(id => Boolean(FLOATING_TOOLS[id]))
+            .slice(0, MAX_FLOATING_TOOLS);
+
+        store.set(
+            FLOATING_TOOLS_SELECTION_KEY,
+            JSON.stringify(cleaned)
+        );
+    }
+
+
+    function setFloatingToolsEnabled(enabled) {
+
+        store.set(
+            FLOATING_TOOLS_ENABLED_KEY,
+            enabled ? 'true' : 'false'
+        );
+
+        renderFloatingToolsSphere();
+        syncFloatingToolsSettings();
+    }
+
+
+    function syncFloatingToolsSettings() {
+
+        const toggle =
+            byId('floatingToolsEnabled');
+
+        const picker =
+            byId('floatingToolsPicker');
+
+        if (toggle) {
+            toggle.checked =
+                getFloatingToolsEnabled();
+        }
+
+        if (picker) {
+
+            picker.classList.toggle(
+                'visible',
+                getFloatingToolsEnabled()
+            );
+        }
+
+        renderFloatingToolsOptions();
+    }
+
+
+    function renderFloatingToolsOptions() {
+
+        const container =
+            byId('floatingToolsOptions');
+
+        const countEl =
+            byId('floatingToolsCount');
+
+        if (!container) {
+            return;
+        }
+
+        const selected =
+            getFloatingToolsSelection();
+
+        if (countEl) {
+            countEl.textContent =
+                `${selected.length}/${MAX_FLOATING_TOOLS}`;
+        }
+
+        container.innerHTML = '';
+
+        Object.values(FLOATING_TOOLS)
+            .forEach(tool => {
+
+                const checked =
+                    selected.includes(tool.id);
+
+                const maxReached =
+                    selected.length >= MAX_FLOATING_TOOLS;
+
+                const disabled =
+                    !checked && maxReached;
+
+                const label =
+                    document.createElement('label');
+
+                label.className =
+                    'floating-tool-option';
+
+                if (disabled) {
+                    label.classList.add('disabled');
+                }
+
+                label.innerHTML = `
+                    <input
+                        type="checkbox"
+                        value="${tool.id}"
+                        ${checked ? 'checked' : ''}
+                        ${disabled ? 'disabled' : ''}
+                    >
+
+                    <i class="${tool.icon} floating-tool-option-icon"></i>
+
+                    <span class="floating-tool-option-label">
+                        ${tool.label}
+                    </span>
+                `;
+
+                const checkbox =
+                    label.querySelector('input');
+
+                checkbox.addEventListener(
+                    'change',
+                    () => {
+
+                        let current =
+                            getFloatingToolsSelection();
+
+                        if (checkbox.checked) {
+
+                            if (
+                                current.length >=
+                                MAX_FLOATING_TOOLS
+                            ) {
+                                checkbox.checked = false;
+                                return;
+                            }
+
+                            current.push(tool.id);
+
+                        } else {
+
+                            current =
+                                current.filter(
+                                    id => id !== tool.id
+                                );
+                        }
+
+                        saveFloatingToolsSelection(current);
+
+                        renderFloatingToolsOptions();
+                        renderFloatingToolsSphere();
+                    }
+                );
+
+                container.appendChild(label);
+            });
+    }
+
+
+    function renderFloatingToolsSphere() {
+
+        const sphere =
+            byId('floatingToolsSphere');
+
+        const menu =
+            byId('floatingToolsMenu');
+
+        const toggle =
+            byId('floatingToolsToggle');
+
+        if (!sphere || !menu || !toggle) {
+            return;
+        }
+
+        const enabled =
+            getFloatingToolsEnabled();
+
+        const selected =
+            getFloatingToolsSelection();
+
+        /*
+           Hide completely when disabled or when
+           there are no selected tools.
+        */
+
+        const shouldShow =
+            enabled && selected.length > 0;
+
+        sphere.classList.toggle(
+            'enabled',
+            shouldShow
+        );
+
+        if (!shouldShow) {
+
+            sphere.classList.remove('open');
+
+            toggle.setAttribute(
+                'aria-expanded',
+                'false'
+            );
+
+            menu.setAttribute(
+                'aria-hidden',
+                'true'
+            );
+
+            menu.innerHTML = '';
+
+            return;
+        }
+
+
+        menu.innerHTML = '';
+
+
+        selected.forEach(id => {
+
+            const tool =
+                FLOATING_TOOLS[id];
+
+            if (!tool) {
+                return;
+            }
+
+            const button =
+                document.createElement('button');
+
+            button.type = 'button';
+
+            button.className =
+                'floating-tool-button';
+
+            button.innerHTML = `
+                <span class="floating-tool-icon">
+                    <i class="${tool.icon}"></i>
+                </span>
+
+                <span class="floating-tool-label">
+                    ${tool.label}
+                </span>
+            `;
+
+            button.addEventListener(
+                'click',
+                () => {
+
+                    /*
+                       Close the sphere first.
+                    */
+
+                    sphere.classList.remove('open');
+
+                    toggle.setAttribute(
+                        'aria-expanded',
+                        'false'
+                    );
+
+                    menu.setAttribute(
+                        'aria-hidden',
+                        'true'
+                    );
+
+                    /*
+                       Then open the selected tool.
+                    */
+
+                    tool.open();
+                }
+            );
+
+            menu.appendChild(button);
+        });
+    }
+
+
+    function closeFloatingToolsSphere() {
+
+        const sphere =
+            byId('floatingToolsSphere');
+
+        const toggle =
+            byId('floatingToolsToggle');
+
+        const menu =
+            byId('floatingToolsMenu');
+
+        if (!sphere || !toggle || !menu) {
+            return;
+        }
+
+        sphere.classList.remove('open');
+
+        toggle.setAttribute(
+            'aria-expanded',
+            'false'
+        );
+
+        menu.setAttribute(
+            'aria-hidden',
+            'true'
+        );
+    }
+
+
+    function setupFloatingTools() {
+
+        const toggle =
+            byId('floatingToolsToggle');
+
+        const enabledToggle =
+            byId('floatingToolsEnabled');
+
+        if (!toggle || !enabledToggle) {
+            return;
+        }
+
+
+        /*
+           Main sphere button
+        */
+
+        toggle.addEventListener(
+            'click',
+            event => {
+
+                event.stopPropagation();
+
+                const sphere =
+                    byId('floatingToolsSphere');
+
+                const menu =
+                    byId('floatingToolsMenu');
+
+                if (!sphere || !menu) {
+                    return;
+                }
+
+                const open =
+                    sphere.classList.toggle('open');
+
+                toggle.setAttribute(
+                    'aria-expanded',
+                    open ? 'true' : 'false'
+                );
+
+                menu.setAttribute(
+                    'aria-hidden',
+                    open ? 'false' : 'true'
+                );
+            }
+        );
+
+
+        /*
+           Settings toggle
+        */
+
+        enabledToggle.addEventListener(
+            'change',
+            () => {
+
+                setFloatingToolsEnabled(
+                    enabledToggle.checked
+                );
+            }
+        );
+
+
+        /*
+           Clicking outside closes the sphere.
+        */
+
+        document.addEventListener(
+            'click',
+            event => {
+
+                const sphere =
+                    byId('floatingToolsSphere');
+
+                if (
+                    sphere &&
+                    !sphere.contains(event.target)
+                ) {
+                    closeFloatingToolsSphere();
+                }
+            }
+        );
+
+
+        /*
+           Initial state
+        */
+
+        syncFloatingToolsSettings();
+        renderFloatingToolsSphere();
+    }
+
     /* ============================================
        INIT
        ============================================ */
 
     document.addEventListener('DOMContentLoaded', () => {
+    // Existing initialization
+    syncSettingsProfile();
+    applySectorBar();
+
+    // Floating Tools
+    setupFloatingTools();
 
         // Theme buttons
         document
@@ -736,9 +1225,12 @@
         runCalculator();
 
 
-        // Settings profile + sector bar for the first paint
+                // Settings profile + sector bar for the first paint
         syncSettingsProfile();
         applySectorBar();
+
+        // Floating Tools Sphere
+        setupFloatingTools();
     });
 
 })();
