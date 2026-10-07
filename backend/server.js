@@ -6,6 +6,8 @@ const cors = require('cors');
 const {
     startConfidenceScheduler
 } = require('./services/confidenceScheduler');
+const { startMarketCalendarScheduler } = require('./services/marketCalendarScheduler');
+const marketCalendarRoutes = require('./routes/marketCalendar');
 const schedulerRoutes =
     require('./routes/scheduler');
 
@@ -14,6 +16,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
 
 // Test Route
 app.get('/api/test', (req, res) => {
@@ -43,6 +46,9 @@ app.use(
     '/api/scheduler',
     schedulerRoutes
 );
+app.use(
+    '/api/market-calendar',
+     marketCalendarRoutes);
 
 // Server Port
 const PORT =
@@ -75,6 +81,7 @@ app.listen(PORT, () => {
 });
 
 startConfidenceScheduler();
+startMarketCalendarScheduler();
 
     } catch (err) {
         console.error(
