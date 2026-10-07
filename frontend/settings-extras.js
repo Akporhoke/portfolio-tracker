@@ -227,7 +227,8 @@
         'Return': 'Rendement',
         'Break-even price': 'Seuil de rentabilité',
         'The fee is applied to both the buy and the sell. Results are estimates only.':
-            'Les frais s’appliquent à l’achat et à la vente. Les résultats sont des estimations.'
+        'Les frais s’appliquent à l’achat et à la vente. Les résultats sont des estimations.',
+        'Market Calendar': 'Calendrier des marchés'
     };
 
     const FR_GREETING = {
@@ -273,7 +274,8 @@
 
         ['#calculatorTab .settings-row-label'],
         ['#calculatorTab .calc-result-row > span'],
-        ['#calculatorTab .calc-hint']
+        ['#calculatorTab .calc-hint'],
+        ['#calendarTab .settings-title'],
 
         ['.floating-tools-setting-row .settings-row-label'],
         ['.floating-tools-setting-hint'],
@@ -402,13 +404,15 @@
 
     // Fill the inputs whenever Settings is opened
     wrap('switchTab', {
-        after(tabName) {
-            if (tabName === 'settings') {
-                fillSettingsInputs();
-                syncSettingsProfile();
-            }
+    after(tabName) {
+        document.body.classList.toggle('calendar-tool-open', tabName === 'calendar');
+
+        if (tabName === 'settings') {
+            fillSettingsInputs();
+            syncSettingsProfile();
         }
-    });
+    }
+});
 
 
     // Remember the goal on this device. Without this,
@@ -686,7 +690,7 @@
        with its own open() function.
     */
 
-    const FLOATING_TOOLS = {
+           const FLOATING_TOOLS = {
 
         explorer: {
             id: 'explorer',
@@ -706,10 +710,19 @@
             open() {
                 switchTab('calculator');
             }
+        },
+
+        calendar: {
+            id: 'calendar',
+            label: 'Market Calendar',
+            icon: 'fa-regular fa-calendar',
+
+            open() {
+                switchTab('calendar');
+            }
         }
 
     };
-
 
     function getFloatingToolsEnabled() {
 
@@ -1225,12 +1238,7 @@
         runCalculator();
 
 
-                // Settings profile + sector bar for the first paint
-        syncSettingsProfile();
-        applySectorBar();
-
-        // Floating Tools Sphere
-        setupFloatingTools();
+             
     });
 
 })();

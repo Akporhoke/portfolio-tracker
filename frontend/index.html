@@ -49,6 +49,7 @@
     <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="theme-and-tools.css">
+    <link rel="stylesheet" href="market-calendar.css">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -541,6 +542,18 @@
                         <i class="fa-solid fa-chevron-right settings-chevron"></i>
                     </button>
 
+                                        <button
+                        type="button"
+                        class="settings-row settings-link"
+                        onclick="switchTab('calendar')"
+                    >
+                        <i class="fa-regular fa-calendar settings-row-icon"></i>
+                        <span class="settings-row-label">Market Calendar</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+
+                    
+
                     <!-- Floating Tools toggle -->
                     <div class="settings-row floating-tools-setting-row">
                         <div class="settings-row-top">
@@ -715,6 +728,15 @@
 
                 <p class="form-hint calc-hint">The fee is applied to both the buy and the sell. Results are estimates only.</p>
             </div>
+        </div>
+
+        <!-- TAB: MARKET CALENDAR -->
+        <div class="tab-content" id="calendarTab">
+         <div class="tool-container">
+        <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+        <h2 class="settings-title">Market Calendar</h2>
+        <div class="market-calendar" id="marketCalendarRoot"></div>
+         </div>
         </div>
 
         <!-- TAB: STUDY (Learn) -->
@@ -980,6 +1002,7 @@
     <script src="settings-extras.js"></script>
     <script src="explorer.js"></script>
     <script src="quick-stats.js"></script>
+    <script src="market-calendar.js"></script>
     <script src="french-extra.js"></script>
     <script src="learn-content.js"></script>
     <script src="learn-progress.js"></script>

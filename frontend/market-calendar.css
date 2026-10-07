@@ -1,0 +1,240 @@
+/* ============================================
+   GAZE — MARKET CALENDAR
+   Load AFTER theme-and-tools.css
+   ============================================ */
+
+:root {
+    --mc-ngx: #087F73;
+    --mc-us: #3B82F6;
+    --mc-closed: #c4cbc9;
+    --mc-closed-text: #c0392b;
+    --mc-trading-text: #1e8e5a;
+    --mc-border: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="dark"] {
+    --mc-ngx: #3FBFB0;
+    --mc-us: #7FB0F5;
+    --mc-closed: #4a5252;
+    --mc-closed-text: #F87171;
+    --mc-trading-text: #4ADE80;
+    --mc-border: rgba(255, 255, 255, 0.10);
+}
+
+.market-calendar {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 16px 12px 12px;
+    margin-bottom: 12px;
+}
+
+.mc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.mc-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.mc-nav {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--mc-border);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.mc-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.mc-nav:focus-visible,
+.mc-day:focus-visible {
+    outline: 2px solid var(--mc-ngx);
+    outline-offset: 2px;
+}
+
+.mc-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.mc-weekday {
+    text-align: center;
+    padding: 4px 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.mc-day {
+    aspect-ratio: 1 / 1.1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.mc-day.empty {
+    cursor: default;
+    pointer-events: none;
+}
+
+.mc-day:not(.empty):hover {
+    background: var(--bg-hover);
+}
+
+.mc-day-num {
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.mc-day.today .mc-day-num {
+    min-width: 26px;
+    padding: 2px 0;
+    border-radius: 999px;
+    background: var(--text-primary);
+    color: var(--bg-card);
+}
+
+.mc-day.selected {
+    border-color: var(--mc-ngx);
+    background: var(--bg-hover);
+}
+
+.mc-dots {
+    display: flex;
+    gap: 4px;
+    height: 7px;
+}
+
+.mc-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+}
+
+.mc-dot.ngx { background: var(--mc-ngx); }
+.mc-dot.us  { background: var(--mc-us); }
+
+.mc-dot.off {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--mc-closed);
+}
+
+.mc-legend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 12px 0 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.mc-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.mc-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--mc-border);
+}
+
+.mc-details-title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.mc-market-card {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border-left: 3px solid var(--mc-closed);
+    background: var(--bg-main);
+}
+
+.mc-market-card.ngx { border-left-color: var(--mc-ngx); }
+.mc-market-card.us  { border-left-color: var(--mc-us); }
+
+.mc-market-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.mc-market-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.mc-badge {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.mc-badge.trading { color: var(--mc-trading-text); }
+.mc-badge.closed  { color: var(--mc-closed-text); }
+.mc-badge.early   { color: #d98a00; }
+.mc-badge.unknown { color: var(--text-secondary); }
+
+.mc-reason {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.mc-type {
+    margin: 2px 0 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.mc-status-msg {
+    padding: 28px 8px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 380px) {
+    .mc-day-num { font-size: 13px; }
+    .mc-legend { gap: 10px; }
+}
+
+/* Calendar is a tool: hide the home dashboard cards while it is open */
+body.calendar-tool-open .quick-stats,
+body.calendar-tool-open .portfolio-card,
+body.calendar-tool-open .mini-cards {
+    display: none !important;
+}
