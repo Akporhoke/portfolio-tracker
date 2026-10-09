@@ -7,10 +7,12 @@
 
    It adds Theme, Language, saved settings, the
    sector fix and the Profit / Loss calculator
-   without editing app.js.
+   without editing y app.js.
    ============================================ */
 
 (function () {
+
+    alert('[TEST 1] settings-extras.js is loading');
 
     'use strict';
 
@@ -354,6 +356,11 @@
        3. SETTINGS THAT ACTUALLY SAVE
        ============================================ */
 
+    let floatingToolReturnTab = null;
+    let floatingToolBackButton = null;
+    let openingFloatingTool = false;
+    let returningFromFloatingTool = false;
+
         function syncSettingsProfile() {
 
         const nameEl = byId('settingsProfileName');
@@ -407,10 +414,25 @@
     });
 
 
-    // Fill the inputs whenever Settings is opened
-    wrap('switchTab', {
+// Fill the inputs whenever Settings is opened.
+// Preserve the existing switchTab function from app.js.
+wrap('switchTab', {
     after(tabName) {
-        document.body.classList.toggle('calendar-tool-open', tabName === 'calendar');
+        document.body.classList.toggle(
+            'calendar-tool-open',
+            tabName === 'calendar'
+        );
+
+        // Hide Back during normal navigation, but preserve it
+        // while a floating tool is opening or Back is returning.
+        if (
+            !openingFloatingTool &&
+            !returningFromFloatingTool &&
+            floatingToolBackButton
+        ) {
+            floatingToolBackButton.style.display = 'none';
+            floatingToolReturnTab = null;
+        }
 
         if (tabName === 'settings') {
             fillSettingsInputs();
@@ -686,6 +708,197 @@
 
     const MAX_FLOATING_TOOLS = 3;
 
+    /* ============================================
+   FLOATING TOOL BACK BUTTON
+   Returns users to the screen they came from.
+   ============================================ */
+
+
+
+
+function getCurrentGazeTab() {
+    const activeTab = document.querySelector(
+        '.tabs .tab-btn.active'
+    );
+
+    return activeTab?.dataset.tab || 'home';
+}
+
+
+function createFloatingToolBackButton() {
+    if (floatingToolBackButton) {
+        return floatingToolBackButton;
+    }
+
+    const button = document.createElement('button');
+
+    button.type = 'button';
+    button.id = 'gazeFloatingToolBack';
+
+    button.innerHTML = `
+    <span style="
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.16);
+        font-size: 17px;
+        line-height: 1;
+    ">‹</span>
+    <span>Back</span>
+`;
+
+    button.setAttribute(
+        'aria-label',
+        'Return to previous screen'
+    );
+
+    button.style.cssText = `
+    position: fixed;
+    bottom: 105px;
+    right: 22px;
+    z-index: 10001;
+
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    min-width: 92px;
+    height: 46px;
+    padding: 0 18px;
+
+    border: 1px solid rgba(8, 127, 115, 0.35);
+    border-radius: 50px;
+
+    background: linear-gradient(
+        135deg,
+        rgba(4, 63, 53, 0.96),
+        rgba(8, 127, 115, 0.94)
+    );
+
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+
+    box-shadow:
+        0 8px 24px rgba(4, 63, 53, 0.25),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        opacity 0.2s ease;
+`;
+
+button.addEventListener('click', () => {
+    const returnTab = floatingToolReturnTab || 'home';
+
+    button.style.display = 'none';
+    floatingToolReturnTab = null;
+
+    returningFromFloatingTool = true;
+
+    try {
+        if (typeof window.switchTab === 'function') {
+            window.switchTab(returnTab);
+        }
+    } finally {
+        returningFromFloatingTool = false;
+    }
+});
+
+    document.body.appendChild(button);
+
+    floatingToolBackButton = button;
+
+    return button;
+}
+
+
+function positionFloatingToolBackButton(button) {
+    const sphere = document.getElementById('floatingToolsSphere');
+
+    if (!button || !sphere) return;
+
+    const sphereRect = sphere.getBoundingClientRect();
+
+    const buttonWidth = button.offsetWidth || 92;
+    const buttonHeight = button.offsetHeight || 46;
+    const gap = 12;
+    const edge = 12;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Prefer placing the Back button above the toolbox.
+    let left = sphereRect.left + (sphereRect.width / 2) - (buttonWidth / 2);
+    let top = sphereRect.top - buttonHeight - gap;
+
+    // If there's insufficient room above, place it below.
+    if (top < edge) {
+        top = sphereRect.bottom + gap;
+    }
+
+    // Keep the button inside the screen horizontally.
+    left = Math.max(
+        edge,
+        Math.min(left, viewportWidth - buttonWidth - edge)
+    );
+
+    // If the bottom placement doesn't fit, place it above instead.
+    if (top + buttonHeight > viewportHeight - edge) {
+        top = sphereRect.top - buttonHeight - gap;
+    }
+
+    // Final vertical safety check.
+    top = Math.max(
+        edge,
+        Math.min(top, viewportHeight - buttonHeight - edge)
+    );
+
+    button.style.left = left + 'px';
+    button.style.top = top + 'px';
+    button.style.right = 'auto';
+    button.style.bottom = 'auto';
+}
+
+function openFloatingTool(tool) {
+    if (!tool || typeof tool.open !== 'function') {
+        return;
+    }
+
+    // Remember the screen before opening the tool.
+    floatingToolReturnTab = getCurrentGazeTab();
+
+    openingFloatingTool = true;
+
+    try {
+        tool.open();
+    } finally {
+        openingFloatingTool = false;
+    }
+
+    const button = createFloatingToolBackButton();
+
+button.style.display = 'inline-flex';
+
+// Wait for the button to become measurable, then position it.
+requestAnimationFrame(function () {
+    positionFloatingToolBackButton(button);
+});
+}
+
 
     /*
        Only tools that actually exist in Gaze are
@@ -725,7 +938,30 @@
             open() {
                 switchTab('calendar');
             }
+        },
+
+        dictionary: {
+    id: 'dictionary',
+    label: 'Investing Dictionary',
+    icon: 'fa-solid fa-book-open',
+
+    open() {
+        // Switch to the Study tab first so #learnRoot is visible.
+        if (typeof window.switchTab === 'function') {
+            window.switchTab('study');
         }
+
+        // Open the existing Gaze Investing Dictionary.
+        if (typeof window.GazeDictionaryUI?.open === 'function') {
+            window.GazeDictionaryUI.open();
+        } else {
+            console.warn(
+                '[Gaze] Investing Dictionary is not available. ' +
+                'Check that dictionary.js has loaded.'
+            );
+        }
+    }
+}
 
     };
 
@@ -1025,7 +1261,7 @@
                        Then open the selected tool.
                     */
 
-                    tool.open();
+                    openFloatingTool(tool);
                 }
             );
 
