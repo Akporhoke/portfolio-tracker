@@ -1,0 +1,19 @@
+NODE_ENV=development
+PORT=3000
+
+# Users database (SEPARATE database + SEPARATE Atlas DB user from your stock data)
+# Use a DB name in the URI, e.g. .../gaze_users
+MONGODB_USERS_URI=mongodb+srv://USERS_DB_USER:PASSWORD@cluster0.xxxxx.mongodb.net/gaze_users?retryWrites=true&w=majority
+
+# Generate with:  node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+JWT_ACCESS_SECRET=
+
+# Comma-separated, exact origins (no trailing slash). Required in production.
+ALLOWED_ORIGINS=https://portfolio-tracker-plwj.onrender.com,http://localhost:3000
+
+# Optional until you set up Google sign-in
+GOOGLE_CLIENT_ID=
+
+# report-only = log CSP violations in the browser console but don't block.
+# Switch to "enforce" once the console is clean.
+CSP_MODE=report-only
