@@ -241,6 +241,10 @@
    FLOATING TOOLS SPHERE
    ============================================ */
 
+/* =========================================================
+   GAZE FLOATING TOOLS — RESPONSIVE TOUCH TOOLBOX
+   ========================================================= */
+
 .floating-tools-sphere {
     position: fixed;
     top: 76px;
@@ -250,10 +254,292 @@
     display: none;
     align-items: center;
     justify-content: center;
+
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+
+    transition:
+        box-shadow 0.2s ease,
+        filter 0.2s ease;
 }
 
 .floating-tools-sphere.enabled {
     display: flex;
+}
+
+.floating-tools-toggle {
+    position: relative;
+
+    width: 46px;
+    height: 46px;
+
+    flex-shrink: 0;
+
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+
+    background: linear-gradient(
+        135deg,
+        #043F35 0%,
+        #087F73 50%,
+        #126E9A 100%
+    );
+
+    color: #fff;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    cursor: pointer;
+
+    box-shadow:
+        0 8px 24px rgba(4, 63, 53, 0.25),
+        0 2px 8px rgba(0, 0, 0, 0.12);
+
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.floating-tools-toggle:hover {
+    box-shadow:
+        0 10px 28px rgba(4, 63, 53, 0.32),
+        0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.floating-tools-toggle:active {
+    transform: scale(0.96);
+}
+
+.floating-tools-toggle i {
+    font-size: 17px;
+    transition: transform 0.25s ease;
+}
+
+.floating-tools-sphere.open .floating-tools-toggle i {
+    transform: rotate(45deg);
+}
+
+/* Toolbox menu */
+
+.floating-tools-menu {
+    position: absolute;
+
+    top: calc(100% + 8px);
+    right: 0;
+    left: auto;
+    bottom: auto;
+
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    width: max-content;
+    min-width: 154px;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transform: translateY(-6px) scale(0.97);
+    transform-origin: top right;
+
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease,
+        visibility 0.18s ease;
+
+    z-index: 901;
+}
+
+.floating-tools-sphere.open .floating-tools-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+
+    transform: translateY(0) scale(1);
+}
+
+/* Open upward when there is more usable space above */
+
+.floating-tools-sphere[data-menu-direction="up"]
+.floating-tools-menu {
+    top: auto;
+    bottom: calc(100% + 8px);
+
+    transform: translateY(6px) scale(0.97);
+    transform-origin: bottom right;
+}
+
+.floating-tools-sphere.open[data-menu-direction="up"]
+.floating-tools-menu {
+    transform: translateY(0) scale(1);
+}
+
+/* Align the menu inward from the left edge */
+
+.floating-tools-sphere[data-menu-alignment="left"]
+.floating-tools-menu {
+    left: 0;
+    right: auto;
+    transform-origin: top left;
+}
+
+.floating-tools-sphere.open[data-menu-alignment="left"]
+.floating-tools-menu {
+    transform: translateY(0) scale(1);
+}
+
+.floating-tools-sphere[data-menu-direction="up"][data-menu-alignment="left"]
+.floating-tools-menu {
+    transform-origin: bottom left;
+}
+
+/* Individual tool buttons */
+
+.floating-tool-button {
+    min-width: 154px;
+    max-width: calc(100vw - 16px);
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 11px 13px;
+
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 12px;
+
+    background: var(--bg-card, #fff);
+    color: var(--text-primary, #17212b);
+
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+
+    cursor: pointer;
+    text-align: left;
+
+    transition:
+        background 0.15s ease,
+        transform 0.15s ease;
+}
+
+.floating-tool-button:hover {
+    background: var(--bg-hover, #f3f6f8);
+    transform: translateX(-2px);
+}
+
+/* Long-press progress ring */
+
+.gaze-hold-ring {
+    position: absolute;
+    inset: -5px;
+
+    border-radius: 50%;
+    padding: 3px;
+
+    opacity: 0;
+    pointer-events: none;
+
+    background: conic-gradient(
+        #a7f3d0 var(--gaze-hold-progress, 0deg),
+        rgba(255, 255, 255, 0.15) 0deg
+    );
+
+    transition: opacity 0.12s ease;
+}
+
+.gaze-hold-ring-progress {
+    display: block;
+    width: 100%;
+    height: 100%;
+
+    border-radius: 50%;
+    background: transparent;
+}
+
+/* Drag mode feedback */
+
+.floating-tools-sphere.gaze-drag-ready {
+    filter: brightness(1.1);
+
+    box-shadow:
+        0 0 0 5px rgba(8, 127, 115, 0.12),
+        0 0 24px rgba(8, 127, 115, 0.45);
+}
+
+.floating-tools-sphere.gaze-drag-ready
+.floating-tools-toggle {
+    box-shadow:
+        0 0 0 3px rgba(167, 243, 208, 0.28),
+        0 0 22px rgba(8, 127, 115, 0.45);
+}
+
+/* Brief shimmer confirms that the new position was saved */
+
+.floating-tools-sphere.gaze-position-saved
+.floating-tools-toggle::after {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+
+    border-radius: 50%;
+    pointer-events: none;
+
+    background: linear-gradient(
+        110deg,
+        transparent 20%,
+        rgba(255, 255, 255, 0.05) 35%,
+        rgba(255, 255, 255, 0.75) 50%,
+        rgba(255, 255, 255, 0.05) 65%,
+        transparent 80%
+    );
+
+    background-size: 220% 100%;
+    animation: gazeSphereShimmer 0.8s ease-out;
+}
+
+@keyframes gazeSphereShimmer {
+    from {
+        background-position: 120% 0;
+    }
+
+    to {
+        background-position: -120% 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .floating-tools-sphere {
+        top: 70px;
+        right: 12px;
+    }
+
+    .floating-tools-toggle {
+        width: 42px;
+        height: 42px;
+    }
+
+    .floating-tool-button {
+        min-width: 145px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .floating-tools-sphere,
+    .floating-tools-toggle,
+    .floating-tools-menu,
+    .floating-tool-button {
+        transition: none;
+    }
+
+    .floating-tools-sphere.gaze-position-saved
+    .floating-tools-toggle::after {
+        animation: none;
+    }
 }
 
 
@@ -347,6 +633,11 @@
     pointer-events: auto;
 
     transform: translateY(0) scale(1);
+}
+.floating-tools-menu {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 
@@ -655,4 +946,19 @@
     .floating-tool-button {
         min-width: 145px;
     }
+}
+
+/* Gaze Floating Tools — Remove unwanted menu container background */
+.floating-tools-menu {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Keep individual tool buttons styled */
+.floating-tool-button {
+    border-radius: 12px;
+    overflow: hidden;
 }

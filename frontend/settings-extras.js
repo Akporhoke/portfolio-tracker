@@ -354,14 +354,15 @@
        3. SETTINGS THAT ACTUALLY SAVE
        ============================================ */
 
-    function syncSettingsProfile() {
+        function syncSettingsProfile() {
 
         const nameEl = byId('settingsProfileName');
         const avatarEl = byId('settingsAvatar');
 
+        // displayName() lives in app.js: Guest when logged out, nickname when logged in
         const name =
-            (typeof state !== 'undefined' && state.userName)
-                ? state.userName
+            typeof displayName === 'function'
+                ? displayName()
                 : 'Guest';
 
         if (nameEl) {
@@ -380,8 +381,13 @@
         const nameInput = byId('settingName');
         const goalInput = byId('settingGoal');
 
-        if (nameInput && typeof state !== 'undefined') {
-            nameInput.value = state.userName || '';
+        // The Name box is the account nickname (empty when logged out)
+        if (nameInput) {
+            const account =
+                window.GazeAuth && window.GazeAuth.getUser();
+
+            nameInput.value =
+                account ? (account.nickname || '') : '';
         }
 
         if (goalInput && typeof state !== 'undefined') {
@@ -393,7 +399,6 @@
             goalInput.value = goal || '';
         }
     }
-
 
     // Keep the settings profile card in step with
     // the header name/avatar
@@ -1240,5 +1245,578 @@
 
              
     });
+
+})();
+
+
+/* =========================================================
+   GAZE FLOATING TOOLS — TOUCH DRAG, EDGE SNAP & POSITION
+   ========================================================= */
+
+(function setupGazeFloatingToolsTouch() {
+    'use strict';
+
+    const STORAGE_KEY = 'gazeFloatingToolsPosition';
+    const HOLD_DURATION = 2000;
+    const SAVE_DELAY = 1000;
+    const EDGE_PADDING = 8;
+    const MOVEMENT_THRESHOLD = 8;
+
+    const sphere = document.getElementById('floatingToolsSphere');
+    const toggle = document.getElementById('floatingToolsToggle');
+    const menu = document.getElementById('floatingToolsMenu');
+
+    if (!sphere || !toggle || !menu) {
+        console.warn(
+            '[Gaze] Floating tools touch controller: required elements not found.'
+        );
+        return;
+    }
+
+    /*
+     * Touch capability is detected separately from viewport width.
+     * A narrow desktop window alone does not activate dragging.
+     *
+     * Set window.GAZE_TEST_TOUCH_TOOLS = true in DevTools before
+     * reloading to test the touch interactions on a desktop.
+     */
+    function supportsTouchInteraction() {
+        return (
+            window.GAZE_TEST_TOUCH_TOOLS === true ||
+            navigator.maxTouchPoints > 0 ||
+            window.matchMedia('(pointer: coarse)').matches
+        );
+    }
+
+    let touchMode = supportsTouchInteraction();
+    let pointerId = null;
+    let startX = 0;
+    let startY = 0;
+    let originalX = 0;
+    let originalY = 0;
+    let holdTimer = null;
+    let saveTimer = null;
+    let holdStarted = 0;
+    let dragging = false;
+    let holdActivated = false;
+    let moved = false;
+    let suppressNextClick = false;
+    let animationFrame = null;
+    let holdRing = null;
+    let holdRingProgress = null;
+
+    const originalTouchAction = toggle.style.touchAction;
+
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), Math.max(min, max));
+    }
+
+    function viewportSize() {
+        const viewport = window.visualViewport;
+
+        return {
+            width: viewport ? viewport.width : window.innerWidth,
+            height: viewport ? viewport.height : window.innerHeight
+        };
+    }
+
+    function sphereSize() {
+        const rect = sphere.getBoundingClientRect();
+
+        return {
+            width: rect.width,
+            height: rect.height
+        };
+    }
+
+    function isMenuOpen() {
+        return sphere.classList.contains('open');
+    }
+
+    function cancelSave() {
+        if (saveTimer) {
+            clearTimeout(saveTimer);
+            saveTimer = null;
+        }
+    }
+
+    function getCurrentPosition() {
+        const rect = sphere.getBoundingClientRect();
+
+        return {
+            x: rect.left,
+            y: rect.top
+        };
+    }
+
+    function setPosition(x, y, side) {
+        const viewport = viewportSize();
+        const size = sphereSize();
+
+        const maxX = viewport.width - size.width - EDGE_PADDING;
+        const maxY = viewport.height - size.height - EDGE_PADDING;
+
+        x = clamp(x, EDGE_PADDING, maxX);
+        y = clamp(y, EDGE_PADDING, maxY);
+
+        sphere.style.position = 'fixed';
+        sphere.style.top = `${y}px`;
+        sphere.style.bottom = 'auto';
+
+        if (side === 'left') {
+            sphere.style.left = `${EDGE_PADDING}px`;
+            sphere.style.right = 'auto';
+            sphere.dataset.edge = 'left';
+        } else if (side === 'right') {
+            sphere.style.left = 'auto';
+            sphere.style.right = `${EDGE_PADDING}px`;
+            sphere.dataset.edge = 'right';
+        } else {
+            sphere.style.left = `${x}px`;
+            sphere.style.right = 'auto';
+        }
+
+        updateMenuPlacement();
+    }
+
+    function savePosition() {
+        const rect = sphere.getBoundingClientRect();
+
+        const position = {
+            side: sphere.dataset.edge || 'right',
+            top: Math.round(rect.top),
+            savedAt: Date.now()
+        };
+
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
+
+            sphere.classList.remove('gaze-position-saved');
+
+            // Restart the confirmation animation on every save.
+            void sphere.offsetWidth;
+
+            sphere.classList.add('gaze-position-saved');
+
+            window.setTimeout(() => {
+                sphere.classList.remove('gaze-position-saved');
+            }, 900);
+        } catch (error) {
+            console.warn('[Gaze] Could not save toolbox position.', error);
+        }
+    }
+
+    function scheduleSave() {
+        cancelSave();
+
+        saveTimer = window.setTimeout(() => {
+            saveTimer = null;
+            savePosition();
+        }, SAVE_DELAY);
+    }
+
+    function restorePosition() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+
+            if (!saved || !Number.isFinite(saved.top)) {
+                return;
+            }
+
+            const viewport = viewportSize();
+            const size = sphereSize();
+
+            const maxY = viewport.height - size.height - EDGE_PADDING;
+            const y = clamp(saved.top, EDGE_PADDING, maxY);
+
+            const side = saved.side === 'left' ? 'left' : 'right';
+
+            setPosition(
+                side === 'left'
+                    ? EDGE_PADDING
+                    : viewport.width - size.width - EDGE_PADDING,
+                y,
+                side
+            );
+        } catch (error) {
+            console.warn('[Gaze] Could not restore toolbox position.', error);
+        }
+    }
+
+    /* ---------- Long-press progress indicator ---------- */
+
+    function createHoldRing() {
+        if (holdRing) return;
+
+        holdRing = document.createElement('span');
+        holdRing.className = 'gaze-hold-ring';
+        holdRing.setAttribute('aria-hidden', 'true');
+
+        holdRingProgress = document.createElement('span');
+        holdRingProgress.className = 'gaze-hold-ring-progress';
+
+        holdRing.appendChild(holdRingProgress);
+        toggle.appendChild(holdRing);
+    }
+
+    function showHoldProgress(progress) {
+        createHoldRing();
+
+        holdRing.style.opacity = '1';
+        holdRingProgress.style.setProperty(
+            '--gaze-hold-progress',
+            `${Math.round(progress * 360)}deg`
+        );
+    }
+
+    function hideHoldProgress() {
+        if (holdRing) {
+            holdRing.style.opacity = '0';
+        }
+    }
+
+    function updateHoldProgress() {
+        if (!holdStarted || !holdTimer) return;
+
+        const elapsed = performance.now() - holdStarted;
+        const progress = Math.min(elapsed / HOLD_DURATION, 1);
+
+        showHoldProgress(progress);
+
+        if (progress < 1) {
+            animationFrame = requestAnimationFrame(updateHoldProgress);
+        }
+    }
+
+    /* ---------- Menu positioning ---------- */
+
+    function updateMenuPlacement() {
+        if (!menu || !sphere.isConnected) return;
+
+        const viewport = viewportSize();
+        const sphereRect = sphere.getBoundingClientRect();
+
+        const previousVisibility = menu.style.visibility;
+        const previousDisplay = menu.style.display;
+
+        // Measure the actual menu even if it is currently closed.
+        menu.style.visibility = 'hidden';
+        menu.style.display = 'flex';
+
+        const menuRect = menu.getBoundingClientRect();
+        const menuHeight = menu.scrollHeight || menuRect.height;
+        const menuWidth = menu.scrollWidth || menuRect.width;
+
+        const spaceBelow =
+            viewport.height - sphereRect.bottom - EDGE_PADDING;
+
+        const spaceAbove =
+            sphereRect.top - EDGE_PADDING;
+
+        const fitsBelow = spaceBelow >= menuHeight;
+        const fitsAbove = spaceAbove >= menuHeight;
+
+        let direction;
+
+        if (fitsBelow && !fitsAbove) {
+            direction = 'down';
+        } else if (fitsAbove && !fitsBelow) {
+            direction = 'up';
+        } else if (fitsAbove && fitsBelow) {
+            direction = 'down';
+        } else {
+            direction =
+                spaceAbove > spaceBelow ? 'up' : 'down';
+        }
+
+        sphere.dataset.menuDirection = direction;
+
+        /*
+         * Keep the menu within the viewport horizontally.
+         * The menu opens inward from whichever side the sphere occupies.
+         */
+        const centerX = sphereRect.left + sphereRect.width / 2;
+
+        sphere.dataset.menuAlignment =
+            centerX > viewport.width / 2 ? 'right' : 'left';
+
+        const maxMenuWidth = Math.max(
+            100,
+            viewport.width - EDGE_PADDING * 2
+        );
+
+        menu.style.maxWidth = `${maxMenuWidth}px`;
+        menu.style.maxHeight = `${Math.max(
+            80,
+            viewport.height - EDGE_PADDING * 2
+        )}px`;
+        menu.style.overflowY = 'auto';
+
+        menu.style.visibility = previousVisibility;
+        menu.style.display = previousDisplay;
+    }
+
+    /* ---------- Dragging ---------- */
+
+    function clearHoldTimer() {
+        if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+        }
+
+        if (animationFrame) {
+            cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+        }
+
+        holdStarted = 0;
+        hideHoldProgress();
+    }
+
+    function activateDragMode() {
+        if (!pointerId || isMenuOpen()) return;
+
+        holdActivated = true;
+        dragging = true;
+
+        sphere.classList.add('gaze-drag-ready');
+
+        if (navigator.vibrate) {
+            try {
+                navigator.vibrate(20);
+            } catch (_) {
+                // Vibration is optional.
+            }
+        }
+    }
+
+    function onPointerDown(event) {
+        touchMode = supportsTouchInteraction();
+
+        if (!touchMode) return;
+        if (event.pointerType === 'mouse') return;
+        if (event.button !== undefined && event.button !== 0) return;
+        if (isMenuOpen()) return;
+
+        pointerId = event.pointerId;
+
+        const rect = sphere.getBoundingClientRect();
+
+        startX = event.clientX;
+        startY = event.clientY;
+
+        originalX = rect.left;
+        originalY = rect.top;
+
+        moved = false;
+        dragging = false;
+        holdActivated = false;
+
+        cancelSave();
+
+        holdStarted = performance.now();
+
+        holdTimer = window.setTimeout(() => {
+            holdTimer = null;
+            activateDragMode();
+        }, HOLD_DURATION);
+
+        animationFrame = requestAnimationFrame(updateHoldProgress);
+    }
+
+    function onPointerMove(event) {
+        if (pointerId === null || event.pointerId !== pointerId) return;
+
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+
+        if (
+            Math.abs(dx) > MOVEMENT_THRESHOLD ||
+            Math.abs(dy) > MOVEMENT_THRESHOLD
+        ) {
+            moved = true;
+        }
+
+        /*
+         * Movement before the 2-second hold does not drag the sphere.
+         * It cancels the hold instead.
+         */
+        if (!holdActivated && moved) {
+            clearHoldTimer();
+            return;
+        }
+
+        if (!dragging) return;
+
+        event.preventDefault();
+
+        const viewport = viewportSize();
+        const size = sphereSize();
+
+        const x = clamp(
+            originalX + dx,
+            EDGE_PADDING,
+            viewport.width - size.width - EDGE_PADDING
+        );
+
+        const y = clamp(
+            originalY + dy,
+            EDGE_PADDING,
+            viewport.height - size.height - EDGE_PADDING
+        );
+
+        sphere.style.left = `${x}px`;
+        sphere.style.right = 'auto';
+        sphere.style.top = `${y}px`;
+        sphere.style.bottom = 'auto';
+
+        updateMenuPlacement();
+    }
+
+    function onPointerUp(event) {
+        if (pointerId === null || event.pointerId !== pointerId) return;
+
+        clearHoldTimer();
+
+        const wasDrag = dragging;
+        const wasHold = holdActivated;
+
+        pointerId = null;
+
+        dragging = false;
+        holdActivated = false;
+
+        sphere.classList.remove('gaze-drag-ready');
+
+        if (wasDrag) {
+            const viewport = viewportSize();
+            const rect = sphere.getBoundingClientRect();
+
+            const centerX = rect.left + rect.width / 2;
+            const side = centerX < viewport.width / 2
+                ? 'left'
+                : 'right';
+
+            const targetX = side === 'left'
+                ? EDGE_PADDING
+                : viewport.width - rect.width - EDGE_PADDING;
+
+            setPosition(targetX, rect.top, side);
+
+            suppressNextClick = true;
+
+            // Save one second after the sphere settles.
+            scheduleSave();
+        } else if (wasHold) {
+            /*
+             * A completed hold without a drag must not open the toolbox.
+             */
+            suppressNextClick = true;
+        }
+
+        sphere.classList.remove('gaze-drag-ready');
+    }
+
+    function onPointerCancel(event) {
+        if (pointerId === null || event.pointerId !== pointerId) return;
+
+        clearHoldTimer();
+
+        pointerId = null;
+        dragging = false;
+        holdActivated = false;
+
+        sphere.classList.remove('gaze-drag-ready');
+    }
+
+    /*
+     * Capture phase lets us suppress the click generated after a drag,
+     * without replacing the existing toolbox click handler.
+     */
+    function onClickCapture(event) {
+        if (suppressNextClick) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            suppressNextClick = false;
+        }
+    }
+
+    toggle.addEventListener('pointerdown', onPointerDown, {
+        passive: true
+    });
+
+    window.addEventListener('pointermove', onPointerMove, {
+        passive: false
+    });
+
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
+
+    toggle.addEventListener('click', onClickCapture, true);
+
+    /* ---------- Resize and orientation ---------- */
+
+    function keepSphereVisible() {
+        if (!touchMode) return;
+
+        const rect = sphere.getBoundingClientRect();
+        const viewport = viewportSize();
+
+        const side = sphere.dataset.edge === 'left'
+            ? 'left'
+            : 'right';
+
+        const x = side === 'left'
+            ? EDGE_PADDING
+            : viewport.width - rect.width - EDGE_PADDING;
+
+        const y = clamp(
+            rect.top,
+            EDGE_PADDING,
+            viewport.height - rect.height - EDGE_PADDING
+        );
+
+        setPosition(x, y, side);
+        updateMenuPlacement();
+    }
+
+    window.addEventListener('resize', keepSphereVisible);
+    window.addEventListener('orientationchange', keepSphereVisible);
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener(
+            'resize',
+            keepSphereVisible
+        );
+    }
+
+    /*
+     * Recalculate placement whenever the existing toolbox opens.
+     * This does not add or replace the existing open/close handler.
+     */
+    const menuObserver = new MutationObserver(() => {
+        if (isMenuOpen()) {
+            requestAnimationFrame(updateMenuPlacement);
+        }
+    });
+
+    menuObserver.observe(sphere, {
+        attributes: true,
+        attributeFilter: ['class']
+    });
+
+    /* ---------- Initialize ---------- */
+
+    toggle.style.touchAction = 'none';
+
+    if (touchMode) {
+        restorePosition();
+    }
+
+    console.info(
+        '[Gaze] Floating tools touch controller initialized.',
+        { touchMode }
+    );
 
 })();

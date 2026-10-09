@@ -8,10 +8,14 @@
   // Leave it empty to hide the "Continue with Google" button.
   var GOOGLE_CLIENT_ID = '';
 
-  // localStorage / sessionStorage keys that hold a user's PRIVATE data in the browser.
+  // Browser-storage keys that hold a user's PRIVATE data (found in app.js).
   // They are wiped on log out so the next person on this device can't see them.
-  // To find the names: open DevTools > Application > Local Storage, or run Object.keys(localStorage)
-  var CLEAR_ON_LOGOUT = [];
+  // 'portfolioTrackerCurrency' (USD/NGN choice) is only a preference, so it stays.
+  var CLEAR_ON_LOGOUT = [
+    'portfolioTrackerState',            // cached portfolio, watchlist, sold, settings, display name
+    'portfolioTrackerLocalActivity',    // local activity log
+    'portfolioTrackerActivityClearedAt'
+  ];
 
   var $ = function (id) { return document.getElementById(id); };
   var mode = 'login';
@@ -54,6 +58,13 @@
     busy = isBusy;
     button.disabled = isBusy;
     button.textContent = isBusy ? busyText : idleText;
+  }
+
+  // app.js owns the header; ask it to redraw (it falls back to the account name)
+  function refreshHeader() {
+    if (typeof window.updateHeader === 'function') {
+      try { window.updateHeader(); } catch (e) { console.error(e); }
+    }
   }
 
   function clearUserCache() {
@@ -306,6 +317,177 @@
     }
   }
 
+  /* ---------- nickname (shown in the greeting) ---------- */
+
+  var NICK_RX = /^[\p{L}\p{N} .'_-]{1,30}$/u;
+  var nickPrompted = false;
+
+  function cleanNick(v) { return String(v || '').trim().replace(/\s+/g, ' '); }
+
+  function greetingWord() {
+    var h = new Date().getHours();
+    return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+  }
+
+  function ensureNicknameStyles() {
+    if ($('nicknameStyles')) return;
+    var style = document.createElement('style');
+    style.id = 'nicknameStyles';
+    style.textContent =
+      '.gz-nick{text-align:center;padding:26px 24px 22px}' +
+      '.gz-nick-owl{display:block;width:118px;height:118px;object-fit:contain;margin:-6px auto 2px;animation:gzNickFloat 3.2s ease-in-out infinite}' +
+      '@keyframes gzNickFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}' +
+      '.gz-nick-title{font-size:22px;margin:6px 0 6px}' +
+      '.gz-nick-sub{font-size:14px;line-height:1.45;opacity:.7;margin:0 0 18px}' +
+      '.gz-nick-input{width:100%;box-sizing:border-box;padding:14px 16px;border-radius:14px;font:inherit;font-size:17px;text-align:center;color:inherit;background:rgba(128,128,128,.1);border:1.5px solid rgba(128,128,128,.35);outline:none;transition:border-color .15s,box-shadow .15s}' +
+      '.gz-nick-input:focus{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,.22)}' +
+      '.gz-nick-preview{margin:16px 0 6px;padding:12px;border-radius:14px;background:rgba(99,102,241,.1);transition:opacity .15s}' +
+      '.gz-nick-preview.gz-dim{opacity:.55}' +
+      '.gz-nick-label{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-bottom:6px}' +
+      '.gz-nick-hello{display:block;font-size:13px;opacity:.75}' +
+      '.gz-nick-name{display:block;font-size:22px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+      '.gz-nick-skip{background:none;border:0;color:inherit;opacity:.6;font:inherit;font-size:14px;margin-top:10px;padding:8px 12px;cursor:pointer}' +
+      '.gz-nick-skip:hover{opacity:.9}';
+    document.head.appendChild(style);
+  }
+
+  function updateNickPreview() {
+    var typed = cleanNick($('nicknameInput').value);
+    $('nicknameHello').textContent = greetingWord() + ',';
+    $('nicknameName').textContent = typed || 'Your nickname';
+    $('nicknamePreview').classList.toggle('gz-dim', !typed);
+  }
+
+  function buildNicknameModal() {
+    if ($('nicknameModal')) return;
+    ensureNicknameStyles();
+
+    var modal = el('div', 'modal');
+    modal.id = 'nicknameModal';
+    var card = el('div', 'modal-content modal-small gz-nick');
+
+    var owl = document.createElement('img');
+    owl.src = 'owl_x5f_waving.svg';
+    owl.alt = '';
+    owl.className = 'gz-nick-owl';
+    owl.addEventListener('error', function () { owl.style.display = 'none'; });
+    card.appendChild(owl);
+
+    card.appendChild(el('h2', 'gz-nick-title', 'What should we call you?'));
+    card.appendChild(el('p', 'gz-nick-sub', 'Pick a nickname. It shows up in your greeting every time you open Gaze.'));
+
+    var form = document.createElement('form');
+    form.id = 'nicknameForm';
+    form.noValidate = true;
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'nicknameInput';
+    input.className = 'gz-nick-input';
+    input.maxLength = 30;
+    input.autocomplete = 'off';
+    input.placeholder = 'Your nickname';
+    input.setAttribute('aria-label', 'Nickname');
+    input.setAttribute('enterkeyhint', 'done');
+    form.appendChild(input);
+
+    var preview = el('div', 'gz-nick-preview');
+    preview.id = 'nicknamePreview';
+    preview.appendChild(el('span', 'gz-nick-label', 'Your greeting'));
+    var hello = el('span', 'gz-nick-hello', '');
+    hello.id = 'nicknameHello';
+    var name = el('strong', 'gz-nick-name', '');
+    name.id = 'nicknameName';
+    preview.appendChild(hello);
+    preview.appendChild(name);
+    form.appendChild(preview);
+
+    var error = el('p', 'auth-error');
+    error.id = 'nicknameError';
+    error.setAttribute('role', 'alert');
+    form.appendChild(error);
+
+    var save = el('button', 'btn-primary btn-full', 'Save nickname');
+    save.type = 'submit';
+    save.id = 'nicknameSave';
+    form.appendChild(save);
+
+    var skip = el('button', 'gz-nick-skip', 'Maybe later');
+    skip.type = 'button';
+    skip.id = 'nicknameSkip';
+    form.appendChild(skip);
+
+    card.appendChild(form);
+    modal.appendChild(card);
+    document.body.appendChild(modal);
+
+    input.addEventListener('input', function () { showError('nicknameError', ''); updateNickPreview(); });
+    form.addEventListener('submit', saveNickname);
+    skip.addEventListener('click', skipNickname);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal('nicknameModal'); });
+  }
+
+  function openNickname(user) {
+    buildNicknameModal();
+    var guess = cleanNick(String((user && user.name) || '').split(' ')[0]);
+    $('nicknameInput').value = NICK_RX.test(guess) ? guess : '';
+    showError('nicknameError', '');
+    updateNickPreview();
+    openModal('nicknameModal');
+    setTimeout(function () { var i = $('nicknameInput'); i.focus(); i.select(); }, 80);
+  }
+
+  // Ask once, when a logged-in account has no nickname yet (not right after login: that reloads the page first)
+  function maybePromptNickname() {
+    var u = window.GazeAuth.getUser();
+    if (!u || nickPrompted || u.nickname || u.nicknamePrompted) return;
+    nickPrompted = true;
+    openNickname(u);
+  }
+
+  async function saveNickname(e) {
+    e.preventDefault();
+    if (busy) return;
+    var v = cleanNick($('nicknameInput').value);
+    if (!v) { showError('nicknameError', 'Type a nickname, or tap "Maybe later".'); return; }
+    if (!NICK_RX.test(v)) { showError('nicknameError', "Use letters, numbers, spaces and . - _ only (max 30)."); return; }
+
+    var btn = $('nicknameSave');
+    setBusy(btn, true, 'Save nickname', 'Saving…');
+    var r = await window.GazeAuth.updateProfile({ nickname: v, nicknamePrompted: true });
+    setBusy(btn, false, 'Save nickname', '');
+    if (r.ok) {
+      closeModal('nicknameModal');
+      refreshHeader();
+      toast('Nice to meet you, ' + v);
+    } else {
+      showError('nicknameError', friendlyError(r));
+    }
+  }
+
+  async function skipNickname() {
+    closeModal('nicknameModal');
+    await window.GazeAuth.updateProfile({ nicknamePrompted: true }); // remembered on the account: we won't ask again
+  }
+
+  // Settings > "Display name" is the same nickname, saved on the account
+  function syncNameInput(user) {
+    var input = $('settingName');
+    if (input) input.value = user ? (user.nickname || '') : '';
+  }
+
+  async function onSettingsSave() {
+    var input = $('settingName');
+    if (!input) return;
+    var v = cleanNick(input.value);
+    var u = window.GazeAuth.getUser();
+    if (!u) { if (v) toast('Log in to set your nickname', 'warning'); return; }
+    if (!v || v === (u.nickname || '')) return;
+    if (!NICK_RX.test(v)) { toast('Nickname: letters, numbers, spaces and . - _ only (max 30)', 'error'); return; }
+    var r = await window.GazeAuth.updateProfile({ nickname: v, nicknamePrompted: true });
+    if (r.ok) refreshHeader(); else toast(friendlyError(r), 'error');
+  }
+
   /* ---------- wiring ---------- */
 
   function init() {
@@ -334,15 +516,20 @@
     $('authClose').addEventListener('click', function () { closeModal('authModal'); });
     $('securityClose').addEventListener('click', function () { closeModal('securityModal'); });
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeModal('authModal'); closeModal('securityModal'); }
+      if (e.key === 'Escape') { closeModal('authModal'); closeModal('securityModal'); closeModal('nicknameModal'); }
     });
+
+    var saveSettingBtn = $('saveSetting');
+    if (saveSettingBtn) saveSettingBtn.addEventListener('click', onSettingsSave);
 
     var secRow = $('securityRowBtn');
     if (secRow) secRow.addEventListener('click', openSecurity);
 
     window.GazeAuth.onChange(function (user) {
       renderCard(user);
-      if (!user) closeModal('securityModal');
+      refreshHeader();
+      syncNameInput(user);
+      if (!user) { closeModal('securityModal'); closeModal('nicknameModal'); }
     });
 
     // A portfolio request was blocked because nobody is logged in: ask them to log in (once per page load)
@@ -354,15 +541,21 @@
     });
 
     // auth-client.js restores the session by itself; just show whatever state it is in
-    var show = function () { renderCard(window.GazeAuth.getUser()); };
+    var show = function () {
+      var u = window.GazeAuth.getUser();
+      renderCard(u);
+      refreshHeader();
+      syncNameInput(u);
+    };
     show();
-    window.GazeAuth.ready.then(show);
+    window.GazeAuth.ready.then(function () { show(); maybePromptNickname(); });
   }
 
   var api = {
     openLogin: function () { openAuth('login'); },
     openSignup: function () { openAuth('signup'); },
     openSecurity: openSecurity,
+    openNickname: function () { var u = window.GazeAuth.getUser(); if (u) openNickname(u); },
     reloadDelay: 600,
     reload: function () { location.reload(); }
   };

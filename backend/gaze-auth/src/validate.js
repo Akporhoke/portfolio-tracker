@@ -12,10 +12,23 @@ const password = z
 
 const name = z.string().trim().max(60).optional().default('');
 
+// Letters (any language), numbers, spaces and . ' _ -   (max 30). Empty string = clear it.
+const NICK_RX = /^[\p{L}\p{N} .'_-]+$/u;
+const nickname = z
+  .string()
+  .trim()
+  .max(30, 'Nickname is too long (max 30 characters)')
+  .transform((v) => v.replace(/\s+/g, ' '))
+  .refine((v) => v === '' || NICK_RX.test(v), 'Nickname can only use letters, numbers, spaces and . - _');
+
 const schemas = {
   signup: z.object({ name, email, password }).strict(),
   login: z.object({ email, password: z.string().min(1).max(200) }).strict(),
   google: z.object({ credential: z.string().min(20).max(4096) }).strict(),
+  profile: z
+    .object({ nickname: nickname.optional(), nicknamePrompted: z.literal(true).optional() })
+    .strict()
+    .refine((o) => o.nickname !== undefined || o.nicknamePrompted === true, { message: 'Nothing to update' }),
   changePassword: z
     .object({ currentPassword: z.string().min(1).max(200), newPassword: password })
     .strict(),

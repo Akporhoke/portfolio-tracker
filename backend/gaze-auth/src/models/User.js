@@ -7,6 +7,8 @@ const userSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, lowercase: true, trim: true, maxlength: 254 },
     name: { type: String, trim: true, maxlength: 60, default: '' },
+    nickname: { type: String, trim: true, maxlength: 30, default: '' },   // what Gaze calls them
+    nicknamePrompted: { type: Boolean, default: false },                   // asked once; don't nag again
     passwordHash: { type: String, select: false },          // absent for Google-only accounts
     googleId: { type: String, unique: true, sparse: true },
     emailVerified: { type: Boolean, default: false },
@@ -34,6 +36,8 @@ userSchema.methods.toPublic = function () {
     id: String(this._id),
     email: this.email,
     name: this.name,
+    nickname: this.nickname || '',
+    nicknamePrompted: !!this.nicknamePrompted,
     emailVerified: this.emailVerified,
     role: this.role,
     plan: this.activePlan(),

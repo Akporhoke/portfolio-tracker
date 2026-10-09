@@ -244,7 +244,7 @@ router.post(
             expiresAt: new Date(now.getTime() + config.refreshTtlMs),
           },
         },
-                { returnDocument: 'after' }
+        { returnDocument: 'after' }
       );
       if (!rotated) return respondWithoutRotation(session); // parallel tab won the race
 
@@ -301,6 +301,31 @@ router.get(
   requireAuth,
   asyncH(async (req, res) => {
     const user = await User.findById(req.auth.userId);
+    if (!user) return res.status(401).json({ error: 'Authentication required', code: 'NO_USER' });
+    return res.json({ user: user.toPublic() });
+  })
+);
+
+router.post(
+  '/profile',
+  limiters.sensitive,
+  requireAuth,
+  asyncH(async (req, res) => {
+    const parsed = schemas.profile.safeParse(req.body);
+    if (!parsed.success) return badRequest(res, parsed.error);
+
+    const set = {};
+    if (parsed.data.nickname !== undefined) {
+      set.nickname = parsed.data.nickname;
+      set.nicknamePrompted = true;
+    }
+    if (parsed.data.nicknamePrompted === true) set.nicknamePrompted = true;
+
+    const user = await User.findByIdAndUpdate(
+      req.auth.userId,
+      { $set: set },
+      { returnDocument: 'after', runValidators: true }
+    );
     if (!user) return res.status(401).json({ error: 'Authentication required', code: 'NO_USER' });
     return res.json({ user: user.toPublic() });
   })

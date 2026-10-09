@@ -3856,6 +3856,13 @@ function displayName() {
     return String(state.userName || accountName || 'Guest').trim() || 'Guest';
 }
 
+function displayName() {
+    const account = window.GazeAuth && window.GazeAuth.getUser();
+    if (!account) return 'Guest';
+    const email = String(account.email || '');
+    return String(account.nickname || account.name || email.split('@')[0] || 'Guest').trim() || 'Guest';
+}
+
 function updateHeader() {
     const name = displayName();
     const userName = document.getElementById('userName');

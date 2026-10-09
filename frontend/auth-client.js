@@ -174,6 +174,18 @@
       var r = await api(BASE + '/change-password', { method: 'POST', body: { currentPassword: currentPassword, newPassword: newPassword } });
       return r.res.ok ? { ok: true } : fail(r);
     },
+    // Save profile fields on the account, e.g. updateProfile({ nickname: 'Orhoke', nicknamePrompted: true })
+    updateProfile: async function (fields) {
+      var r;
+      try { r = await api(BASE + '/profile', { method: 'POST', body: fields }); }
+      catch (_) { return { ok: false, error: 'Network error. Check your connection.', code: 'NETWORK' }; }
+      if (r.res.ok && r.data && r.data.user) {
+        currentUser = r.data.user;
+        emit();
+        return { ok: true, user: currentUser };
+      }
+      return fail(r);
+    },
     sessions: async function () {
       var r = await api(BASE + '/sessions');
       return r.res.ok ? { ok: true, sessions: r.data.sessions } : fail(r);
