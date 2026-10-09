@@ -1211,6 +1211,10 @@ async function fetchAllData() {
             );
 
 
+        if (portfolioRes.status === 401) {
+            return; // not logged in: the login box handles it
+        }
+
         if (!portfolioRes.ok) {
 
             throw new Error(
@@ -3844,32 +3848,21 @@ function updateUI() {
 }
 
 
+function displayName() {
+    const account = window.GazeAuth && window.GazeAuth.getUser();
+    const accountName = account
+        ? (account.name || String(account.email || '').split('@')[0])
+        : '';
+    return String(state.userName || accountName || 'Guest').trim() || 'Guest';
+}
+
 function updateHeader() {
+    const name = displayName();
+    const userName = document.getElementById('userName');
+    const avatar = document.getElementById('avatar');
 
-    const userName =
-        document.getElementById(
-            'userName'
-        );
-
-
-    const avatar =
-        document.getElementById(
-            'avatar'
-        );
-
-
-    if (userName) {
-        userName.textContent =
-            state.userName;
-    }
-
-
-    if (avatar) {
-
-        avatar.textContent =
-            state.userName[0]
-                .toUpperCase();
-    }
+    if (userName) userName.textContent = name;
+    if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
 }
 
 

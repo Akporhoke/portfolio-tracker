@@ -1,0 +1,107 @@
+/* Gaze auth UI. Uses transparent greys + inherited colours so it works in light and dark themes. */
+
+.auth-hidden { display: none !important; }
+
+.auth-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+    background: rgba(128, 128, 128, 0.14);
+}
+.auth-tab {
+    flex: 1;
+    border: 0;
+    border-radius: 9px;
+    padding: 9px 12px;
+    font: inherit;
+    font-weight: 600;
+    color: inherit;
+    background: transparent;
+    opacity: 0.65;
+    cursor: pointer;
+}
+.auth-tab.active { background: rgba(128, 128, 128, 0.24); opacity: 1; }
+
+.auth-google {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.auth-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    font-size: 12px;
+    opacity: 0.6;
+}
+.auth-or::before, .auth-or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(128, 128, 128, 0.4);
+}
+
+.auth-label-row { display: flex; align-items: center; justify-content: space-between; }
+.auth-show {
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+.auth-error { color: #e5484d; font-size: 13px; margin: 4px 0 10px; }
+.auth-error:empty { display: none; }
+
+.auth-h3 { font-size: 15px; margin: 18px 0 10px; }
+.auth-h3:first-child { margin-top: 0; }
+
+.auth-devices { margin-bottom: 14px; }
+.auth-device {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.22);
+}
+.auth-device-name { font-weight: 600; font-size: 14px; }
+.auth-device-meta { font-size: 12px; opacity: 0.65; margin-top: 2px; }
+.auth-badge {
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(128, 128, 128, 0.22);
+}
+.auth-link-btn {
+    border: 0;
+    background: none;
+    color: #e5484d;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px;
+    cursor: pointer;
+}
+.auth-link-btn:disabled { opacity: 0.5; }
+
+.auth-email {
+    margin-left: auto;
+    max-width: 55%;
+    font-size: 13px;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

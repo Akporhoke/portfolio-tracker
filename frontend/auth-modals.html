@@ -1,0 +1,76 @@
+<!-- ===== AUTH MODALS (paste just before <!-- Sync Indicator --> ) ===== -->
+
+    <!-- Login / Sign up -->
+    <div class="modal" id="authModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2 id="authTitle">Log in</h2>
+                <button type="button" class="close-modal" id="authClose" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="auth-tabs" role="tablist">
+                    <button type="button" class="auth-tab active" data-mode="login" role="tab">Log in</button>
+                    <button type="button" class="auth-tab" data-mode="signup" role="tab">Sign up</button>
+                </div>
+
+                <div class="auth-google auth-hidden" id="authGoogleWrap">
+                    <div id="authGoogleBtn"></div>
+                    <div class="auth-or"><span>or</span></div>
+                </div>
+
+                <form id="authForm" novalidate>
+                    <div class="form-group auth-hidden" id="authNameGroup">
+                        <label for="authName">Name</label>
+                        <input type="text" id="authName" autocomplete="name" maxlength="60" placeholder="Your name">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="authEmail">Email</label>
+                        <input type="email" id="authEmail" autocomplete="email" inputmode="email" placeholder="you@example.com">
+                    </div>
+
+                    <div class="form-group">
+                        <div class="auth-label-row">
+                            <label for="authPassword">Password</label>
+                            <button type="button" class="auth-show" id="authShowPw">Show</button>
+                        </div>
+                        <input type="password" id="authPassword" autocomplete="current-password" placeholder="Password">
+                        <p class="form-hint auth-hidden" id="authPwHint">At least 10 characters.</p>
+                    </div>
+
+                    <p class="auth-error" id="authError" role="alert"></p>
+                    <button type="submit" class="btn-primary btn-full" id="authSubmit">Log in</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password & Security -->
+    <div class="modal" id="securityModal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Password &amp; Security</h2>
+                <button type="button" class="close-modal" id="securityClose" aria-label="Close">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="pwForm" novalidate>
+                    <h3 class="auth-h3">Change password</h3>
+                    <div class="form-group">
+                        <label for="pwCurrent">Current password</label>
+                        <input type="password" id="pwCurrent" autocomplete="current-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="pwNew">New password</label>
+                        <input type="password" id="pwNew" autocomplete="new-password">
+                        <p class="form-hint">At least 10 characters. Your other devices will be logged out.</p>
+                    </div>
+                    <p class="auth-error" id="pwError" role="alert"></p>
+                    <button type="submit" class="btn-primary btn-full" id="pwSubmit">Update password</button>
+                </form>
+
+                <h3 class="auth-h3">Devices</h3>
+                <div class="auth-devices" id="deviceList"></div>
+                <button type="button" class="btn-secondary btn-full" id="logoutAllBtn">Log out of all devices</button>
+            </div>
+        </div>
+    </div>
