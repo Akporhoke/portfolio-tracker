@@ -12,9 +12,7 @@
 
 (function () {
 
-    alert('[TEST 1] settings-extras.js is loading');
-
-    'use strict';
+  
 
 
     /* ----------------------------------------
