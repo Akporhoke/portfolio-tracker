@@ -705,7 +705,7 @@ wrap('switchTab', {
         'gazeFloatingTools';
 
     const MAX_FLOATING_TOOLS = 3;
-
+    let floatingToolsCloseTimer = null;
     /* ============================================
    FLOATING TOOL BACK BUTTON
    Returns users to the screen they came from.
@@ -1270,32 +1270,44 @@ requestAnimationFrame(function () {
 
     function closeFloatingToolsSphere() {
 
-        const sphere =
-            byId('floatingToolsSphere');
+const sphere = byId('floatingToolsSphere');
+const toggle = byId('floatingToolsToggle');
+const menu = byId('floatingToolsMenu');
 
-        const toggle =
-            byId('floatingToolsToggle');
+if (!sphere || !toggle || !menu) {
+    return;
+}
 
-        const menu =
-            byId('floatingToolsMenu');
+// Already closed or currently closing.
+if (
+    !sphere.classList.contains('open') ||
+    sphere.classList.contains('closing')
+) {
+    return;
+}
 
-        if (!sphere || !toggle || !menu) {
-            return;
-        }
+// Cancel any previous closing timer.
+if (floatingToolsCloseTimer) {
+    clearTimeout(floatingToolsCloseTimer);
+    floatingToolsCloseTimer = null;
+}
 
-        sphere.classList.remove('open');
+// Keep the menu open temporarily so the exit animation can play.
+sphere.classList.add('closing');
 
-        toggle.setAttribute(
-            'aria-expanded',
-            'false'
-        );
+toggle.setAttribute('aria-expanded', 'false');
+menu.setAttribute('aria-hidden', 'true');
 
-        menu.setAttribute(
-            'aria-hidden',
-            'true'
-        );
-    }
+// Wait for the longest exit animation to finish.
+floatingToolsCloseTimer = setTimeout(() => {
 
+    sphere.classList.remove('open', 'closing');
+
+    floatingToolsCloseTimer = null;
+
+}, 350);
+
+}
 
     function setupFloatingTools() {
 
@@ -1315,50 +1327,51 @@ requestAnimationFrame(function () {
         */
 
         toggle.addEventListener(
-            'click',
-            event => {
+'click',
+event => {
 
-                event.stopPropagation();
+    event.stopPropagation();
 
-                const sphere =
-                    byId('floatingToolsSphere');
+    const sphere = byId('floatingToolsSphere');
+    const menu = byId('floatingToolsMenu');
 
-                const menu =
-                    byId('floatingToolsMenu');
+    if (!sphere || !menu) {
+        return;
+    }
 
-                if (!sphere || !menu) {
-                    return;
-                }
+    // If the toolbox is open, play its closing animation.
+    if (sphere.classList.contains('open')) {
+        closeFloatingToolsSphere();
+        return;
+    }
 
-                const open =
-                    sphere.classList.toggle('open');
+    // Cancel a pending close if the toolbox is reopened quickly.
+    if (floatingToolsCloseTimer) {
+        clearTimeout(floatingToolsCloseTimer);
+        floatingToolsCloseTimer = null;
+    }
 
-                toggle.setAttribute(
-                    'aria-expanded',
-                    open ? 'true' : 'false'
-                );
+    sphere.classList.remove('closing');
+    sphere.classList.add('open');
 
-                menu.setAttribute(
-                    'aria-hidden',
-                    open ? 'false' : 'true'
-                );
-            }
-        );
+    toggle.setAttribute('aria-expanded', 'true');
+    menu.setAttribute('aria-hidden', 'false');
+}
 
+);
 
         /*
            Settings toggle
         */
 
         enabledToggle.addEventListener(
-            'change',
-            () => {
-
-                setFloatingToolsEnabled(
-                    enabledToggle.checked
-                );
-            }
+    'change',
+    () => {
+        setFloatingToolsEnabled(
+            enabledToggle.checked
         );
+    }
+);
 
 
         /*
@@ -1491,7 +1504,7 @@ requestAnimationFrame(function () {
     'use strict';
 
     const STORAGE_KEY = 'gazeFloatingToolsPosition';
-    const HOLD_DURATION = 2000;
+    const HOLD_DURATION = 500;
     const SAVE_DELAY = 1000;
     const EDGE_PADDING = 8;
     const MOVEMENT_THRESHOLD = 8;

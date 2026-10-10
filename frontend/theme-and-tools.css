@@ -1,124 +1,122 @@
 /* ============================================
-   GAZE — THEME + TOOLS
-   Load this AFTER style.css
-   ============================================ */
-
+GAZE — THEME + TOOLS
+Load this AFTER style.css
+============================================ */
 
 /* --------------------------------------------
-   THEME VARIABLES
-   JS sets data-theme="light" or "dark" on <html>.
-   These beat the old prefers-color-scheme block,
-   so you do not need to delete it.
-   -------------------------------------------- */
+THEME VARIABLES
+JS sets data-theme="light" or "dark" on <html>.
+These beat the old prefers-color-scheme block,
+so you do not need to delete it.
+-------------------------------------------- */
 
 :root[data-theme="light"] {
-    --bg-main: #F6F8FA;
-    --bg-card: #ffffff;
-    --bg-hover: #f9f9f9;
-    --text-primary: #333;
-    --text-secondary: #999;
-    color-scheme: light;
+--bg-main: #F6F8FA;
+--bg-card: #ffffff;
+--bg-hover: #f9f9f9;
+--text-primary: #333;
+--text-secondary: #999;
+color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-    --bg-main: #141616;
-    --bg-card: #232626;
-    --bg-hover: #2c3030;
-    --text-primary: #F1F5F4;
-    --text-secondary: #9AA5A3;
-    color-scheme: dark;
+--bg-main: #141616;
+--bg-card: #232626;
+--bg-hover: #2c3030;
+--text-primary: #F1F5F4;
+--text-secondary: #9AA5A3;
+color-scheme: dark;
 }
 
-
 /* --------------------------------------------
-   DARK MODE FIXES
-   (places where the old CSS hardcodes colours)
-   -------------------------------------------- */
+DARK MODE FIXES
+(places where the old CSS hardcodes colours)
+-------------------------------------------- */
 
 :root[data-theme="dark"] .pull-to-refresh,
 :root[data-theme="dark"] .status-bar {
-    background: transparent;
+background: transparent;
 }
 
 /* Quick stats */
 :root[data-theme="dark"] .quick-stats {
-    background: linear-gradient(135deg, #1B2A28 0%, #1B2430 100%);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: none;
+background: linear-gradient(135deg, #1B2A28 0%, #1B2430 100%);
+border-color: rgba(255, 255, 255, 0.08);
+box-shadow: none;
 }
 
 :root[data-theme="dark"] .quick-stats .stat:nth-child(1) .stat-label,
 :root[data-theme="dark"] .quick-stats .stat:nth-child(1) .stat-number {
-    color: #3FBFB0;
+color: #3FBFB0;
 }
 
 :root[data-theme="dark"] .quick-stats .stat:nth-child(3) .stat-label,
 :root[data-theme="dark"] .quick-stats .stat:nth-child(3) .stat-number {
-    color: #7FB0F5;
+color: #7FB0F5;
 }
 
 :root[data-theme="dark"] .quick-stats .stat:nth-child(5) .stat-label,
 :root[data-theme="dark"] .quick-stats .stat:nth-child(5) .stat-number {
-    color: #D79AAA;
+color: #D79AAA;
 }
 
 :root[data-theme="dark"] .quick-stats .divider {
-    background: rgba(255, 255, 255, 0.12);
+background: rgba(255, 255, 255, 0.12);
 }
 
 /* Search / sort toolbars */
 :root[data-theme="dark"] .list-toolbar input,
 :root[data-theme="dark"] .list-toolbar select {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.12);
-    box-shadow: none;
+background: var(--bg-card);
+color: var(--text-primary);
+border-color: rgba(255, 255, 255, 0.12);
+box-shadow: none;
 }
 
 /* Charts */
 :root[data-theme="dark"] .chart,
 :root[data-theme="dark"] .stock-history-chart {
-    background: #1B1E1E;
+background: #1B1E1E;
 }
 
 :root[data-theme="dark"] .chart-range-label,
 :root[data-theme="dark"] .chart-change {
-    color: #F1F5F4;
+color: #F1F5F4;
 }
 
 :root[data-theme="dark"] .chart-change.positive {
-    color: #4ADE80;
+color: #4ADE80;
 }
 
 :root[data-theme="dark"] .chart-change.negative {
-    color: #F87171;
+color: #F87171;
 }
 
 :root[data-theme="dark"] .chart-axis {
-    stroke: #3A4040;
+stroke: #3A4040;
 }
 
 :root[data-theme="dark"] .confidence-metric-track {
-    background: #3A4040;
+background: #3A4040;
 }
 
 /* Skeleton loaders */
 :root[data-theme="dark"] .skeleton-block {
-    background: linear-gradient(90deg, #2A2E2E 25%, #343939 37%, #2A2E2E 63%);
-    background-size: 400% 100%;
+background: linear-gradient(90deg, #2A2E2E 25%, #343939 37%, #2A2E2E 63%);
+background-size: 400% 100%;
 }
 
 /* Toasts */
 :root[data-theme="dark"] .toast.success {
-    background: #1B3326;
+background: #1B3326;
 }
 
 :root[data-theme="dark"] .toast.error {
-    background: #3A1F1F;
+background: #3A1F1F;
 }
 
 :root[data-theme="dark"] .toast.warning {
-    background: #3A2E18;
+background: #3A2E18;
 }
 
 /* Lists and borders */
@@ -129,836 +127,1007 @@
 :root[data-theme="dark"] .calc-result-row,
 :root[data-theme="dark"] .detail-stats .stat-row,
 :root[data-theme="dark"] .autocomplete-item {
-    border-color: rgba(255, 255, 255, 0.08);
+border-color: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="dark"] .watchlist-analysis-inner,
 :root[data-theme="dark"] .watchlist-confidence-section {
-    border-color: rgba(255, 255, 255, 0.08);
+border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Buttons that were hardcoded white */
 :root[data-theme="dark"] .currency-btn {
-    background: var(--bg-card);
-    color: var(--text-primary);
-    border-color: rgba(255, 255, 255, 0.15);
+background: var(--bg-card);
+color: var(--text-primary);
+border-color: rgba(255, 255, 255, 0.15);
 }
 
 :root[data-theme="dark"] .currency-btn.active {
-    background: #667eea;
-    color: #fff;
-    border-color: #667eea;
+background: #667eea;
+color: #fff;
+border-color: #667eea;
 }
 
 :root[data-theme="dark"] .watchlist-analysis-actions .btn-delete,
 :root[data-theme="dark"] .watchlist-analysis-actions button:last-child {
-    background: var(--bg-card);
-    color: #F87171;
-    border-color: rgba(248, 113, 113, 0.35);
+background: var(--bg-card);
+color: #F87171;
+border-color: rgba(248, 113, 113, 0.35);
 }
 
-/* Confirm modal inline grey box */
-:root[data-theme="dark"] #confirmModal div[style*="f5f5f5"] {
-    background: #2C3030 !important;
+/* Confirm modal inline grey box /
+:root[data-theme="dark"] #confirmModal div[style="f5f5f5"] {
+background: #2C3030 !important;
 }
 
 :root[data-theme="dark"] #confirmMessage {
-    color: var(--text-secondary) !important;
+color: var(--text-secondary) !important;
 }
 
-
 /* --------------------------------------------
-   SECTOR BAR — "Other" segment
-   -------------------------------------------- */
+SECTOR BAR — "Other" segment
+-------------------------------------------- */
 
 .sector-other {
-    flex: 0 0 0%;
-    background: #B0BEC5;
+flex: 0 0 0%;
+background: #B0BEC5;
 }
 
-
 /* --------------------------------------------
-   SETTINGS EXTRAS
-   -------------------------------------------- */
+SETTINGS EXTRAS
+-------------------------------------------- */
 
 .segmented.two {
-    grid-template-columns: 1fr 1fr;
+grid-template-columns: 1fr 1fr;
 }
 
-
 /* --------------------------------------------
-   CALCULATOR
-   -------------------------------------------- */
+CALCULATOR
+-------------------------------------------- */
 
 .tool-container {
-    padding-bottom: 24px;
+padding-bottom: 24px;
 }
 
 .calc-results {
-    background: var(--bg-card);
-    border-radius: 16px;
-    padding: 4px 16px;
-    margin-bottom: 12px;
+background: var(--bg-card);
+border-radius: 16px;
+padding: 4px 16px;
+margin-bottom: 12px;
 }
 
 .calc-result-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid #f0f0f0;
-    font-size: 14px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 12px;
+padding: 14px 0;
+border-bottom: 1px solid #f0f0f0;
+font-size: 14px;
 }
 
 .calc-result-row:last-child {
-    border-bottom: none;
+border-bottom: none;
 }
 
 .calc-result-row > span {
-    color: var(--text-secondary);
+color: var(--text-secondary);
 }
 
 .calc-result-row > strong {
-    font-weight: 700;
-    color: var(--text-primary);
-    font-variant-numeric: tabular-nums;
+font-weight: 700;
+color: var(--text-primary);
+font-variant-numeric: tabular-nums;
 }
 
 .calc-result-row > strong.positive {
-    color: #00a651;
+color: #00a651;
 }
 
 .calc-result-row > strong.negative {
-    color: var(--error);
+color: var(--error);
 }
 
 .calc-result-row.calc-main > strong {
-    font-size: 17px;
+font-size: 17px;
 }
 
 /* ============================================
-   FLOATING TOOLS SPHERE
-   ============================================ */
+FLOATING TOOLS SPHERE
+============================================ */
 
 /* =========================================================
-   GAZE FLOATING TOOLS — RESPONSIVE TOUCH TOOLBOX
-   ========================================================= */
+GAZE FLOATING TOOLS — RESPONSIVE TOUCH TOOLBOX
+========================================================= */
 
 .floating-tools-sphere {
-    position: fixed;
-    top: 76px;
-    right: 16px;
-    z-index: 900;
+position: fixed;
+top: 76px;
+right: 16px;
+z-index: 900;
 
-    display: none;
-    align-items: center;
-    justify-content: center;
+display: none;  
+align-items: center;  
+justify-content: center;  
 
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
+touch-action: none;  
+user-select: none;  
+-webkit-user-select: none;  
 
-    transition:
-        box-shadow 0.2s ease,
-        filter 0.2s ease;
+transition:  
+    box-shadow 0.2s ease,  
+    filter 0.2s ease;
+
 }
 
 .floating-tools-sphere.enabled {
-    display: flex;
+display: flex;
 }
 
 .floating-tools-toggle {
-    position: relative;
+position: relative;
 
-    width: 46px;
-    height: 46px;
+width: 46px;  
+height: 46px;  
 
-    flex-shrink: 0;
+flex-shrink: 0;  
 
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 50%;
+border: 1px solid rgba(255, 255, 255, 0.14);  
+border-radius: 50%;  
 
-    background: linear-gradient(
-        135deg,
-        #043F35 0%,
-        #087F73 50%,
-        #126E9A 100%
-    );
+background: linear-gradient(  
+    135deg,  
+    #043F35 0%,  
+    #087F73 50%,  
+    #126E9A 100%  
+);  
 
-    color: #fff;
+color: #fff;  
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+display: flex;  
+align-items: center;  
+justify-content: center;  
 
-    cursor: pointer;
+cursor: pointer;  
 
-    box-shadow:
-        0 8px 24px rgba(4, 63, 53, 0.25),
-        0 2px 8px rgba(0, 0, 0, 0.12);
+box-shadow:  
+    0 8px 24px rgba(4, 63, 53, 0.25),  
+    0 2px 8px rgba(0, 0, 0, 0.12);  
 
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
+transition:  
+    transform 0.2s ease,  
+    box-shadow 0.2s ease;
+
 }
 
 .floating-tools-toggle:hover {
-    box-shadow:
-        0 10px 28px rgba(4, 63, 53, 0.32),
-        0 3px 10px rgba(0, 0, 0, 0.14);
+box-shadow:
+0 10px 28px rgba(4, 63, 53, 0.32),
+0 3px 10px rgba(0, 0, 0, 0.14);
 }
 
 .floating-tools-toggle:active {
-    transform: scale(0.96);
+transform: scale(0.96);
 }
 
 .floating-tools-toggle i {
-    font-size: 17px;
-    transition: transform 0.25s ease;
+font-size: 17px;
+transition: transform 0.25s ease;
 }
 
 .floating-tools-sphere.open .floating-tools-toggle i {
-    transform: rotate(45deg);
+transform: rotate(45deg);
 }
 
 /* Toolbox menu */
 
 .floating-tools-menu {
-    position: absolute;
+position: absolute;
 
-    top: calc(100% + 8px);
-    right: 0;
-    left: auto;
-    bottom: auto;
+top: calc(100% + 8px);  
+right: 0;  
+left: auto;  
+bottom: auto;  
 
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+display: flex;  
+flex-direction: column;  
+gap: 8px;  
 
-    width: max-content;
-    min-width: 154px;
+width: max-content;  
+min-width: 154px;  
 
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+opacity: 0;  
+visibility: hidden;  
+pointer-events: none;  
 
-    transform: translateY(-6px) scale(0.97);
-    transform-origin: top right;
+transform: translateY(-6px) scale(0.97);  
+transform-origin: top right;  
 
-    transition:
-        opacity 0.18s ease,
-        transform 0.18s ease,
-        visibility 0.18s ease;
+transition:  
+    opacity 0.18s ease,  
+    transform 0.18s ease,  
+    visibility 0.18s ease;  
 
-    z-index: 901;
+z-index: 901;
+
 }
 
 .floating-tools-sphere.open .floating-tools-menu {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
+opacity: 1;
+visibility: visible;
+pointer-events: auto;
 
-    transform: translateY(0) scale(1);
+transform: translateY(0) scale(1);
+
 }
 
 /* Open upward when there is more usable space above */
 
 .floating-tools-sphere[data-menu-direction="up"]
 .floating-tools-menu {
-    top: auto;
-    bottom: calc(100% + 8px);
+top: auto;
+bottom: calc(100% + 8px);
 
-    transform: translateY(6px) scale(0.97);
-    transform-origin: bottom right;
+transform: translateY(6px) scale(0.97);  
+transform-origin: bottom right;
+
 }
 
 .floating-tools-sphere.open[data-menu-direction="up"]
 .floating-tools-menu {
-    transform: translateY(0) scale(1);
+transform: translateY(0) scale(1);
 }
 
 /* Align the menu inward from the left edge */
 
 .floating-tools-sphere[data-menu-alignment="left"]
 .floating-tools-menu {
-    left: 0;
-    right: auto;
-    transform-origin: top left;
+left: 0;
+right: auto;
+transform-origin: top left;
 }
 
 .floating-tools-sphere.open[data-menu-alignment="left"]
 .floating-tools-menu {
-    transform: translateY(0) scale(1);
+transform: translateY(0) scale(1);
 }
 
 .floating-tools-sphere[data-menu-direction="up"][data-menu-alignment="left"]
 .floating-tools-menu {
-    transform-origin: bottom left;
+transform-origin: bottom left;
 }
 
 /* Individual tool buttons */
 
 .floating-tool-button {
-    min-width: 154px;
-    max-width: calc(100vw - 16px);
-    box-sizing: border-box;
+min-width: 154px;
+max-width: calc(100vw - 16px);
+box-sizing: border-box;
 
-    display: flex;
-    align-items: center;
-    gap: 10px;
+display: flex;  
+align-items: center;  
+gap: 10px;  
 
-    padding: 11px 13px;
+padding: 11px 13px;  
 
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 12px;
+border: 1px solid var(--border-color, #e5e7eb);  
+border-radius: 12px;  
 
-    background: var(--bg-card, #fff);
-    color: var(--text-primary, #17212b);
+background: var(--bg-card, #fff);  
+color: var(--text-primary, #17212b);  
 
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);  
 
-    cursor: pointer;
-    text-align: left;
+cursor: pointer;  
+text-align: left;  
 
-    transition:
-        background 0.15s ease,
-        transform 0.15s ease;
+transition:  
+    background 0.15s ease,  
+    transform 0.15s ease;
+
 }
 
 .floating-tool-button:hover {
-    background: var(--bg-hover, #f3f6f8);
-    transform: translateX(-2px);
+background: var(--bg-hover, #f3f6f8);
+transform: translateX(-2px);
 }
 
 /* Long-press progress ring */
 
 .gaze-hold-ring {
-    position: absolute;
-    inset: -5px;
+position: absolute;
+inset: -5px;
 
-    border-radius: 50%;
-    padding: 3px;
+border-radius: 50%;  
+padding: 3px;  
 
-    opacity: 0;
-    pointer-events: none;
+opacity: 0;  
+pointer-events: none;  
 
-    background: conic-gradient(
-        #a7f3d0 var(--gaze-hold-progress, 0deg),
-        rgba(255, 255, 255, 0.15) 0deg
-    );
+background: conic-gradient(  
+    #a7f3d0 var(--gaze-hold-progress, 0deg),  
+    rgba(255, 255, 255, 0.15) 0deg  
+);  
 
-    transition: opacity 0.12s ease;
+transition: opacity 0.12s ease;
+
 }
 
 .gaze-hold-ring-progress {
-    display: block;
-    width: 100%;
-    height: 100%;
+display: block;
+width: 100%;
+height: 100%;
 
-    border-radius: 50%;
-    background: transparent;
+border-radius: 50%;  
+background: transparent;
+
 }
 
 /* Drag mode feedback */
 
 .floating-tools-sphere.gaze-drag-ready {
-    filter: brightness(1.1);
+filter: brightness(1.1);
 
-    box-shadow:
-        0 0 0 5px rgba(8, 127, 115, 0.12),
-        0 0 24px rgba(8, 127, 115, 0.45);
+box-shadow:  
+    0 0 0 5px rgba(8, 127, 115, 0.12),  
+    0 0 24px rgba(8, 127, 115, 0.45);
+
 }
 
 .floating-tools-sphere.gaze-drag-ready
 .floating-tools-toggle {
-    box-shadow:
-        0 0 0 3px rgba(167, 243, 208, 0.28),
-        0 0 22px rgba(8, 127, 115, 0.45);
+box-shadow:
+0 0 0 3px rgba(167, 243, 208, 0.28),
+0 0 22px rgba(8, 127, 115, 0.45);
 }
 
 /* Brief shimmer confirms that the new position was saved */
 
 .floating-tools-sphere.gaze-position-saved
 .floating-tools-toggle::after {
-    content: "";
+content: "";
 
-    position: absolute;
-    inset: 0;
+position: absolute;  
+inset: 0;  
 
-    border-radius: 50%;
-    pointer-events: none;
+border-radius: 50%;  
+pointer-events: none;  
 
-    background: linear-gradient(
-        110deg,
-        transparent 20%,
-        rgba(255, 255, 255, 0.05) 35%,
-        rgba(255, 255, 255, 0.75) 50%,
-        rgba(255, 255, 255, 0.05) 65%,
-        transparent 80%
-    );
+background: linear-gradient(  
+    110deg,  
+    transparent 20%,  
+    rgba(255, 255, 255, 0.05) 35%,  
+    rgba(255, 255, 255, 0.75) 50%,  
+    rgba(255, 255, 255, 0.05) 65%,  
+    transparent 80%  
+);  
 
-    background-size: 220% 100%;
-    animation: gazeSphereShimmer 0.8s ease-out;
+background-size: 220% 100%;  
+animation: gazeSphereShimmer 0.8s ease-out;
+
 }
 
 @keyframes gazeSphereShimmer {
-    from {
-        background-position: 120% 0;
-    }
+from {
+background-position: 120% 0;
+}
 
-    to {
-        background-position: -120% 0;
-    }
+to {  
+    background-position: -120% 0;  
+}
+
 }
 
 @media (max-width: 480px) {
-    .floating-tools-sphere {
-        top: 70px;
-        right: 12px;
-    }
+.floating-tools-sphere {
+top: 70px;
+right: 12px;
+}
 
-    .floating-tools-toggle {
-        width: 42px;
-        height: 42px;
-    }
+.floating-tools-toggle {  
+    width: 42px;  
+    height: 42px;  
+}  
 
-    .floating-tool-button {
-        min-width: 145px;
-    }
+.floating-tool-button {  
+    min-width: 145px;  
+}
+
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .floating-tools-sphere,
-    .floating-tools-toggle,
-    .floating-tools-menu,
-    .floating-tool-button {
-        transition: none;
-    }
-
-    .floating-tools-sphere.gaze-position-saved
-    .floating-tools-toggle::after {
-        animation: none;
-    }
+.floating-tools-sphere,
+.floating-tools-toggle,
+.floating-tools-menu,
+.floating-tool-button {
+transition: none;
 }
 
+.floating-tools-sphere.gaze-position-saved  
+.floating-tools-toggle::after {  
+    animation: none;  
+}
+
+}
 
 /* --------------------------------------------
-   MAIN SPHERE
-   -------------------------------------------- */
+MAIN SPHERE
+-------------------------------------------- */
 
 .floating-tools-toggle {
-    width: 46px;
-    height: 46px;
+width: 46px;
+height: 46px;
 
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 50%;
+border: 1px solid rgba(255, 255, 255, 0.14);  
+border-radius: 50%;  
 
-    background: linear-gradient(
-        135deg,
-        #043F35 0%,
-        #087F73 50%,
-        #126E9A 100%
-    );
+background: linear-gradient(  
+    135deg,  
+    #043F35 0%,  
+    #087F73 50%,  
+    #126E9A 100%  
+);  
 
-    color: #ffffff;
+color: #ffffff;  
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+display: flex;  
+align-items: center;  
+justify-content: center;  
 
-    cursor: pointer;
+cursor: pointer;  
 
-    box-shadow:
-        0 8px 24px rgba(4, 63, 53, 0.25),
-        0 2px 8px rgba(0, 0, 0, 0.12);
+box-shadow:  
+    0 8px 24px rgba(4, 63, 53, 0.25),  
+    0 2px 8px rgba(0, 0, 0, 0.12);  
 
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease;
+transition:  
+    transform 0.2s ease,  
+    box-shadow 0.2s ease;
+
 }
 
 .floating-tools-toggle:hover {
-    transform: translateY(-1px);
+transform: translateY(-1px);
 
-    box-shadow:
-        0 10px 28px rgba(4, 63, 53, 0.30),
-        0 3px 10px rgba(0, 0, 0, 0.14);
+box-shadow:  
+    0 10px 28px rgba(4, 63, 53, 0.30),  
+    0 3px 10px rgba(0, 0, 0, 0.14);
+
 }
 
 .floating-tools-toggle:active {
-    transform: scale(0.94);
+transform: scale(0.94);
 }
 
 .floating-tools-toggle i {
-    font-size: 17px;
-    transition: transform 0.25s ease;
+font-size: 17px;
+transition: transform 0.25s ease;
 }
 
 .floating-tools-sphere.open .floating-tools-toggle i {
-    transform: rotate(45deg);
+transform: rotate(45deg);
 }
 
-
 /* --------------------------------------------
-   EXPANDED MENU
-   -------------------------------------------- */
+EXPANDED MENU
+-------------------------------------------- */
 
 .floating-tools-menu {
-    position: absolute;
+position: absolute;
 
-    top: 54px;
-    right: 0;
+top: 54px;  
+right: 0;  
 
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+display: flex;  
+flex-direction: column;  
+gap: 8px;  
 
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+opacity: 0;  
+visibility: hidden;  
+pointer-events: none;  
 
-    transform: translateY(-6px) scale(0.96);
-    transform-origin: top right;
+transform: translateY(-6px) scale(0.96);  
+transform-origin: top right;  
 
-    transition:
-        opacity 0.18s ease,
-        transform 0.18s ease,
-        visibility 0.18s ease;
+transition:  
+    opacity 0.18s ease,  
+    transform 0.18s ease,  
+    visibility 0.18s ease;
+
 }
 
 .floating-tools-sphere.open .floating-tools-menu {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
+opacity: 1;
+visibility: visible;
+pointer-events: auto;
 
-    transform: translateY(0) scale(1);
+transform: translateY(0) scale(1);
+
 }
 .floating-tools-menu {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
+background: transparent !important;
+border: none !important;
+box-shadow: none !important;
 }
 
-
 /* --------------------------------------------
-   INDIVIDUAL TOOL BUTTON
-   -------------------------------------------- */
+INDIVIDUAL TOOL BUTTON
+-------------------------------------------- */
 
 .floating-tool-button {
-    min-width: 154px;
+min-width: 154px;
 
-    display: flex;
-    align-items: center;
-    gap: 10px;
+display: flex;  
+align-items: center;  
+gap: 10px;  
 
-    padding: 10px 12px;
+padding: 10px 12px;  
 
-    border: 1px solid rgba(0, 0, 0, 0.06);
-    border-radius: 13px;
+border: 1px solid rgba(0, 0, 0, 0.06);  
+border-radius: 13px;  
 
-    background: var(--bg-card);
-    color: var(--text-primary);
+background: var(--bg-card);  
+color: var(--text-primary);  
 
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);  
 
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
+font-family: inherit;  
+font-size: 13px;  
+font-weight: 600;  
 
-    cursor: pointer;
+cursor: pointer;  
 
-    white-space: nowrap;
+white-space: nowrap;  
 
-    transition:
-        transform 0.18s ease,
-        background 0.18s ease;
+transition:  
+    transform 0.18s ease,  
+    background 0.18s ease;
+
 }
 
 .floating-tool-button:hover {
-    transform: translateX(-2px);
-    background: var(--bg-hover);
+transform: translateX(-2px);
+background: var(--bg-hover);
 }
 
 .floating-tool-icon {
-    width: 30px;
-    height: 30px;
+width: 30px;
+height: 30px;
 
-    flex: 0 0 30px;
+flex: 0 0 30px;  
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+display: flex;  
+align-items: center;  
+justify-content: center;  
 
-    border-radius: 9px;
+border-radius: 9px;  
 
-    background: rgba(8, 127, 115, 0.10);
-    color: #087F73;
+background: rgba(8, 127, 115, 0.10);  
+color: #087F73;
+
 }
 
 .floating-tool-label {
-    flex: 1;
-    text-align: left;
+flex: 1;
+text-align: left;
 }
 
-
 /* --------------------------------------------
-   SETTINGS — FLOATING TOOLS
-   -------------------------------------------- */
+SETTINGS — FLOATING TOOLS
+-------------------------------------------- */
 
 .floating-tools-setting-row {
-    cursor: default;
+cursor: default;
 }
 
 .floating-tools-setting-copy {
-    flex: 1;
+flex: 1;
 
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+display: flex;  
+flex-direction: column;  
+gap: 2px;
+
 }
 
 .floating-tools-setting-hint {
-    font-size: 11px;
-    color: var(--text-secondary);
+font-size: 11px;
+color: var(--text-secondary);
 }
 
-
 /* --------------------------------------------
-   TOGGLE SWITCH
-   -------------------------------------------- */
+TOGGLE SWITCH
+-------------------------------------------- */
 
 .gaze-switch {
-    position: relative;
+position: relative;
 
-    width: 42px;
-    height: 24px;
+width: 42px;  
+height: 24px;  
 
-    flex: 0 0 auto;
+flex: 0 0 auto;  
 
-    cursor: pointer;
+cursor: pointer;
+
 }
 
 .gaze-switch input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
+position: absolute;
+opacity: 0;
+pointer-events: none;
 }
 
 .gaze-switch-slider {
-    position: absolute;
-    inset: 0;
+position: absolute;
+inset: 0;
 
-    border-radius: 999px;
+border-radius: 999px;  
 
-    background: #cfd6d4;
+background: #cfd6d4;  
 
-    transition: background 0.2s ease;
+transition: background 0.2s ease;
+
 }
 
 .gaze-switch-slider::after {
-    content: "";
+content: "";
 
-    position: absolute;
+position: absolute;  
 
-    width: 18px;
-    height: 18px;
+width: 18px;  
+height: 18px;  
 
-    left: 3px;
-    top: 3px;
+left: 3px;  
+top: 3px;  
 
-    border-radius: 50%;
+border-radius: 50%;  
 
-    background: #ffffff;
+background: #ffffff;  
 
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.16);
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.16);  
 
-    transition: transform 0.2s ease;
+transition: transform 0.2s ease;
+
 }
 
 .gaze-switch input:checked + .gaze-switch-slider {
-    background: #087F73;
+background: #087F73;
 }
 
 .gaze-switch input:checked + .gaze-switch-slider::after {
-    transform: translateX(18px);
+transform: translateX(18px);
 }
 
-
 /* --------------------------------------------
-   TOOL PICKER
-   -------------------------------------------- */
+TOOL PICKER
+-------------------------------------------- */
 
 .floating-tools-picker {
-    display: none;
+display: none;
 
-    padding: 14px 0 6px;
+padding: 14px 0 6px;
+
 }
 
 .floating-tools-picker.visible {
-    display: block;
+display: block;
 }
 
 .floating-tools-picker-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+display: flex;
+align-items: center;
+justify-content: space-between;
 
-    gap: 12px;
+gap: 12px;  
 
-    margin-bottom: 10px;
+margin-bottom: 10px;
+
 }
 
 .floating-tools-picker-header > div {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+display: flex;
+flex-direction: column;
+gap: 2px;
 }
 
 .floating-tools-picker-header strong {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text-primary);
+font-size: 13px;
+font-weight: 700;
+color: var(--text-primary);
 }
 
 .floating-tools-picker-header span {
-    font-size: 11px;
-    color: var(--text-secondary);
+font-size: 11px;
+color: var(--text-secondary);
 }
 
 .floating-tools-count {
-    min-width: 38px;
+min-width: 38px;
 
-    padding: 4px 8px;
+padding: 4px 8px;  
 
-    border-radius: 999px;
+border-radius: 999px;  
 
-    background: var(--bg-main);
+background: var(--bg-main);  
 
-    color: var(--text-secondary);
+color: var(--text-secondary);  
 
-    font-size: 11px !important;
-    font-weight: 700;
+font-size: 11px !important;  
+font-weight: 700;  
 
-    text-align: center;
+text-align: center;
+
 }
 
-
 /* --------------------------------------------
-   TOOL OPTIONS
-   -------------------------------------------- */
+TOOL OPTIONS
+-------------------------------------------- */
 
 .floating-tools-options {
-    display: flex;
-    flex-direction: column;
+display: flex;
+flex-direction: column;
 }
 
 .floating-tool-option {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+display: flex;
+align-items: center;
+gap: 10px;
 
-    padding: 10px 0;
+padding: 10px 0;  
 
-    border-bottom: 1px solid #f0f0f0;
+border-bottom: 1px solid #f0f0f0;  
 
-    cursor: pointer;
+cursor: pointer;
+
 }
 
 .floating-tool-option:last-child {
-    border-bottom: none;
+border-bottom: none;
 }
 
 .floating-tool-option.disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
+opacity: 0.45;
+cursor: not-allowed;
 }
 
 .floating-tool-option input {
-    width: 17px;
-    height: 17px;
+width: 17px;
+height: 17px;
 
-    margin: 0;
+margin: 0;  
 
-    accent-color: #087F73;
+accent-color: #087F73;  
 
-    cursor: pointer;
+cursor: pointer;
+
 }
 
 .floating-tool-option.disabled input {
-    cursor: not-allowed;
+cursor: not-allowed;
 }
 
 .floating-tool-option-icon {
-    width: 26px;
+width: 26px;
 
-    text-align: center;
+text-align: center;  
 
-    color: var(--text-primary);
+color: var(--text-primary);
+
 }
 
 .floating-tool-option-label {
-    flex: 1;
+flex: 1;
 
-    font-size: 13px;
-    font-weight: 500;
+font-size: 13px;  
+font-weight: 500;  
 
-    color: var(--text-primary);
+color: var(--text-primary);
+
 }
 
-
 /* --------------------------------------------
-   DARK MODE
-   -------------------------------------------- */
+DARK MODE
+-------------------------------------------- */
 
 :root[data-theme="dark"] .floating-tool-button {
-    border-color: rgba(255, 255, 255, 0.08);
+border-color: rgba(255, 255, 255, 0.08);
 
-    box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.35);
+box-shadow:  
+    0 8px 24px rgba(0, 0, 0, 0.35);
+
 }
 
 :root[data-theme="dark"] .floating-tool-option {
-    border-color: rgba(255, 255, 255, 0.08);
+border-color: rgba(255, 255, 255, 0.08);
 }
 
 :root[data-theme="dark"] .floating-tools-count {
-    background: var(--bg-hover);
+background: var(--bg-hover);
 }
 
-
 /* --------------------------------------------
-   SMALL SCREENS
-   -------------------------------------------- */
+SMALL SCREENS
+-------------------------------------------- */
 
 @media (max-width: 480px) {
 
-    .floating-tools-sphere {
-        top: 70px;
-        right: 12px;
-    }
+.floating-tools-sphere {  
+    top: 70px;  
+    right: 12px;  
+}  
 
-    .floating-tools-toggle {
-        width: 42px;
-        height: 42px;
-    }
+.floating-tools-toggle {  
+    width: 42px;  
+    height: 42px;  
+}  
 
-    .floating-tool-button {
-        min-width: 145px;
-    }
+.floating-tool-button {  
+    min-width: 145px;  
+}
+
 }
 
 /* Gaze Floating Tools — Remove unwanted menu container background */
 .floating-tools-menu {
-    background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    outline: none !important;
+background: transparent !important;
+border: none !important;
+border-radius: 0 !important;
+box-shadow: none !important;
+outline: none !important;
 }
 
-/* Keep individual tool buttons styled */
+/* Keep individual tool buttons styled /
 .floating-tool-button {
-    border-radius: 12px;
-    overflow: hidden;
+border-radius: 12px;
+overflow: hidden;
+}
+/ ============================================
+GAZE — STAGGERED FLOATING TOOL ANIMATION
+Each tool drops in after the previous one.
+============================================ */
+
+@keyframes gazeToolDrop {
+0% {
+opacity: 0;
+transform: translateY(-12px) scale(0.96);
+}
+
+75% {  
+    opacity: 1;  
+    transform: translateY(2px) scale(1.005);  
+}  
+
+100% {  
+    opacity: 1;  
+    transform: translateY(0) scale(1);  
+}
+
+}
+
+/* Animate the actual toolbox buttons */
+
+.floating-tools-sphere.open .floating-tool-button {
+animation: gazeToolDrop 280ms ease-out both;
+}
+
+/* Stagger: each button follows the previous one */
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(1) {
+animation-delay: 0ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(2) {
+animation-delay: 55ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(3) {
+animation-delay: 110ms;
+}
+
+/* Continue the sequence if more tools are displayed */
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(4) {
+animation-delay: 165ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(5) {
+animation-delay: 220ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(6) {
+animation-delay: 275ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(7) {
+animation-delay: 330ms;
+}
+
+.floating-tools-sphere.open .floating-tool-button:nth-child(8) {
+animation-delay: 385ms;
+}
+
+/* Respect reduced-motion preferences */
+
+@media (prefers-reduced-motion: reduce) {
+.floating-tools-sphere.open .floating-tool-button {
+animation: none;
+opacity: 1;
+transform: none;
+}
+}
+/* ============================================
+GAZE — REVERSE TOOLBOX CLOSING ANIMATION
+Last tool exits first.
+============================================ */
+
+@keyframes gazeToolLiftOut {
+0% {
+opacity: 1;
+transform: translateY(0) scale(1);
+}
+
+100% {
+opacity: 0;
+transform: translateY(-10px) scale(0.96);
+}
+
+}
+
+/* Apply closing animation when the toolbox is closing */
+
+.floating-tools-sphere.closing .floating-tool-button {
+    animation: gazeToolLiftOut 160ms ease-in both;
+    pointer-events: none;
+}
+
+/* Keep the menu stable while its buttons disappear. */
+.floating-tools-sphere.closing .floating-tools-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: none;
+    transform: translateY(0) scale(1);
+    transition: none;
+}
+
+/* Prevent the opening animation from running during closing. */
+.floating-tools-sphere.closing .floating-tool-button {
+    animation-name: gazeToolLiftOut;
+}
+/* Reverse the opening sequence */
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(1) {
+animation-delay: 330ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(2) {
+animation-delay: 275ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(3) {
+animation-delay: 220ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(4) {
+animation-delay: 165ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(5) {
+animation-delay: 110ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(6) {
+animation-delay: 55ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(7) {
+animation-delay: 0ms;
+}
+
+.floating-tools-sphere.closing .floating-tool-button:nth-child(8) {
+animation-delay: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+.floating-tools-sphere.closing .floating-tool-button {
+animation: none;
+}
 }
