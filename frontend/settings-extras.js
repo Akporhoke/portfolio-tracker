@@ -706,6 +706,71 @@ wrap('switchTab', {
 
     const MAX_FLOATING_TOOLS = 3;
     let floatingToolsCloseTimer = null;
+    
+     /* ============================================
+   GAZE — FLOATING TOOLS QUICK ACCESS
+   ============================================ */
+
+const QUICK_ACCESS_STORAGE_KEY =
+    'gazeFloatingToolsQuickAccess';
+
+const QUICK_ACCESS_OPTIONS = [
+    {
+        value: 'home',
+        label: 'Home'
+    },
+    {
+        value: 'usPortfolio',
+        label: 'US Portfolio'
+    },
+    {
+        value: 'ngxPortfolio',
+        label: 'NGX Portfolio'
+    },
+    {
+        value: 'watchlist',
+        label: 'Watchlist'
+    },
+    {
+        value: 'learn',
+        label: 'Learn'
+    },
+    {
+        value: 'study',
+        label: 'Study'
+    },
+    {
+        value: 'settings',
+        label: 'Settings'
+    }
+];
+
+function getFloatingQuickAccess() {
+    const saved = store.get(
+        QUICK_ACCESS_STORAGE_KEY
+    );
+
+    return QUICK_ACCESS_OPTIONS.some(
+        option => option.value === saved
+    )
+        ? saved
+        : 'settings';
+}
+
+function saveFloatingQuickAccess(value) {
+    const isValid = QUICK_ACCESS_OPTIONS.some(
+        option => option.value === value
+    );
+
+    if (!isValid) {
+        return;
+    }
+
+    store.set(
+        QUICK_ACCESS_STORAGE_KEY,
+        value
+    );
+}
     /* ============================================
    FLOATING TOOL BACK BUTTON
    Returns users to the screen they came from.
@@ -1309,100 +1374,219 @@ floatingToolsCloseTimer = setTimeout(() => {
 
 }
 
-    function setupFloatingTools() {
 
-        const toggle =
-            byId('floatingToolsToggle');
 
-        const enabledToggle =
-            byId('floatingToolsEnabled');
+function navigateFloatingQuickAccess() {
+    const destination = getFloatingQuickAccess();
 
+    switch (destination) {
+        case 'home':
+            window.switchTab('home');
+            break;
+
+        case 'usPortfolio':
+            window.switchTab('home');
+            window.openMarketModal('US');
+            break;
+
+        case 'ngxPortfolio':
+            window.switchTab('home');
+            window.openMarketModal('NGX');
+            break;
+
+        case 'watchlist':
+            window.switchTab('watchlist');
+            break;
+
+        case 'learn':
+        case 'study':
+            window.switchTab('study');
+            break;
+
+        case 'settings':
+        default:
+            window.switchTab('settings');
+            break;
+    }
+}
+
+
+function setupFloatingQuickAccessSetting() {
+    if (document.getElementById('gazeFloatingQuickAccess')) {
+        return;
+    }
+
+    const toolsPicker = document.getElementById(
+        'floatingToolsOptions'
+    );
+
+    if (!toolsPicker) {
+        return;
+    }
+
+    const section = document.createElement('div');
+
+    section.id = 'gazeQuickAccessSetting';
+    section.style.marginTop = '18px';
+    section.style.paddingTop = '16px';
+    section.style.borderTop =
+        '1px solid var(--border-color, #E5E7EB)';
+
+    const label = document.createElement('label');
+
+    label.htmlFor = 'gazeFloatingQuickAccess';
+    label.textContent = 'Double-tap Quick Access';
+    label.style.display = 'block';
+    label.style.fontWeight = '600';
+    label.style.marginBottom = '6px';
+
+    const description = document.createElement('p');
+
+    description.textContent =
+        'Choose where the floating sphere takes you when double-tapped.';
+
+    description.style.fontSize = '13px';
+    description.style.opacity = '0.75';
+    description.style.margin = '0 0 10px';
+
+    const select = document.createElement('select');
+
+    select.id = 'gazeFloatingQuickAccess';
+    select.style.width = '100%';
+    select.style.padding = '11px 12px';
+    select.style.borderRadius = '10px';
+    select.style.font = 'inherit';
+
+    QUICK_ACCESS_OPTIONS.forEach(option => {
+        const item = document.createElement('option');
+
+        item.value = option.value;
+        item.textContent = option.label;
+
+        select.appendChild(item);
+    });
+
+    select.value = getFloatingQuickAccess();
+
+    select.addEventListener('change', () => {
+        saveFloatingQuickAccess(select.value);
+    });
+
+    section.appendChild(label);
+    section.appendChild(description);
+    section.appendChild(select);
+
+    toolsPicker.insertAdjacentElement('afterend', section);
+}
+
+        function setupFloatingTools() {
+        const toggle = byId('floatingToolsToggle');
+        const enabledToggle = byId('floatingToolsEnabled');
+        
         if (!toggle || !enabledToggle) {
             return;
         }
-
-
+        
         /*
-           Main sphere button
-        */
-
-        toggle.addEventListener(
-'click',
-event => {
-
-    event.stopPropagation();
-
-    const sphere = byId('floatingToolsSphere');
-    const menu = byId('floatingToolsMenu');
-
-    if (!sphere || !menu) {
-        return;
-    }
-
-    // If the toolbox is open, play its closing animation.
-    if (sphere.classList.contains('open')) {
-        closeFloatingToolsSphere();
-        return;
-    }
-
-    // Cancel a pending close if the toolbox is reopened quickly.
-    if (floatingToolsCloseTimer) {
-        clearTimeout(floatingToolsCloseTimer);
-        floatingToolsCloseTimer = null;
-    }
-
-    sphere.classList.remove('closing');
-    sphere.classList.add('open');
-
-    toggle.setAttribute('aria-expanded', 'true');
-    menu.setAttribute('aria-hidden', 'false');
-}
-
-);
-
-        /*
-           Settings toggle
-        */
-
-        enabledToggle.addEventListener(
-    'change',
-    () => {
-        setFloatingToolsEnabled(
-            enabledToggle.checked
-        );
-    }
-);
-
-
-        /*
-           Clicking outside closes the sphere.
-        */
-
-        document.addEventListener(
-            'click',
-            event => {
-
-                const sphere =
-                    byId('floatingToolsSphere');
-
-                if (
-                    sphere &&
-                    !sphere.contains(event.target)
-                ) {
-                    closeFloatingToolsSphere();
-                }
+         * MAIN FLOATING SPHERE
+         *
+         * Single tap: Open or close the toolbox.
+         * Double-tap: Open Settings.
+         * Long press and drag: Managed by the touch controller below.
+         */
+        
+        let lastSphereTap = 0;
+        let singleTapTimer = null;
+        
+        const DOUBLE_TAP_DELAY = 280;
+        
+        toggle.addEventListener('click', event => {
+            event.stopPropagation();
+            
+            const sphere = byId('floatingToolsSphere');
+            const menu = byId('floatingToolsMenu');
+            
+            if (!sphere || !menu) {
+                return;
             }
-        );
+             
+            const now = Date.now();
+            
+            // Detect a second tap within the allowed interval.
+            if (
+                lastSphereTap !== 0 &&
+                now - lastSphereTap <= DOUBLE_TAP_DELAY
+            ) {
+                lastSphereTap = 0;
+                
+                if (singleTapTimer !== null) {
+                    clearTimeout(singleTapTimer);
+                    singleTapTimer = null;
+                }
+                
+                // Close the toolbox before switching screens.
+                closeFloatingToolsSphere();
 
+navigateFloatingQuickAccess();
 
+return;
+            }
+            
+            // Delay the first tap so a double-tap can be detected.
+            lastSphereTap = now;
+            
+            singleTapTimer = setTimeout(() => {
+                singleTapTimer = null;
+                lastSphereTap = 0;
+                
+                // If already open, close it.
+                if (sphere.classList.contains('open')) {
+                    closeFloatingToolsSphere();
+                    return;
+                }
+                
+                // Cancel any pending close animation timer.
+                if (floatingToolsCloseTimer !== null) {
+                    clearTimeout(floatingToolsCloseTimer);
+                    floatingToolsCloseTimer = null;
+                }
+                
+                sphere.classList.remove('closing');
+                sphere.classList.add('open');
+                
+                toggle.setAttribute('aria-expanded', 'true');
+                menu.setAttribute('aria-hidden', 'false');
+                
+            }, DOUBLE_TAP_DELAY);
+        });
+        
         /*
-           Initial state
-        */
-
+         * SETTINGS TOGGLE
+         */
+        
+        enabledToggle.addEventListener('change', () => {
+            setFloatingToolsEnabled(enabledToggle.checked);
+        });
+        
+        /*
+         * CLICKING OUTSIDE CLOSES THE TOOLBOX
+         */
+        
+        document.addEventListener('click', event => {
+            const sphere = byId('floatingToolsSphere');
+            
+            if (sphere && !sphere.contains(event.target)) {
+                closeFloatingToolsSphere();
+            }
+        });
+        
+        /*
+         * INITIAL STATE
+         */
+        
         syncFloatingToolsSettings();
         renderFloatingToolsSphere();
     }
-
     /* ============================================
        INIT
        ============================================ */
@@ -1414,6 +1598,7 @@ event => {
 
     // Floating Tools
     setupFloatingTools();
+    setupFloatingQuickAccessSetting();
 
         // Theme buttons
         document
@@ -1507,6 +1692,7 @@ event => {
     const HOLD_DURATION = 500;
     const SAVE_DELAY = 1000;
     const EDGE_PADDING = 8;
+    const NAV_BAR_CLEARANCE = 90;
     const MOVEMENT_THRESHOLD = 8;
 
     const sphere = document.getElementById('floatingToolsSphere');
@@ -1597,34 +1783,45 @@ event => {
     }
 
     function setPosition(x, y, side) {
-        const viewport = viewportSize();
-        const size = sphereSize();
+    const viewport = viewportSize();
+    const size = sphereSize();
 
-        const maxX = viewport.width - size.width - EDGE_PADDING;
-        const maxY = viewport.height - size.height - EDGE_PADDING;
+    // Keep the toolbox above the bottom navigation area.
+    const maxX = Math.max(
+        EDGE_PADDING,
+        viewport.width - size.width - EDGE_PADDING
+    );
 
-        x = clamp(x, EDGE_PADDING, maxX);
-        y = clamp(y, EDGE_PADDING, maxY);
+    const maxY = Math.max(
+        EDGE_PADDING,
+        viewport.height -
+            NAV_BAR_CLEARANCE -
+            size.height -
+            EDGE_PADDING
+    );
 
-        sphere.style.position = 'fixed';
-        sphere.style.top = `${y}px`;
-        sphere.style.bottom = 'auto';
+    x = clamp(x, EDGE_PADDING, maxX);
+    y = clamp(y, EDGE_PADDING, maxY);
 
-        if (side === 'left') {
-            sphere.style.left = `${EDGE_PADDING}px`;
-            sphere.style.right = 'auto';
-            sphere.dataset.edge = 'left';
-        } else if (side === 'right') {
-            sphere.style.left = 'auto';
-            sphere.style.right = `${EDGE_PADDING}px`;
-            sphere.dataset.edge = 'right';
-        } else {
-            sphere.style.left = `${x}px`;
-            sphere.style.right = 'auto';
-        }
+    sphere.style.position = 'fixed';
+    sphere.style.top = `${y}px`;
+    sphere.style.bottom = 'auto';
 
-        updateMenuPlacement();
+    if (side === 'left') {
+        sphere.style.left = `${EDGE_PADDING}px`;
+        sphere.style.right = 'auto';
+        sphere.dataset.edge = 'left';
+    } else if (side === 'right') {
+        sphere.style.left = 'auto';
+        sphere.style.right = `${EDGE_PADDING}px`;
+        sphere.dataset.edge = 'right';
+    } else {
+        sphere.style.left = `${x}px`;
+        sphere.style.right = 'auto';
     }
+
+    updateMenuPlacement();
+}
 
     function savePosition() {
         const rect = sphere.getBoundingClientRect();
@@ -1673,9 +1870,19 @@ event => {
             const viewport = viewportSize();
             const size = sphereSize();
 
-            const maxY = viewport.height - size.height - EDGE_PADDING;
-            const y = clamp(saved.top, EDGE_PADDING, maxY);
+            const maxY = Math.max(
+    EDGE_PADDING,
+    viewport.height -
+        NAV_BAR_CLEARANCE -
+        size.height -
+        EDGE_PADDING
+);
 
+const y = clamp(
+    saved.top,
+    EDGE_PADDING,
+    maxY
+); 
             const side = saved.side === 'left' ? 'left' : 'right';
 
             setPosition(
@@ -1906,11 +2113,19 @@ event => {
             viewport.width - size.width - EDGE_PADDING
         );
 
-        const y = clamp(
-            originalY + dy,
-            EDGE_PADDING,
-            viewport.height - size.height - EDGE_PADDING
-        );
+const maxY = Math.max(
+    EDGE_PADDING,
+    viewport.height -
+    NAV_BAR_CLEARANCE -
+    size.height -
+    EDGE_PADDING
+);
+
+const y = clamp(
+    originalY + dy,
+    EDGE_PADDING,
+    maxY
+);
 
         sphere.style.left = `${x}px`;
         sphere.style.right = 'auto';
@@ -1921,48 +2136,64 @@ event => {
     }
 
     function onPointerUp(event) {
-        if (pointerId === null || event.pointerId !== pointerId) return;
-
-        clearHoldTimer();
-
-        const wasDrag = dragging;
-        const wasHold = holdActivated;
-
-        pointerId = null;
-
-        dragging = false;
-        holdActivated = false;
-
-        sphere.classList.remove('gaze-drag-ready');
-
-        if (wasDrag) {
-            const viewport = viewportSize();
-            const rect = sphere.getBoundingClientRect();
-
-            const centerX = rect.left + rect.width / 2;
-            const side = centerX < viewport.width / 2
-                ? 'left'
-                : 'right';
-
-            const targetX = side === 'left'
-                ? EDGE_PADDING
-                : viewport.width - rect.width - EDGE_PADDING;
-
-            setPosition(targetX, rect.top, side);
-
-            suppressNextClick = true;
-
-            // Save one second after the sphere settles.
-            scheduleSave();
-        } else if (wasHold) {
-            /*
-             * A completed hold without a drag must not open the toolbox.
-             */
-            suppressNextClick = true;
-        }
-
-        sphere.classList.remove('gaze-drag-ready');
+    if (pointerId === null || event.pointerId !== pointerId) {
+        return;
     }
+
+    clearHoldTimer();
+
+    const wasDrag = dragging;
+    const wasHold = holdActivated;
+
+    pointerId = null;
+    dragging = false;
+    holdActivated = false;
+
+    sphere.classList.remove('gaze-drag-ready');
+
+    if (wasDrag) {
+        const viewport = viewportSize();
+        const rect = sphere.getBoundingClientRect();
+
+        const centerX = rect.left + rect.width / 2;
+
+        const side = centerX < viewport.width / 2
+            ? 'left'
+            : 'right';
+
+        const targetX = side === 'left'
+            ? EDGE_PADDING
+            : viewport.width - rect.width - EDGE_PADDING;
+
+        // Keep the sphere above the bottom navigation area.
+        const maxY = Math.max(
+            EDGE_PADDING,
+            viewport.height -
+                NAV_BAR_CLEARANCE -
+                rect.height -
+                EDGE_PADDING
+        );
+
+        const safeY = clamp(
+            rect.top,
+            EDGE_PADDING,
+            maxY
+        );
+
+        setPosition(targetX, safeY, side);
+
+        suppressNextClick = true;
+
+        // Save the corrected position.
+        scheduleSave();
+
+    } else if (wasHold) {
+        // A completed hold without dragging must not open the toolbox.
+        suppressNextClick = true;
+    }
+
+    sphere.classList.remove('gaze-drag-ready');
+}
 
     function onPointerCancel(event) {
         if (pointerId === null || event.pointerId !== pointerId) return;
@@ -2018,11 +2249,19 @@ event => {
             ? EDGE_PADDING
             : viewport.width - rect.width - EDGE_PADDING;
 
-        const y = clamp(
-            rect.top,
-            EDGE_PADDING,
-            viewport.height - rect.height - EDGE_PADDING
-        );
+        const maxY = Math.max(
+    EDGE_PADDING,
+    viewport.height -
+    NAV_BAR_CLEARANCE -
+    rect.height -
+    EDGE_PADDING
+);
+
+const y = clamp(
+    rect.top,
+    EDGE_PADDING,
+    maxY
+);
 
         setPosition(x, y, side);
         updateMenuPlacement();
@@ -2042,11 +2281,14 @@ event => {
      * Recalculate placement whenever the existing toolbox opens.
      * This does not add or replace the existing open/close handler.
      */
-    const menuObserver = new MutationObserver(() => {
-        if (isMenuOpen()) {
-            requestAnimationFrame(updateMenuPlacement);
-        }
-    });
+const menuObserver = new MutationObserver(() => {
+    if (
+        isMenuOpen() &&
+        !sphere.classList.contains('closing')
+    ) {
+        requestAnimationFrame(updateMenuPlacement);
+    }
+});
 
     menuObserver.observe(sphere, {
         attributes: true,
