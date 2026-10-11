@@ -8,8 +8,10 @@ const { startMarketCalendarScheduler } = require('./services/marketCalendarSched
 const { mountAuth, requireRole } = require('./gaze-auth/src');
 const portfolioGuard = require('./gaze-auth/src/portfolio-guard');
 
+const dividendRoutes = require('./routes/dividends');
 const marketCalendarRoutes = require('./routes/marketCalendar');
 const schedulerRoutes = require('./routes/scheduler');
+const { startDividendScheduler } = require('./services/dividendScheduler');
 const portfolioRoutes = require('./routes/portfolio');
 const stockRoutes = require('./routes/stocks');
 
@@ -30,6 +32,7 @@ app.use('/api/portfolio', portfolioGuard, portfolioRoutes); // login required + 
 app.use('/api/stocks', stockRoutes);                        // public market data
 app.use('/api/market-calendar', marketCalendarRoutes);
 app.use('/api/scheduler', requireRole('admin'), schedulerRoutes); // admin only
+app.use('/api/dividends', dividendRoutes);
 
 // Server Port
 const PORT = process.env.PORT || 5000;
@@ -56,6 +59,7 @@ async function startServer() {
 
         startConfidenceScheduler();
         startMarketCalendarScheduler();
+        startDividendScheduler();
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);

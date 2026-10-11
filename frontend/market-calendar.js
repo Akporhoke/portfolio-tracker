@@ -86,25 +86,74 @@ let provider = apiProvider;
 
     /* ---------- State ---------- */
 
-    const state = { offset: 0, selected: null, sessions: null, loading: false, error: false };
-
+    const state = {
+        offset: 0, selected: null, sessions: null, loading: false, error: false,
+        dividends: {}, dividendsError: false,
+        historySymbol: null, history: null, historyLoading: false, historyError: false
+    };
     let root = null;
 
     /* ---------- Data loading ---------- */
 
+    let loadId = 0;
+
     async function load() {
         const { y, m } = monthFromOffset(state.offset);
+        const id = ++loadId;
         state.loading = true;
         state.error = false;
+        state.dividendsError = false;
+        state.dividends = {};
         render();
-        try {
-            state.sessions = await provider(y, m);
-        } catch (err) {
-            console.error('Market calendar load failed:', err);
+
+        const divs = window.GazeDividends
+            ? window.GazeDividends.fetchMonth(y, m)
+            : Promise.resolve({});
+
+        const [sess, div] = await Promise.allSettled([provider(y, m), divs]);
+        if (id !== loadId) return;
+
+        if (sess.status === 'fulfilled') {
+            state.sessions = sess.value;
+        } else {
+            console.error('Market calendar load failed:', sess.reason);
             state.sessions = null;
             state.error = true;
         }
+
+        if (div.status === 'fulfilled') {
+            state.dividends = div.value;
+        } else {
+            console.error('Dividend load failed:', div.reason);
+            state.dividendsError = true;
+        }
+
         state.loading = false;
+        render();
+    }
+
+    async function openHistory(symbol) {
+        state.historySymbol = symbol;
+        state.history = null;
+        state.historyError = false;
+        state.historyLoading = true;
+        render();
+        try {
+            const records = await window.GazeDividends.fetchHistory(symbol);
+            if (state.historySymbol !== symbol) return;
+            state.history = records;
+        } catch (err) {
+            if (state.historySymbol !== symbol) return;
+            console.error('Dividend history failed:', err);
+            state.historyError = true;
+        }
+        state.historyLoading = false;
+        render();
+    }
+
+    function closeHistory() {
+        state.historySymbol = null;
+        state.history = null;
         render();
     }
 
@@ -133,11 +182,13 @@ let provider = apiProvider;
 
     function dotsHtml(key) {
         const day = state.sessions && state.sessions[key];
-        return MARKETS.map((mk) => {
+        const dots = MARKETS.map((mk) => {
             const s = day && day[mk.id];
             const open = s && s.status !== 'closed';
             return `<span class="mc-dot ${mk.cls}${open ? '' : ' off'}"></span>`;
         }).join('');
+        const dv = window.GazeDividends ? window.GazeDividends.markHtml(state.dividends[key]) : '';
+        return dots + dv;
     }
 
     function cellAria(key, d, monthName) {
@@ -146,8 +197,8 @@ let provider = apiProvider;
             const s = day && day[mk.id];
             return `${mk.label} ${statusText(s).label.toLowerCase()}`;
         });
-        return `${monthName} ${d}: ${parts.join(', ')}`;
-    }
+        const dv = window.GazeDividends ? window.GazeDividends.ariaText(state.dividends[key]) : '';
+        return `${monthName} ${d}: ${parts.join(', ')}${dv}`;    }
 
     function gridHtml(y, m) {
         const t = todayParts();
@@ -197,11 +248,20 @@ let provider = apiProvider;
                 </div>`;
         }).join('');
 
-        return `<h3 class="mc-details-title">${title}</h3>${cards}`;
-    }
+        const dvSection = window.GazeDividends
+            ? window.GazeDividends.sectionHtml(state.dividends[state.selected], state.dividendsError)
+            : '';
+        return `<h3 class="mc-details-title">${title}</h3>${cards}${dvSection}`;    }
 
     function render() {
         if (!root) return;
+
+        if (state.historySymbol && window.GazeDividends) {
+            root.innerHTML = window.GazeDividends.historyHtml(
+                state.historySymbol, state.history, state.historyLoading, state.historyError);
+            return;
+        }
+
         const { y, m } = monthFromOffset(state.offset);
         const title = new Date(y, m, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -214,6 +274,7 @@ let provider = apiProvider;
                        <span><i class="mc-dot ngx"></i> NGX trading</span>
                        <span><i class="mc-dot us"></i> US trading</span>
                        <span><i class="mc-dot off"></i> Closed</span>
+                       <span><i class="dv-mark"></i> Dividend</span>
                    </div>
                    <div class="mc-details" aria-live="polite">${detailsHtml()}</div>`;
 
@@ -231,6 +292,10 @@ let provider = apiProvider;
     /* ---------- Events ---------- */
 
     function onClick(e) {
+
+                const hist = e.target.closest('[data-history]');
+        if (hist) { openHistory(hist.dataset.history); return; }
+        if (e.target.closest('[data-history-back]')) { closeHistory(); return; }
         const nav = e.target.closest('[data-nav]');
         if (nav) { go(Number(nav.dataset.nav)); return; }
 

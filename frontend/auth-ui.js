@@ -6,7 +6,7 @@
 
   // Paste your Google OAuth *Web client ID* here (it is public, not a secret).
   // Leave it empty to hide the "Continue with Google" button.
-  var GOOGLE_CLIENT_ID = '';
+  var GOOGLE_CLIENT_ID = '265369795290-1hesg3lpgnhp8pkqv5gajd8aetji3sv6.apps.googleusercontent.com';
 
   // Browser-storage keys that hold a user's PRIVATE data (found in app.js).
   // They are wiped on log out so the next person on this device can't see them.
@@ -26,8 +26,8 @@
 
   /* ---------- small helpers ---------- */
 
-  function toast(message, type) {
-    if (typeof window.showToast === 'function') window.showToast(message, type || 'success');
+  function toast(message, type, action, duration) {
+    if (typeof window.showToast === 'function') window.showToast(message, type || 'success', action || null, duration);
   }
   function openModal(id) { var m = $(id); if (m) m.classList.add('active'); }
   function closeModal(id) { var m = $(id); if (m) m.classList.remove('active'); }
@@ -101,6 +101,14 @@
       emailRow.appendChild(icon('fa-regular fa-envelope settings-row-icon'));
       emailRow.appendChild(el('span', 'settings-row-label', 'Email'));
       emailRow.appendChild(el('span', 'auth-email', user.email));
+      if (user.emailVerified) {
+        emailRow.appendChild(el('span', 'auth-badge', 'Verified'));
+      } else {
+        var verifyBtn = el('button', 'auth-link-btn', 'Verify email');
+        verifyBtn.type = 'button';
+        verifyBtn.addEventListener('click', function () { sendVerification(verifyBtn); });
+        emailRow.appendChild(verifyBtn);
+      }
       group.appendChild(emailRow);
 
       var outBtn = el('button', 'settings-row settings-link');
@@ -124,10 +132,21 @@
   function setMode(next) {
     mode = next;
     var signup = next === 'signup';
+    var forgot = next === 'forgot';
     document.querySelectorAll('.auth-tab').forEach(function (t) {
       t.classList.toggle('active', t.getAttribute('data-mode') === next);
     });
-    $('authTitle').textContent = signup ? 'Create account' : 'Log in';
+    var tabs = document.querySelector('.auth-tabs');
+    if (tabs) tabs.classList.toggle('auth-hidden', forgot);
+    $('authForm').classList.toggle('auth-hidden', forgot);
+    var fForm = $('forgotForm');
+    if (fForm) fForm.classList.toggle('auth-hidden', !forgot);
+    var fRow = $('authForgotRow');
+    if (fRow) fRow.classList.toggle('auth-hidden', next !== 'login');
+    var gWrap = $('authGoogleWrap');
+    if (gWrap) { if (forgot) gWrap.classList.add('auth-hidden'); else if (googleStarted) gWrap.classList.remove('auth-hidden'); }
+    if (forgot) { showError('forgotError', ''); if ($('forgotOk')) $('forgotOk').textContent = ''; }
+    $('authTitle').textContent = forgot ? 'Reset password' : signup ? 'Create account' : 'Log in';
     $('authSubmit').textContent = signup ? 'Create account' : 'Log in';
     $('authNameGroup').classList.toggle('auth-hidden', !signup);
     $('authPwHint').classList.toggle('auth-hidden', !signup);
@@ -317,6 +336,137 @@
     }
   }
 
+  /* ---------- forgot password ---------- */
+
+  function ensureAuthExtraStyles() {
+    if ($('authExtraStyles')) return;
+    var style = document.createElement('style');
+    style.id = 'authExtraStyles';
+    style.textContent =
+      '.auth-forgot-row{display:flex;justify-content:flex-end;margin:-6px 0 8px}' +
+      '.auth-link{background:none;border:0;color:inherit;opacity:.75;font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:6px 0}' +
+      '.auth-link:hover{opacity:1}' +
+      '.auth-ok{color:#16a34a;font-size:14px;line-height:1.45;margin:8px 0 12px}' +
+      '.auth-ok:empty{display:none}' +
+      '.auth-forgot-intro{font-size:14px;line-height:1.45;opacity:.75;margin:0 0 14px}' +
+      '.auth-back-row{text-align:center;margin-top:6px}';
+    document.head.appendChild(style);
+  }
+
+  function buildForgotView() {
+    ensureAuthExtraStyles();
+
+    // "Forgot password?" link under the password box (login view only)
+    var row = el('div', 'auth-forgot-row');
+    row.id = 'authForgotRow';
+    var link = el('button', 'auth-link', 'Forgot password?');
+    link.type = 'button';
+    link.id = 'authForgotLink';
+    row.appendChild(link);
+    $('authError').parentNode.insertBefore(row, $('authError'));
+
+    // the reset-request form itself
+    var form = document.createElement('form');
+    form.id = 'forgotForm';
+    form.noValidate = true;
+    form.className = 'auth-hidden';
+    form.appendChild(el('p', 'auth-forgot-intro', 'Enter the email you signed up with and we will send you a link to choose a new password.'));
+
+    var group = el('div', 'form-group');
+    var label = el('label', '', 'Email');
+    label.setAttribute('for', 'forgotEmail');
+    var input = document.createElement('input');
+    input.type = 'email';
+    input.id = 'forgotEmail';
+    input.autocomplete = 'email';
+    input.setAttribute('inputmode', 'email');
+    input.placeholder = 'you@example.com';
+    group.appendChild(label);
+    group.appendChild(input);
+    form.appendChild(group);
+
+    var err = el('p', 'auth-error');
+    err.id = 'forgotError';
+    err.setAttribute('role', 'alert');
+    form.appendChild(err);
+
+    var ok = el('p', 'auth-ok');
+    ok.id = 'forgotOk';
+    ok.setAttribute('role', 'status');
+    form.appendChild(ok);
+
+    var send = el('button', 'btn-primary btn-full', 'Send reset link');
+    send.type = 'submit';
+    send.id = 'forgotSend';
+    form.appendChild(send);
+
+    var backRow = el('div', 'auth-back-row');
+    var back = el('button', 'auth-link', 'Back to log in');
+    back.type = 'button';
+    back.id = 'forgotBack';
+    backRow.appendChild(back);
+    form.appendChild(backRow);
+
+    $('authForm').insertAdjacentElement('afterend', form);
+
+    link.addEventListener('click', function () {
+      setMode('forgot');
+      input.value = $('authEmail').value.trim();
+      setTimeout(function () { input.focus(); }, 50);
+    });
+    back.addEventListener('click', function () { setMode('login'); });
+    form.addEventListener('submit', submitForgot);
+  }
+
+  async function submitForgot(e) {
+    e.preventDefault();
+    if (busy) return;
+    showError('forgotError', '');
+    $('forgotOk').textContent = '';
+
+    var email = $('forgotEmail').value.trim();
+    if (!email || email.indexOf('@') < 1) {
+      showError('forgotError', 'Enter the email you signed up with.');
+      return;
+    }
+    var btn = $('forgotSend');
+    setBusy(btn, true, 'Send reset link', 'Sending…');
+    var r = await window.GazeAuth.forgotPassword(email);
+    setBusy(btn, false, 'Send reset link', '');
+    if (r.ok) {
+      $('forgotOk').textContent = r.message || 'If an account exists for that email, a reset link is on its way. Check your inbox and spam folder.';
+    } else {
+      showError('forgotError', friendlyError(r));
+    }
+  }
+
+  /* ---------- email verification ---------- */
+
+  var remindedVerify = false;
+
+  async function sendVerification(btn) {
+    if (btn) btn.disabled = true;
+    var r = await window.GazeAuth.resendVerification();
+    if (btn) btn.disabled = false;
+    if (r.ok && r.alreadyVerified) {
+      await window.GazeAuth.refreshUser();
+      toast('Your email is already confirmed');
+    } else if (r.ok) {
+      toast('Confirmation email sent. Check your inbox and spam folder.');
+    } else {
+      toast(friendlyError(r), 'warning');
+    }
+  }
+
+  // Once per page load, nudge people whose email is not confirmed yet
+  function maybeRemindVerify() {
+    var u = window.GazeAuth.getUser();
+    if (!u || u.emailVerified || remindedVerify || nickPrompted) return;
+    remindedVerify = true;
+    toast('Please confirm your email to keep your account safe', 'warning',
+      { label: 'Send link', onClick: function () { sendVerification(null); } }, 9000);
+  }
+
   /* ---------- nickname (shown in the greeting) ---------- */
 
   var NICK_RX = /^[\p{L}\p{N} .'_-]{1,30}$/u;
@@ -502,6 +652,8 @@
     $('authForm').addEventListener('submit', submitAuth);
     $('pwForm').addEventListener('submit', submitPassword);
     $('logoutAllBtn').addEventListener('click', onLogoutAll);
+    buildForgotView();
+
     $('authShowPw').addEventListener('click', function () {
       var field = $('authPassword');
       var show = field.type === 'password';
@@ -548,7 +700,13 @@
       syncNameInput(u);
     };
     show();
-    window.GazeAuth.ready.then(function () { show(); maybePromptNickname(); });
+    window.GazeAuth.ready.then(function () { show(); maybePromptNickname(); maybeRemindVerify(); });
+
+    // came back from confirming the email in another tab: pick up the new status
+    window.addEventListener('focus', function () {
+      var u = window.GazeAuth.getUser();
+      if (u && !u.emailVerified) window.GazeAuth.refreshUser();
+    });
   }
 
   var api = {

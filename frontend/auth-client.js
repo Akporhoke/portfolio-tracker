@@ -174,6 +174,30 @@
       var r = await api(BASE + '/change-password', { method: 'POST', body: { currentPassword: currentPassword, newPassword: newPassword } });
       return r.res.ok ? { ok: true } : fail(r);
     },
+    // Ask for a password-reset email. The server answers the same way for every address.
+    forgotPassword: async function (email) {
+      var r;
+      try { r = await raw(BASE + '/forgot-password', { method: 'POST', body: { email: email } }); }
+      catch (_) { return { ok: false, error: 'Network error. Check your connection.', code: 'NETWORK' }; }
+      return r.res.ok ? { ok: true, message: r.data && r.data.message } : fail(r);
+    },
+    // Send (another) "confirm your email" message to the logged-in account
+    resendVerification: async function () {
+      var r;
+      try { r = await api(BASE + '/resend-verification', { method: 'POST' }); }
+      catch (_) { return { ok: false, error: 'Network error. Check your connection.', code: 'NETWORK' }; }
+      return r.res.ok ? { ok: true, alreadyVerified: !!(r.data && r.data.alreadyVerified) } : fail(r);
+    },
+    // Re-read the account from the server (e.g. after confirming the email in another tab)
+    refreshUser: async function () {
+      var r;
+      try { r = await api(BASE + '/me'); } catch (_) { return false; }
+      if (!(r.res.ok && r.data && r.data.user)) return false;
+      var changed = JSON.stringify(currentUser) !== JSON.stringify(r.data.user);
+      currentUser = r.data.user;
+      if (changed) emit();
+      return changed;
+    },
     // Save profile fields on the account, e.g. updateProfile({ nickname: 'Orhoke', nicknamePrompted: true })
     updateProfile: async function (fields) {
       var r;

@@ -62,6 +62,8 @@ const limiters = {
   signup: make(60 * 60 * 1000, 10, 'Too many signups from this network. Try again later.'),
   refresh: make(15 * 60 * 1000, 120, 'Too many session refreshes.'),
   sensitive: make(15 * 60 * 1000, 20, 'Too many attempts. Try again later.'),
+  // "Forgot password" emails: keeps one person from flooding inboxes or burning the daily email quota
+  forgot: make(60 * 60 * 1000, 5, 'Too many reset requests. Try again in an hour.'),
 };
 
 module.exports = { securityMiddleware, limiters };

@@ -21,7 +21,13 @@ const nickname = z
   .transform((v) => v.replace(/\s+/g, ' '))
   .refine((v) => v === '' || NICK_RX.test(v), 'Nickname can only use letters, numbers, spaces and . - _');
 
+// one-time tokens from email links are 43 characters; allow some slack
+const emailToken = z.string().min(20).max(200);
+
 const schemas = {
+  forgot: z.object({ email }).strict(),
+  resetPassword: z.object({ token: emailToken, password }).strict(),
+  verifyEmail: z.object({ token: emailToken }).strict(),
   signup: z.object({ name, email, password }).strict(),
   login: z.object({ email, password: z.string().min(1).max(200) }).strict(),
   google: z.object({ credential: z.string().min(20).max(4096) }).strict(),

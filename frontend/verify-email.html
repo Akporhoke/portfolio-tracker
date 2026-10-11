@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <meta name="referrer" content="no-referrer">
+    <title>Confirm your email · Gaze</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="auth-pages.css">
+</head>
+<body data-page="verify">
+    <main class="gp-card" aria-live="polite">
+        <img class="gp-owl" src="owl_x5f_waving.svg" alt="">
+        <p class="gp-brand">Gaze</p>
+
+        <section id="gpLoading">
+            <div class="gp-spin" aria-hidden="true"></div>
+            <h1>Confirming your email…</h1>
+        </section>
+
+        <section id="gpDone" hidden>
+            <div class="gp-ok-mark" aria-hidden="true">✓</div>
+            <h1>Email confirmed</h1>
+            <p class="gp-sub">Thank you. Your account is now verified. You can close this tab or go back to the app.</p>
+            <a class="gp-link-btn" href="/">Go to Gaze</a>
+        </section>
+
+        <section id="gpProblem" hidden>
+            <div class="gp-bad-mark" aria-hidden="true">!</div>
+            <h1>We could not confirm this link</h1>
+            <p class="gp-sub" id="gpProblemMsg"></p>
+            <a class="gp-link-btn" href="/">Back to Gaze</a>
+            <p class="gp-small">Log in and tap "Send link" on the reminder to get a fresh one.</p>
+        </section>
+    </main>
+
+    <script src="auth-pages.js"></script>
+</body>
+</html>

@@ -13,6 +13,7 @@ const { sha256, newRefreshToken, signAccess } = require('../tokens');
 const { schemas, badRequest } = require('../validate');
 const { limiters } = require('../security');
 const { asyncH, requireAuth, requireSameOrigin } = require('../middleware');
+const recovery = require('../recovery');
 
 const router = express.Router();
 router.use(express.json({ limit: '10kb' }));
@@ -85,6 +86,7 @@ router.post(
       throw err;
     }
     const { accessToken } = await startSession(user, req, res);
+    recovery.queue(() => recovery.sendVerificationEmail(user, { skipAllowanceCheck: true }));
     return res.status(201).json({ accessToken, user: user.toPublic() });
   })
 );
@@ -328,6 +330,107 @@ router.post(
     );
     if (!user) return res.status(401).json({ error: 'Authentication required', code: 'NO_USER' });
     return res.json({ user: user.toPublic() });
+  })
+);
+
+/* ---------- password reset + email verification ---------- */
+
+router.post(
+  '/forgot-password',
+  limiters.forgot,
+  asyncH(async (req, res) => {
+    const parsed = schemas.forgot.safeParse(req.body);
+    if (!parsed.success) return badRequest(res, parsed.error);
+
+    // Same answer whether or not the email has an account, sent BEFORE any lookup,
+    // so nobody can use this form to find out who is registered.
+    res.json({
+      ok: true,
+      message: 'If an account exists for that email, a reset link is on its way. Check your inbox and spam folder.'
+    });
+
+    recovery.queue(async () => {
+      const user = await User.findOne({ email: parsed.data.email });
+      if (user) await recovery.sendResetEmail(user);
+    });
+  })
+);
+
+router.post(
+  '/reset-password',
+  limiters.sensitive,
+  asyncH(async (req, res) => {
+    // validated first, so a weak password never uses up the one-time link
+    const parsed = schemas.resetPassword.safeParse(req.body);
+    if (!parsed.success) return badRequest(res, parsed.error);
+
+    const invalid = () =>
+      res.status(400).json({
+        error: 'This reset link is invalid or has expired. Please request a new one.',
+        code: 'INVALID_TOKEN'
+      });
+
+    const record = await recovery.consumeToken(parsed.data.token, 'reset');
+    if (!record) return invalid();
+
+    const user = await User.findById(record.userId);
+    if (!user) return invalid();
+
+    user.passwordHash = await bcrypt.hash(parsed.data.password, config.bcryptCost);
+    user.failedLogins = 0;
+    user.lockUntil = null;
+    user.emailVerified = true; // they just proved they control this inbox
+    await user.save();
+
+    await Session.deleteMany({ userId: user._id }); // signed out everywhere, including whoever had the old password
+    clearRefreshCookie(res);
+
+    recovery.queue(() => recovery.sendPasswordChangedEmail(user));
+    return res.json({ ok: true });
+  })
+);
+
+router.post(
+  '/verify-email',
+  limiters.sensitive,
+  asyncH(async (req, res) => {
+    const parsed = schemas.verifyEmail.safeParse(req.body);
+    if (!parsed.success) return badRequest(res, parsed.error);
+
+    const record = await recovery.consumeToken(parsed.data.token, 'verify');
+    if (!record) {
+      return res.status(400).json({
+        error: 'This confirmation link is invalid or has expired. Log in and ask for a new one.',
+        code: 'INVALID_TOKEN'
+      });
+    }
+    await User.updateOne({ _id: record.userId }, { $set: { emailVerified: true } });
+    return res.json({ ok: true });
+  })
+);
+
+router.post(
+  '/resend-verification',
+  limiters.sensitive,
+  requireAuth,
+  asyncH(async (req, res) => {
+    const user = await User.findById(req.auth.userId);
+    if (!user) return res.status(401).json({ error: 'Authentication required', code: 'NO_USER' });
+    if (user.emailVerified) return res.json({ ok: true, alreadyVerified: true });
+
+    const allowance = await recovery.checkSendAllowance(user, 'verify');
+    if (!allowance.ok) {
+      return res.status(429).json({
+        error: allowance.retryAfterSec >= 3600
+          ? 'You have asked for several emails already. Try again later.'
+          : 'Please wait a minute before asking for another email.',
+        code: 'TOO_SOON',
+        retryAfterSec: allowance.retryAfterSec
+      });
+    }
+
+    res.json({ ok: true });
+    recovery.queue(() => recovery.sendVerificationEmail(user, { skipAllowanceCheck: true }));
   })
 );
 

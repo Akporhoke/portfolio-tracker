@@ -1,0 +1,80 @@
+/* ============================================
+   GAZE — DIVIDENDS INSIDE THE MARKET CALENDAR
+   Load AFTER market-calendar.css
+   Dividends use a DIAMOND shape, so they never
+   depend on color alone.
+   ============================================ */
+
+:root { --dv-accent: #8B5CF6; }
+:root[data-theme="dark"] { --dv-accent: #A78BFA; }
+
+.dv-mark {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--dv-accent);
+    transform: rotate(45deg);
+}
+
+.dv-section {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--mc-border);
+}
+
+.dv-heading {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.dv-card { border-left-color: var(--dv-accent); }
+
+.dv-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--dv-accent);
+}
+
+.dv-meta {
+    margin: 4px 0 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.dv-link,
+.dv-back {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--mc-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.dv-back { margin-top: 0; }
+
+.dv-link:focus-visible,
+.dv-back:focus-visible {
+    outline: 2px solid var(--mc-ngx);
+    outline-offset: 2px;
+}
+
+.dv-empty {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.dv-note {
+    margin: 14px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+}
