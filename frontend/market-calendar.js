@@ -89,7 +89,7 @@ let provider = apiProvider;
     const state = {
         offset: 0, selected: null, sessions: null, loading: false, error: false,
         dividends: {}, dividendsError: false,
-        historySymbol: null, history: null, historyLoading: false, historyError: false
+        historySymbol: null, historyMarket: 'NGX', history: null, historyLoading: false, historyError: false
     };
     let root = null;
 
@@ -132,24 +132,25 @@ let provider = apiProvider;
         render();
     }
 
-    async function openHistory(symbol) {
-        state.historySymbol = symbol;
-        state.history = null;
-        state.historyError = false;
-        state.historyLoading = true;
-        render();
-        try {
-            const records = await window.GazeDividends.fetchHistory(symbol);
-            if (state.historySymbol !== symbol) return;
-            state.history = records;
-        } catch (err) {
-            if (state.historySymbol !== symbol) return;
-            console.error('Dividend history failed:', err);
-            state.historyError = true;
-        }
-        state.historyLoading = false;
-        render();
-    }
+      async function openHistory(symbol, market) {
+          state.historySymbol = symbol;
+          state.historyMarket = market || 'NGX';
+          state.history = null;
+          state.historyError = false;
+          state.historyLoading = true;
+          render();
+          try {
+              const records = await window.GazeDividends.fetchHistory(symbol, state.historyMarket);
+              if (state.historySymbol !== symbol) return;
+              state.history = records;
+          } catch (err) {
+              if (state.historySymbol !== symbol) return;
+              console.error('Dividend history failed:', err);
+              state.historyError = true;
+          }
+          state.historyLoading = false;
+          render();
+      }
 
     function closeHistory() {
         state.historySymbol = null;
@@ -294,8 +295,8 @@ let provider = apiProvider;
     function onClick(e) {
 
                 const hist = e.target.closest('[data-history]');
-        if (hist) { openHistory(hist.dataset.history); return; }
-        if (e.target.closest('[data-history-back]')) { closeHistory(); return; }
+          if (hist) { openHistory(hist.dataset.history, hist.dataset.market); return; }
+          if (e.target.closest('[data-history-back]')) { closeHistory(); return; }
         const nav = e.target.closest('[data-nav]');
         if (nav) { go(Number(nav.dataset.nav)); return; }
 

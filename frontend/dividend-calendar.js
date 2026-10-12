@@ -43,6 +43,10 @@
         return 'Dividend';
     }
 
+    function flag(market) {
+        return market === 'US' ? '🇺🇸' : '🇳🇬';
+    }
+
     const EVENT_LABELS = {
         'ex-dividend': 'Ex-dividend date',
         record: 'Record date',
@@ -67,8 +71,10 @@
         return byDate;
     }
 
-    async function fetchHistory(symbol) {
-        const res = await fetch(`${apiBase()}/dividends/${encodeURIComponent(symbol)}`);
+    async function fetchHistory(symbol, market) {
+        const res = await fetch(
+            `${apiBase()}/dividends/${encodeURIComponent(symbol)}?market=${encodeURIComponent(market || 'NGX')}`
+        );
         if (!res.ok) throw new Error(`History HTTP ${res.status}`);
         const data = await res.json();
         if (!data.success || !Array.isArray(data.records)) {
@@ -102,15 +108,15 @@
         return `
             <div class="mc-market-card dv-card">
                 <div class="mc-market-head">
-                    <span class="mc-market-name">${esc(e.symbol)}</span>
+                    <span class="mc-market-name">${flag(e.market)} ${esc(e.symbol)}</span>
                     <span class="dv-tag">${esc(EVENT_LABELS[e.eventType] || 'Event')}</span>
                 </div>
                 ${e.companyName ? `<p class="mc-reason">${esc(e.companyName)}</p>` : ''}
                 <p class="dv-meta">${esc(meta)}</p>
                 <p class="mc-type">${esc(dates)}</p>
-                                <p class="mc-type">${esc(dates)}</p>
                 ${e.rawDeclaredText ? `<p class="mc-type">Provider note: ${esc(e.rawDeclaredText)}</p>` : ''}
-                <button type="button" class="dv-link" data-history="${esc(e.symbol)}">
+                <button type="button" class="dv-link"
+                        data-history="${esc(e.symbol)}" data-market="${esc(e.market || 'NGX')}">
                     View dividend history
                 </button>
             </div>`;
@@ -161,7 +167,7 @@
                 <span style="width:36px"></span>
             </div>
             ${body}
-            <p class="dv-note">Dividend data comes from Kobo Terminal and may be incomplete or change.</p>`;
+            <p class="dv-note">Dividend data comes from third-party providers (Kobo Terminal for NGX, Twelve Data for US) and may be incomplete or change. Confirm dates with the company or your broker.</p>`;
     }
 
     window.GazeDividends = {
