@@ -228,7 +228,16 @@
         'Break-even price': 'Seuil de rentabilité',
         'The fee is applied to both the buy and the sell. Results are estimates only.':
         'Les frais s’appliquent à l’achat et à la vente. Les résultats sont des estimations.',
-        'Market Calendar': 'Calendrier des marchés'
+        'Market Calendar': 'Calendrier des marchés',
+
+        // Currency converter
+        'Currency Converter': 'Convertisseur de devises',
+        'Convert': 'Convertir',
+        'Amount': 'Montant',
+        'Converted': 'Converti',
+        'Exchange rate': 'Taux de change',
+        "Rates are approximate and for reference only. Your broker's rate may differ.":
+        'Les taux sont approximatifs et fournis à titre indicatif. Le taux de votre courtier peut différer.'
     };
 
     const FR_GREETING = {
@@ -276,6 +285,11 @@
         ['#calculatorTab .calc-result-row > span'],
         ['#calculatorTab .calc-hint'],
         ['#calendarTab .settings-title'],
+
+        ['#converterTab .settings-title'],
+        ['#converterTab .settings-row-label'],
+        ['#converterTab .calc-result-row > span'],
+        ['#converterTab .calc-hint'],
 
         ['.floating-tools-setting-row .settings-row-label'],
         ['.floating-tools-setting-hint'],
@@ -435,6 +449,12 @@ wrap('switchTab', {
         if (tabName === 'settings') {
             fillSettingsInputs();
             syncSettingsProfile();
+        }
+
+        // The exchange rate may have loaded since last time,
+        // so recalculate whenever the converter is opened.
+        if (tabName === 'converter') {
+            runConverter();
         }
     }
 });
@@ -693,6 +713,186 @@ wrap('switchTab', {
     }
 
 
+    /* ============================================
+       5b. CURRENCY CONVERTER (₦ <-> $)
+
+       Uses the rate the app already loads:
+       state.exchangeRate.usdToNgn (the same one the
+       sector bar uses). If it is not available yet,
+       it falls back to 1650, matching the backend
+       fallback in exchangeRate.js, and says so.
+
+       The screen and its Settings row are created
+       here, so index.html does not need editing.
+       ============================================ */
+
+    const CONVERTER_FALLBACK_RATE = 1650;
+
+    // 'NGN_USD' = Naira to Dollar, 'USD_NGN' = Dollar to Naira
+    let convDirection = 'NGN_USD';
+
+
+    // Money always shows 2 decimals, so $0.61 never rounds to $1.
+    function fmtMoney(value) {
+
+        return Number(value).toLocaleString(
+            'en-US',
+            {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }
+        );
+    }
+
+
+    function getUsdToNgnRate() {
+
+        const live = Number(
+            typeof state !== 'undefined' && state.exchangeRate
+                ? state.exchangeRate.usdToNgn
+                : NaN
+        );
+
+        return live > 0
+            ? { rate: live, approx: false }
+            : { rate: CONVERTER_FALLBACK_RATE, approx: true };
+    }
+
+
+    function runConverter() {
+
+        const amount = parseFloat(byId('convAmount')?.value);
+
+        const { rate, approx } = getUsdToNgnRate();
+
+        const toUsd = convDirection === 'NGN_USD';
+        const targetSymbol = toUsd ? '$' : '₦';
+
+        setResult(
+            'convRate',
+            `$1 ${approx ? '≈' : '='} ₦${fmtMoney(rate)}`
+        );
+
+        if (!(amount > 0)) {
+            setResult('convResult', '—');
+            return;
+        }
+
+        const converted = toUsd
+            ? amount / rate
+            : amount * rate;
+
+        setResult(
+            'convResult',
+            `${targetSymbol}${fmtMoney(converted)}`
+        );
+    }
+
+
+    function setupCurrencyConverterTool() {
+
+        // Never create it twice.
+        if (byId('converterTab')) {
+            return;
+        }
+
+        const calendarTab = byId('calendarTab');
+
+        // The new screen is placed right after the Market Calendar screen.
+        if (!calendarTab) {
+            return;
+        }
+
+        calendarTab.insertAdjacentHTML('afterend', `
+            <div class="tab-content" id="converterTab">
+                <div class="tool-container">
+                    <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+                    <h2 class="settings-title">Currency Converter</h2>
+
+                    <div class="settings-group">
+                        <div class="settings-row settings-row-stack">
+                            <div class="settings-row-top">
+                                <i class="fa-solid fa-right-left settings-row-icon"></i>
+                                <span class="settings-row-label">Convert</span>
+                            </div>
+                            <div class="segmented two">
+                                <button type="button" class="segmented-btn active" data-conv-dir="NGN_USD">₦ → $</button>
+                                <button type="button" class="segmented-btn" data-conv-dir="USD_NGN">$ → ₦</button>
+                            </div>
+                        </div>
+
+                        <label class="settings-row" for="convAmount">
+                            <i class="fa-solid fa-coins settings-row-icon"></i>
+                            <span class="settings-row-label">Amount</span>
+                            <input type="number" id="convAmount" class="settings-row-input" placeholder="1000" inputmode="decimal" step="0.01" min="0">
+                        </label>
+                    </div>
+
+                    <div class="calc-results">
+                        <div class="calc-result-row calc-main">
+                            <span>Converted</span>
+                            <strong id="convResult">—</strong>
+                        </div>
+                        <div class="calc-result-row">
+                            <span>Exchange rate</span>
+                            <strong id="convRate">—</strong>
+                        </div>
+                    </div>
+
+                    <p class="form-hint calc-hint">Rates are approximate and for reference only. Your broker's rate may differ.</p>
+                </div>
+            </div>
+        `);
+
+        // Settings > Tools row, placed right after "Market Calendar".
+        const calendarRow = document.querySelector(
+            '#settingsTab button[onclick="switchTab(\'calendar\')"]'
+        );
+
+        if (calendarRow) {
+            calendarRow.insertAdjacentHTML('afterend', `
+                <button type="button" class="settings-row settings-link" id="settingsConverterRow">
+                    <i class="fa-solid fa-right-left settings-row-icon"></i>
+                    <span class="settings-row-label">Currency Converter</span>
+                    <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                </button>
+            `);
+
+            byId('settingsConverterRow').addEventListener(
+                'click',
+                () => window.switchTab('converter')
+            );
+        }
+
+        // Recalculate as the user types.
+        byId('convAmount').addEventListener('input', runConverter);
+
+        // Direction buttons.
+        document
+            .querySelectorAll('[data-conv-dir]')
+            .forEach(btn => {
+
+                btn.addEventListener('click', () => {
+
+                    convDirection = btn.dataset.convDir;
+
+                    document
+                        .querySelectorAll('[data-conv-dir]')
+                        .forEach(b =>
+                            b.classList.toggle(
+                                'active',
+                                b === btn
+                            )
+                        );
+
+                    runConverter();
+                });
+            });
+
+        runConverter();
+    }
+
+
 
         /* ============================================
        6. FLOATING TOOLS SPHERE
@@ -771,12 +971,40 @@ function saveFloatingQuickAccess(value) {
         value
     );
 }
+
+
     /* ============================================
    FLOATING TOOL BACK BUTTON
    Returns users to the screen they came from.
+
+   STRUCTURE (the CSS for this is section 22 of
+   theme-and-tools.css):
+
+     <div id="gazeFloatingToolBack">     wrapper: position + shadow
+       <button class="gaze-back-btn">    the real button (clip-path
+                                         shape: circle <-> pill)
+         <span class="gaze-back-text">Back</span>
+         <span class="gaze-back-icon">‹</span>
+       </button>
+     </div>
+
+   RULES THIS CODE FOLLOWS
+   - JavaScript owns the LIFECYCLE and the POSITION.
+   - CSS owns the ANIMATION. JavaScript only adds the
+     .gaze-back-animate class to replay it.
+   - The wrapper is ALWAYS 92 x 46. Position is clamped
+     with that full width, so the button can never end up
+     off-screen in either the compact or expanded state.
    ============================================ */
 
+const GAZE_BACK_WIDTH = 92;     // full pill width (must match the CSS)
+const GAZE_BACK_HEIGHT = 46;    // also the diameter of the compact circle
+const GAZE_BACK_GAP = 12;       // space between the sphere and the button
+const GAZE_BACK_EDGE = 8;       // minimum distance from any screen edge
+const GAZE_BACK_BOTTOM_FALLBACK = 105; // used only if the sphere is missing
+const GAZE_BACK_SIDE_FALLBACK = 22;    // used only if the sphere is missing
 
+let floatingToolBackFrame = null;
 
 
 function getCurrentGazeTab() {
@@ -788,153 +1016,222 @@ function getCurrentGazeTab() {
 }
 
 
+// True only while the Back button is on screen.
+// (JavaScript always sets display to exactly 'block' or 'none'.)
+function isFloatingToolBackVisible() {
+    return Boolean(
+        floatingToolBackButton &&
+        floatingToolBackButton.style.display === 'block'
+    );
+}
+
+
+// Restarts the CSS animation from the beginning.
+// Removing the class, forcing a reflow (reading offsetWidth),
+// then adding it back is what makes the browser replay it.
+function playFloatingToolBackAnimation(wrapper) {
+    wrapper.classList.remove('gaze-back-animate');
+    void wrapper.offsetWidth;
+    wrapper.classList.add('gaze-back-animate');
+}
+
+
 function createFloatingToolBackButton() {
+    // Only ever one Back button: reuse it if it already exists.
     if (floatingToolBackButton) {
         return floatingToolBackButton;
     }
 
+    // Wrapper: carries position, shadow and slot variables.
+    const wrapper = document.createElement('div');
+    wrapper.id = 'gazeFloatingToolBack';
+
+    // The real button. Text first, arrow second, so the arrow
+    // is painted on top of the word while it sweeps across.
     const button = document.createElement('button');
 
     button.type = 'button';
-    button.id = 'gazeFloatingToolBack';
-
-    button.innerHTML = `
-    <span style="
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 22px;
-        height: 22px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.16);
-        font-size: 17px;
-        line-height: 1;
-    ">‹</span>
-    <span>Back</span>
-`;
+    button.className = 'gaze-back-btn';
 
     button.setAttribute(
         'aria-label',
         'Return to previous screen'
     );
 
-    button.style.cssText = `
-    position: fixed;
-    bottom: 105px;
-    right: 22px;
-    z-index: 10001;
+    button.innerHTML = `
+        <span class="gaze-back-text">Back</span>
+        <span class="gaze-back-icon" aria-hidden="true">‹</span>
+    `;
 
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    button.addEventListener('click', () => {
+        const returnTab = floatingToolReturnTab || 'home';
 
-    min-width: 92px;
-    height: 46px;
-    padding: 0 18px;
+        // Hide first so the switchTab hook has nothing to do.
+        wrapper.style.display = 'none';
+        wrapper.classList.remove('gaze-back-animate');
+        floatingToolReturnTab = null;
 
-    border: 1px solid rgba(8, 127, 115, 0.35);
-    border-radius: 50px;
+        // Tell the switchTab wrapper this is an intentional return.
+        returningFromFloatingTool = true;
 
-    background: linear-gradient(
-        135deg,
-        rgba(4, 63, 53, 0.96),
-        rgba(8, 127, 115, 0.94)
-    );
-
-    color: #ffffff;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-
-    box-shadow:
-        0 8px 24px rgba(4, 63, 53, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.18);
-
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        opacity 0.2s ease;
-`;
-
-button.addEventListener('click', () => {
-    const returnTab = floatingToolReturnTab || 'home';
-
-    button.style.display = 'none';
-    floatingToolReturnTab = null;
-
-    returningFromFloatingTool = true;
-
-    try {
-        if (typeof window.switchTab === 'function') {
-            window.switchTab(returnTab);
+        try {
+            if (typeof window.switchTab === 'function') {
+                window.switchTab(returnTab);
+            }
+        } finally {
+            returningFromFloatingTool = false;
         }
-    } finally {
-        returningFromFloatingTool = false;
-    }
-});
+    });
 
-    document.body.appendChild(button);
+    wrapper.appendChild(button);
+    document.body.appendChild(wrapper);
 
-    floatingToolBackButton = button;
+    floatingToolBackButton = wrapper;
 
-    return button;
+    watchFloatingToolBackPosition();
+
+    return wrapper;
 }
 
 
-function positionFloatingToolBackButton(button) {
-    const sphere = document.getElementById('floatingToolsSphere');
+// Position the button at most once per animation frame, and only
+// while it is visible. Safe to call as often as needed.
+function scheduleFloatingToolBackReposition() {
+    if (floatingToolBackFrame !== null) {
+        return;
+    }
 
-    if (!button || !sphere) return;
+    floatingToolBackFrame = requestAnimationFrame(function () {
+        floatingToolBackFrame = null;
 
-    const sphereRect = sphere.getBoundingClientRect();
+        if (isFloatingToolBackVisible()) {
+            positionFloatingToolBackButton(floatingToolBackButton);
+        }
+    });
+}
 
-    const buttonWidth = button.offsetWidth || 92;
-    const buttonHeight = button.offsetHeight || 46;
-    const gap = 12;
-    const edge = 12;
 
-    const viewportWidth = window.innerWidth;
+// Keep the button correct when the screen changes size or the
+// user drags the sphere. Called once, when the button is created.
+function watchFloatingToolBackPosition() {
+    window.addEventListener(
+        'resize',
+        scheduleFloatingToolBackReposition
+    );
+
+    window.addEventListener(
+        'orientationchange',
+        scheduleFloatingToolBackReposition
+    );
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener(
+            'resize',
+            scheduleFloatingToolBackReposition
+        );
+    }
+
+    // The sphere is moved by changing its inline style (drag and
+    // edge snap), so watching style/class means the Back button
+    // follows it. The observer only READS the sphere and WRITES
+    // the Back wrapper, so it cannot loop.
+    const sphere = byId('floatingToolsSphere');
+
+    if (sphere && 'MutationObserver' in window) {
+        new MutationObserver(
+            scheduleFloatingToolBackReposition
+        ).observe(sphere, {
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+    }
+}
+
+
+function positionFloatingToolBackButton(wrapper) {
+    if (!wrapper) return;
+
+    const sphere = byId('floatingToolsSphere');
+
+    // Layout viewport: the box that position:fixed is measured from.
+    const viewportWidth = document.documentElement.clientWidth;
     const viewportHeight = window.innerHeight;
 
-    // Prefer placing the Back button above the toolbox.
-    let left = sphereRect.left + (sphereRect.width / 2) - (buttonWidth / 2);
-    let top = sphereRect.top - buttonHeight - gap;
-
-    // If there's insufficient room above, place it below.
-    if (top < edge) {
-        top = sphereRect.bottom + gap;
-    }
-
-    // Keep the button inside the screen horizontally.
-    left = Math.max(
-        edge,
-        Math.min(left, viewportWidth - buttonWidth - edge)
+    // Largest left/top that still keeps the FULL 92 x 46 box on screen.
+    const maxLeft = Math.max(
+        GAZE_BACK_EDGE,
+        viewportWidth - GAZE_BACK_WIDTH - GAZE_BACK_EDGE
     );
 
-    // If the bottom placement doesn't fit, place it above instead.
-    if (top + buttonHeight > viewportHeight - edge) {
-        top = sphereRect.top - buttonHeight - gap;
-    }
-
-    // Final vertical safety check.
-    top = Math.max(
-        edge,
-        Math.min(top, viewportHeight - buttonHeight - edge)
+    const maxTop = Math.max(
+        GAZE_BACK_EDGE,
+        viewportHeight - GAZE_BACK_HEIGHT - GAZE_BACK_EDGE
     );
 
-    button.style.left = left + 'px';
-    button.style.top = top + 'px';
-    button.style.right = 'auto';
-    button.style.bottom = 'auto';
+    const sphereRect = sphere
+        ? sphere.getBoundingClientRect()
+        : null;
+
+    // A hidden sphere (display:none) reports a 0 x 0 rect.
+    const hasSphere = Boolean(
+        sphereRect &&
+        sphereRect.width > 0 &&
+        sphereRect.height > 0
+    );
+
+    let side = 'right';
+    let left;
+    let top;
+
+    if (hasSphere) {
+        const sphereCenterX =
+            sphereRect.left + sphereRect.width / 2;
+
+        // Dock on the same side of the screen as the sphere.
+        side = sphereCenterX > viewportWidth / 2
+            ? 'right'
+            : 'left';
+
+        // The compact circle (46px) is centred on the sphere.
+        // Right dock: the circle is the RIGHT 46px of the box, so the
+        //   box grows leftwards, toward the middle of the screen.
+        // Left dock: the circle is the LEFT 46px, so it grows rightwards.
+        left = side === 'right'
+            ? sphereCenterX + GAZE_BACK_HEIGHT / 2 - GAZE_BACK_WIDTH
+            : sphereCenterX - GAZE_BACK_HEIGHT / 2;
+
+        // Prefer above the sphere.
+        top = sphereRect.top - GAZE_BACK_HEIGHT - GAZE_BACK_GAP;
+
+        // No room above: go below.
+        if (top < GAZE_BACK_EDGE) {
+            top = sphereRect.bottom + GAZE_BACK_GAP;
+        }
+
+        // No room below either: go back above (the clamp below
+        // will then pull it fully on screen).
+        if (top + GAZE_BACK_HEIGHT > viewportHeight - GAZE_BACK_EDGE) {
+            top = sphereRect.top - GAZE_BACK_HEIGHT - GAZE_BACK_GAP;
+        }
+    } else {
+        // Sphere unavailable: bottom-right, like the original default.
+        left = viewportWidth - GAZE_BACK_WIDTH - GAZE_BACK_SIDE_FALLBACK;
+        top = viewportHeight - GAZE_BACK_BOTTOM_FALLBACK - GAZE_BACK_HEIGHT;
+    }
+
+    // Final safety clamp using the full expanded width.
+    left = Math.max(GAZE_BACK_EDGE, Math.min(left, maxLeft));
+    top = Math.max(GAZE_BACK_EDGE, Math.min(top, maxTop));
+
+    // Tell the CSS which way to open (mirrors the slots on the left).
+    wrapper.classList.toggle('gaze-back-left', side === 'left');
+
+    wrapper.style.left = Math.round(left) + 'px';
+    wrapper.style.top = Math.round(top) + 'px';
+    wrapper.style.right = 'auto';
+    wrapper.style.bottom = 'auto';
 }
+
 
 function openFloatingTool(tool) {
     if (!tool || typeof tool.open !== 'function') {
@@ -942,7 +1239,12 @@ function openFloatingTool(tool) {
     }
 
     // Remember the screen before opening the tool.
-    floatingToolReturnTab = getCurrentGazeTab();
+    // If Back is already showing, a tool session is in progress
+    // (for example Calculator, then Dictionary): keep the ORIGINAL
+    // screen so Back still returns to where the user started.
+    if (!isFloatingToolBackVisible() || !floatingToolReturnTab) {
+        floatingToolReturnTab = getCurrentGazeTab();
+    }
 
     openingFloatingTool = true;
 
@@ -952,14 +1254,19 @@ function openFloatingTool(tool) {
         openingFloatingTool = false;
     }
 
-    const button = createFloatingToolBackButton();
+    const wrapper = createFloatingToolBackButton();
 
-button.style.display = 'inline-flex';
+    // Show it, place it, then start the CSS animation.
+    wrapper.style.display = 'block';
+    positionFloatingToolBackButton(wrapper);
+    playFloatingToolBackAnimation(wrapper);
 
-// Wait for the button to become measurable, then position it.
-requestAnimationFrame(function () {
-    positionFloatingToolBackButton(button);
-});
+    // One more pass after the tool's screen has finished laying out.
+    requestAnimationFrame(function () {
+        if (isFloatingToolBackVisible()) {
+            positionFloatingToolBackButton(wrapper);
+        }
+    });
 }
 
 
@@ -1000,6 +1307,16 @@ requestAnimationFrame(function () {
 
             open() {
                 switchTab('calendar');
+            }
+        },
+
+        converter: {
+            id: 'converter',
+            label: 'Currency Converter',
+            icon: 'fa-solid fa-right-left',
+
+            open() {
+                switchTab('converter');
             }
         },
 
@@ -1599,6 +1916,10 @@ return;
     // Floating Tools
     setupFloatingTools();
     setupFloatingQuickAccessSetting();
+
+    // Currency converter screen + Settings row.
+    // Must run BEFORE applyLanguage() so French applies to it.
+    setupCurrencyConverterTool();
 
         // Theme buttons
         document

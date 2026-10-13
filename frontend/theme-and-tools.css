@@ -1178,3 +1178,243 @@ border-radius: 14px;
 transition: none;
 }
 }
+
+
+/* ============================================
+   22. FLOATING TOOL BACK BUTTON
+   ============================================
+
+   HOW IT WORKS (read this first)
+
+   The Back control is built from three layers:
+
+     #gazeFloatingToolBack   wrapper. Always 92 x 46. Holds the
+                             position, the shadow and the slot
+                             variables. Never receives clicks.
+     .gaze-back-btn          the real <button>. Its SHAPE is a
+                             clip-path: a 46px circle (compact) or
+                             the full 92px pill (expanded).
+     .gaze-back-text         the word "Back"
+     .gaze-back-icon         the ‹ arrow badge
+
+   Because the box is ALWAYS 92px wide, JavaScript can clamp it to
+   the viewport using the expanded width, so it can never overflow
+   in either state. Only the clip-path changes, so nothing jumps.
+
+   The box has two 46px "slots":
+     --gaze-back-home   the slot that stays as the final circle
+     --gaze-back-far    the opposite slot
+
+   Docked on the right (default): home = right slot, far = left slot.
+   Docked on the left (.gaze-back-left): the two are swapped.
+
+   TIMELINE (1.8s, one animation per layer, same duration)
+
+     0.00s  compact circle, arrow in the home slot
+     0.00 – 0.36s  pill opens, arrow rides the open edge to the far
+                   slot, "Back" fades in
+     0.36 – 0.76s  hold, so the word can be read
+     0.76 – 1.44s  arrow sweeps across "Back" (arrow is ABOVE the
+                   text), the word fades under it
+     1.12 – 1.55s  pill closes back into the circle around the arrow
+     1.80s  finished: compact circle, stays until used or dismissed
+   ============================================ */
+
+#gazeFloatingToolBack {
+    --gaze-back-home: 46px;
+    --gaze-back-far: 0px;
+    --gaze-back-clip-home: inset(0 0 0 46px round 23px);
+    --gaze-back-clip-full: inset(0 0 0 0 round 23px);
+
+    position: fixed;
+    z-index: 10001;
+
+    /* JavaScript switches this to block when a tool opens */
+    display: none;
+
+    width: 92px;
+    height: 46px;
+
+    /* Only the real button receives taps */
+    pointer-events: none;
+
+    /* The shadow is on the wrapper so the clip-path cannot cut it */
+    filter: drop-shadow(0 6px 10px rgba(4, 63, 53, 0.28));
+}
+
+/* Docked on the left edge: mirror the slots */
+
+#gazeFloatingToolBack.gaze-back-left {
+    --gaze-back-home: 0px;
+    --gaze-back-far: 46px;
+    --gaze-back-clip-home: inset(0 46px 0 0 round 23px);
+}
+
+.gaze-back-btn {
+    position: absolute;
+    inset: 0;
+
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+
+    border: 0;
+    outline: none;
+
+    appearance: none;
+    -webkit-appearance: none;
+
+    background: linear-gradient(
+        135deg,
+        rgba(4, 63, 53, 0.96),
+        rgba(8, 127, 115, 0.94)
+    );
+
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+
+    cursor: pointer;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+
+    /* Resting state = compact circle */
+    clip-path: var(--gaze-back-clip-home);
+}
+
+.gaze-back-btn:active {
+    filter: brightness(0.9);
+}
+
+/* Keyboard focus (an outline would be clipped, so use the badge) */
+
+.gaze-back-btn:focus-visible .gaze-back-icon {
+    box-shadow: 0 0 0 2px #a7f3d0;
+}
+
+/* The word "Back" sits in the HOME slot, under the arrow */
+
+.gaze-back-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 46px;
+    height: 46px;
+
+    white-space: nowrap;
+    pointer-events: none;
+
+    opacity: 0;
+    transform: translateX(var(--gaze-back-home));
+}
+
+/* The arrow badge is ABOVE the text (z-index 2) so it sweeps over it */
+
+.gaze-back-icon {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 2;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 22px;
+    height: 22px;
+
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+
+    font-size: 17px;
+    line-height: 1;
+    padding-bottom: 1px;
+    box-sizing: border-box;
+
+    pointer-events: none;
+
+    transform: translateX(var(--gaze-back-home));
+}
+
+
+/* ---------- Animation ---------- */
+
+@keyframes gazeBackShape {
+    0% {
+        clip-path: var(--gaze-back-clip-home);
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    20%, 62% {
+        clip-path: var(--gaze-back-clip-full);
+        animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    }
+
+    86%, 100% {
+        clip-path: var(--gaze-back-clip-home);
+    }
+}
+
+@keyframes gazeBackArrow {
+    0% {
+        transform: translateX(var(--gaze-back-home));
+        animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    20%, 42% {
+        transform: translateX(var(--gaze-back-far));
+        animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+    }
+
+    80%, 100% {
+        transform: translateX(var(--gaze-back-home));
+    }
+}
+
+@keyframes gazeBackText {
+    0%, 10% {
+        opacity: 0;
+    }
+
+    24%, 50% {
+        opacity: 1;
+    }
+
+    68%, 100% {
+        opacity: 0;
+    }
+}
+
+/* JavaScript adds .gaze-back-animate each time a tool opens */
+
+#gazeFloatingToolBack.gaze-back-animate .gaze-back-btn {
+    animation: gazeBackShape 1.8s both;
+}
+
+#gazeFloatingToolBack.gaze-back-animate .gaze-back-icon {
+    animation: gazeBackArrow 1.8s both;
+}
+
+#gazeFloatingToolBack.gaze-back-animate .gaze-back-text {
+    animation: gazeBackText 1.8s both;
+}
+
+/* Reduced motion: skip straight to the compact circle */
+
+@media (prefers-reduced-motion: reduce) {
+    #gazeFloatingToolBack.gaze-back-animate .gaze-back-btn,
+    #gazeFloatingToolBack.gaze-back-animate .gaze-back-icon,
+    #gazeFloatingToolBack.gaze-back-animate .gaze-back-text {
+        animation: none;
+    }
+}
