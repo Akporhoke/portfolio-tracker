@@ -8,11 +8,15 @@ const config = require('./config');
 function securityMiddleware() {
   const directives = {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", 'https://accounts.google.com'],
-    styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com'],
-    fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+    // Font Awesome's "kit" script loads its icon CSS and fonts from ka-f.fontawesome.com
+    scriptSrc: ["'self'", 'https://accounts.google.com', 'https://kit.fontawesome.com'],
+    // The app still uses inline onclick="..." attributes. This allows ONLY those attributes
+    // (inline <script> blocks stay blocked). Remove it once the handlers are moved into JS files.
+    scriptSrcAttr: ["'unsafe-inline'"],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com', 'https://ka-f.fontawesome.com'],
+    fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://ka-f.fontawesome.com'],
     imgSrc: ["'self'", 'data:', 'https:'],
-    connectSrc: ["'self'", 'https://accounts.google.com'],
+    connectSrc: ["'self'", 'https://accounts.google.com', 'https://ka-f.fontawesome.com'],
     frameSrc: ["'self'", 'https://accounts.google.com'],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],

@@ -17,8 +17,8 @@ const posInt = (v, fallback) => {
   return n > 0 ? n : fallback;
 };
 
-// US shares your Twelve Data credits with the price-history sync, so keep this small.
-const US_CAP = posInt(process.env.US_DIVIDEND_DAILY_CAP, 40);
+// Alpha Vantage's free key allows 25 requests a day, so keep US well under that.
+const US_CAP = posInt(process.env.US_DIVIDEND_DAILY_CAP, 15);
 const US_SYMBOL_LIMIT = posInt(process.env.US_DIVIDEND_SYMBOL_LIMIT, 60);
 
 const MARKETS = {
@@ -33,15 +33,14 @@ const MARKETS = {
     sync: (state) => syncSymbol(state.providerSymbol || state.symbol)
   },
   US: {
-    provider: 'twelve',
-    envKey: 'TWELVE_DATA_API_KEY',
+    provider: 'alphavantage',
+    envKey: 'ALPHA_VANTAGE_KEY',
     scheduledCap: US_CAP,
-    hardCap: US_CAP + 10,
-    gapMs: posInt(process.env.US_DIVIDEND_GAP_MS, 9000),
-    // Twelve Data: 403 means THIS symbol is not on your plan, so it is not fatal
+    hardCap: US_CAP + 3,
+    gapMs: posInt(process.env.US_DIVIDEND_GAP_MS, 2000),
+    // Alpha Vantage rate-limit notices are mapped to 429 by the service
     fatalCodes: [401, 429],
-    sync: (state) =>
-      syncUsSymbol(state.providerSymbol || state.symbol, state.lastSuccessAt ? '1y' : 'full')
+    sync: (state) => syncUsSymbol(state.providerSymbol || state.symbol)
   }
 };
 
@@ -54,7 +53,8 @@ const isoDay = (offsetDays) => new Date(Date.now() + offsetDays * DAY).toISOStri
 async function quotaUsed(provider) {
   return DividendRequestLog.countDocuments({
     at: { $gte: new Date(Date.now() - DAY) },
-    provider: provider === 'kobo' ? { $ne: 'twelve' } : 'twelve'
+    // Older Kobo log rows have no provider field, so treat "not another provider" as Kobo
+    provider: provider === 'kobo' ? { $nin: ['twelve', 'alphavantage'] } : provider
   });
 }
 
@@ -264,7 +264,7 @@ function startDividendScheduler() {
     runIfStale().catch((e) => console.error('[Dividends] Catch-up failed:', e.message));
   }, STARTUP_DELAY_MS);
 
-  console.log(`✓ Dividend scheduler started (${CRON_EXPR}, NGX via Kobo, US via Twelve Data cap ${US_CAP}/day)`);
+  console.log(`✓ Dividend scheduler started (${CRON_EXPR}, NGX via Kobo, US via Alpha Vantage cap ${US_CAP}/day)`);
 }
 
 /* ---------- Admin status ---------- */

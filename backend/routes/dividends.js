@@ -5,7 +5,7 @@ const { refreshOne, getDividendStatus } = require('../services/dividendScheduler
 
 const router = express.Router();
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
-const SYMBOL_RE = /^[A-Za-z0-9.\-]{1,20}$/;
+const SYMBOL_RE = /^[A-Za-z0-9.\-\/]{1,20}$/;
 const MARKETS = ['NGX', 'US'];
 
 const marketOf = (value) => String(value || 'NGX').trim().toUpperCase();
@@ -87,8 +87,8 @@ router.get('/:symbol', async (req, res) => {
   if (!SYMBOL_RE.test(symbol)) return res.status(400).json({ success: false, error: 'Invalid symbol' });
   if (!MARKETS.includes(market)) return res.status(400).json({ success: false, error: 'Market must be NGX or US' });
   try {
-    const records = await Dividend.find({ symbol, market }).sort({ exDividendDate: -1 }).lean();
-    res.json({ success: true, symbol, market, records });
+    const records = await Dividend.find({ symbol, market }).sort({ exDividendDate: -1 }).limit(60).lean();
+        res.json({ success: true, symbol, market, records });
   } catch (err) {
     console.error('Dividend history failed:', err.message);
     res.status(500).json({ success: false, error: 'Could not load dividends' });

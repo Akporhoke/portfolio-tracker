@@ -5,13 +5,14 @@ require('dotenv').config(); // must stay BEFORE requiring gaze-auth (it reads en
 
 const { startConfidenceScheduler } = require('./services/confidenceScheduler');
 const { startMarketCalendarScheduler } = require('./services/marketCalendarScheduler');
+const { startDividendScheduler } = require('./services/dividendScheduler');
 const { mountAuth, requireRole } = require('./gaze-auth/src');
 const portfolioGuard = require('./gaze-auth/src/portfolio-guard');
+const portfolioValidate = require('./gaze-auth/src/portfolio-validate');
 
 const dividendRoutes = require('./routes/dividends');
 const marketCalendarRoutes = require('./routes/marketCalendar');
 const schedulerRoutes = require('./routes/scheduler');
-const { startDividendScheduler } = require('./services/dividendScheduler');
 const portfolioRoutes = require('./routes/portfolio');
 const stockRoutes = require('./routes/stocks');
 
@@ -27,11 +28,11 @@ app.get('/api/test', (req, res) => {
     res.json({ message: 'Backend is working!' });
 });
 
-// Routes
-app.use('/api/portfolio', portfolioGuard, portfolioRoutes); // login required + own portfolio only
-app.use('/api/stocks', stockRoutes);                        // public market data
+// Routes  (everything that uses `app` comes AFTER `const app = express()` above)
+app.use('/api/portfolio', portfolioGuard, portfolioValidate, portfolioRoutes); // login + own portfolio + checked input
+app.use('/api/stocks', stockRoutes);                                          // public market data
 app.use('/api/market-calendar', marketCalendarRoutes);
-app.use('/api/scheduler', requireRole('admin'), schedulerRoutes); // admin only
+app.use('/api/scheduler', requireRole('admin'), schedulerRoutes);             // admin only
 app.use('/api/dividends', dividendRoutes);
 
 // Server Port

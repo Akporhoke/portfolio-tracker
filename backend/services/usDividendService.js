@@ -3,58 +3,56 @@ const crypto = require('crypto');
 const Dividend = require('../models/Dividend');
 const Stock = require('../models/Stock');
 
-const BASE_URL = 'https://api.twelvedata.com/dividends';
+const BASE_URL = 'https://www.alphavantage.co/query';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SYMBOL_RE = /^[A-Z0-9.\-]{1,12}$/;
 
-async function fetchUsHistory(symbol, range) {
-  const key = process.env.TWELVE_DATA_API_KEY;
-  if (!key) throw new Error('TWELVE_DATA_API_KEY is not configured');
+// Alpha Vantage sends the string "None" for missing dates, so only accept real dates
+const cleanDate = (v) => (typeof v === 'string' && DATE_RE.test(v) ? v : null);
+
+async function fetchUsHistory(symbol) {
+  const key = process.env.ALPHA_VANTAGE_KEY;
+  if (!key) throw new Error('ALPHA_VANTAGE_KEY is not configured');
   if (!SYMBOL_RE.test(symbol)) throw new Error(`Invalid symbol: ${symbol}`);
 
-  let res;
-  try {
-    res = await axios.get(BASE_URL, {
-      params: { symbol, range, apikey: key },
-      timeout: 15000
-    });
-  } catch (err) {
-    // Twelve Data explains the problem in the response body, so surface it
-    const status = err.response && err.response.status;
-    const body = err.response && err.response.data;
-    const detail = body && (body.message || body.error);
-    if (detail) err.message = `${err.message} (${String(detail).slice(0, 160)})`;
-    // 403 here means this symbol or endpoint is not covered by the plan
-    if (status === 403) err.planRestricted = true;
-    throw err;
-  }
-
+  const res = await axios.get(BASE_URL, {
+    params: { function: 'DIVIDENDS', symbol, apikey: key },
+    timeout: 20000
+  });
   const data = res.data;
 
-  // Twelve Data can also report errors inside a normal 200 response
-  if (data && data.status === 'error') {
-    const code = Number(data.code) || 500;
-    const err = new Error(data.message || 'Twelve Data error');
-    err.response = { status: code };
-    err.notFound = code === 404 || /not found/i.test(String(data.message || ''));
-    err.planRestricted = code === 403;
+  // Alpha Vantage reports rate limits and plan notices inside a normal 200 response
+  if (data && (data.Note || data.Information)) {
+    const err = new Error(String(data.Note || data.Information).slice(0, 200));
+    err.response = { status: 429 };
     throw err;
   }
-  if (!data || !Array.isArray(data.dividends)) {
+  if (data && data['Error Message']) {
+    const err = new Error(String(data['Error Message']).slice(0, 200));
+    err.notFound = true;
+    throw err;
+  }
+  // An empty object means no dividend data for this symbol
+  if (data && typeof data === 'object' && Object.keys(data).length === 0) {
+    return { data: [] };
+  }
+  if (!data || !Array.isArray(data.data)) {
     throw new Error(`Unexpected response shape for ${symbol}`);
   }
   return data;
 }
 
-function normalizeUs(rec, symbol, companyName, currency) {
-  const exDividendDate =
-    typeof rec.ex_date === 'string' && DATE_RE.test(rec.ex_date) ? rec.ex_date : null;
+function normalizeUs(rec, symbol, companyName) {
+  const exDividendDate = cleanDate(rec.ex_dividend_date);
   const amount = Number(rec.amount);
   if (!exDividendDate || !Number.isFinite(amount)) return null;
 
-  // The provider gives no ID, so identity = market + symbol + ex-date + amount
+  // Identity = market + symbol + ex-date + amount, the same formula as before,
+  // so records already stored for AAPL are updated in place, not duplicated
   const rowHash = crypto.createHash('sha1')
     .update(`US|${symbol}|${exDividendDate}|${amount}`).digest('hex');
+
+  const declared = cleanDate(rec.declaration_date);
 
   return {
     rowHash,
@@ -62,34 +60,37 @@ function normalizeUs(rec, symbol, companyName, currency) {
     symbol,
     companyName: companyName || null,
     dividendPerShare: amount,
-    currency: currency || 'USD',
+    currency: 'USD',
     dividendType: 'unknown',
     financialPeriod: null,
     exDividendDate,
-    recordDate: null,
-    paymentDate: null,
-    rawDeclaredText: null,
+    recordDate: cleanDate(rec.record_date),
+    paymentDate: cleanDate(rec.payment_date),
+    // The Dividend model has no declaration-date field, so keep it as a note
+    rawDeclaredText: declared ? `Declared ${declared}` : null,
     rawAmountText: String(rec.amount),
-    source: 'Twelve Data',
-    providerSourceName: 'Twelve Data',
+    source: 'Alpha Vantage',
+    providerSourceName: 'Alpha Vantage',
     providerUpdatedAt: null
   };
 }
 
-async function syncUsSymbol(symbol, range = '1y') {
+// Gaze stores class shares as BRK/B; the provider usually expects BRK-B
+const toProviderSymbol = (s) => String(s).toUpperCase().replace(/\//g, '-');
+
+async function syncUsSymbol(symbol) {
   const sym = symbol.toUpperCase();
-  const data = await fetchUsHistory(sym, range);
+  const data = await fetchUsHistory(toProviderSymbol(sym));
   const now = new Date();
 
   const stock = await Stock.findOne({ ticker: sym, market: 'US' }).select('name').lean();
-  const name = (data.meta && data.meta.name) || (stock && stock.name) || null;
-  const currency = data.meta && data.meta.currency;
+  const name = (stock && stock.name) || null;
 
-  const records = data.dividends.map((r) => normalizeUs(r, sym, name, currency)).filter(Boolean);
-  const skipped = data.dividends.length - records.length;
+  const records = data.data.map((r) => normalizeUs(r, sym, name)).filter(Boolean);
+  const skipped = data.data.length - records.length;
 
   if (records.length === 0) {
-    return { symbol: sym, fetched: data.dividends.length, upserted: 0, modified: 0, skipped };
+    return { symbol: sym, fetched: data.data.length, upserted: 0, modified: 0, skipped };
   }
 
   const result = await Dividend.bulkWrite(
@@ -104,7 +105,7 @@ async function syncUsSymbol(symbol, range = '1y') {
 
   return {
     symbol: sym,
-    fetched: data.dividends.length,
+    fetched: data.data.length,
     upserted: result.upsertedCount,
     modified: result.modifiedCount,
     skipped
