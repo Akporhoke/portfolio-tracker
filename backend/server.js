@@ -18,6 +18,12 @@ const stockRoutes = require('./routes/stocks');
 
 const app = express();
 
+// Health check for uptime monitors (UptimeRobot / Render). Mounted BEFORE auth
+// so it skips rate limits and CORS, and it doesn't touch the database.
+app.get('/health', (req, res) => {
+    res.status(200).send('ok');
+});
+
 // Auth + security (helmet, CORS allowlist, rate limits, /api/auth routes)
 mountAuth(app);
 
