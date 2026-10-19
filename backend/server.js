@@ -40,6 +40,7 @@ app.use('/api/stocks', stockRoutes);                                          //
 app.use('/api/market-calendar', marketCalendarRoutes);
 app.use('/api/scheduler', requireRole('admin'), schedulerRoutes);             // admin only
 app.use('/api/dividends', dividendRoutes);
+app.use('/api/fx', require('./routes/fx'));
 
 // Server Port
 const PORT = process.env.PORT || 5000;

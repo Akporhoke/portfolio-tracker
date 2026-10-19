@@ -1,0 +1,305 @@
+/* ============================================
+   GAZE — CURRENCY CONVERTER
+   Colors match the Floating Tools toolbox.
+   Change --conv-accent / --conv-gradient to restyle.
+   ============================================ */
+
+#converterTab {
+    --conv-accent: #087F73;
+    --conv-gradient: linear-gradient(135deg, #043F35 0%, #087F73 50%, #126E9A 100%);
+    --conv-border: rgba(8, 127, 115, 0.18);
+    --conv-tint: rgba(8, 127, 115, 0.07);
+    --conv-ring: rgba(8, 127, 115, 0.12);
+    --conv-text: var(--text-primary, #333333);
+    --conv-muted: var(--text-secondary, #999999);
+}
+
+:root[data-theme="dark"] #converterTab {
+    --conv-accent: #3FBFB0;
+    --conv-border: rgba(63, 191, 176, 0.25);
+    --conv-tint: rgba(63, 191, 176, 0.08);
+    --conv-ring: rgba(63, 191, 176, 0.16);
+}
+
+#converterTab .conv-card {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    margin-bottom: 12px;
+}
+
+#converterTab .conv-box {
+    box-sizing: border-box;
+    border: 1px solid var(--conv-border);
+    background: var(--bg-card, #ffffff);
+    border-radius: 18px;
+    padding: 14px 16px 16px;
+    transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+#converterTab .conv-box:focus-within {
+    border-color: var(--conv-accent);
+    box-shadow: 0 0 0 3px var(--conv-ring);
+}
+
+#converterTab .conv-box-result {
+    background: linear-gradient(var(--conv-tint), var(--conv-tint)), var(--bg-card, #ffffff);
+    padding-top: 24px;
+}
+
+#converterTab .conv-box-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+#converterTab .conv-label {
+    color: var(--conv-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Currency chips */
+#converterTab .conv-chips {
+    display: flex;
+    gap: 6px;
+}
+
+#converterTab .conv-chip {
+    border: 1px solid var(--conv-border);
+    background: transparent;
+    color: var(--conv-text);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 11px;
+    border-radius: 999px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 150ms ease, background 180ms ease, color 180ms ease;
+}
+
+#converterTab .conv-chip:active {
+    transform: scale(0.94);
+}
+
+#converterTab .conv-chip.active {
+    background: var(--conv-gradient);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+}
+
+/* Amount + result text */
+#converterTab .conv-amount-row,
+#converterTab .conv-result-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#converterTab .conv-symbol {
+    color: var(--conv-muted);
+    font-size: 26px;
+    font-weight: 700;
+}
+
+#converterTab #convAmount {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--conv-text);
+    font: inherit;
+    font-size: clamp(22px, 7vw, 30px);
+    font-weight: 700;
+    padding: 0;
+}
+
+#converterTab #convAmount::placeholder {
+    color: var(--conv-muted);
+    opacity: 0.5;
+}
+
+#converterTab #convResult {
+    flex: 1;
+    min-width: 0;
+    color: var(--conv-text);
+    font-size: clamp(22px, 7vw, 30px);
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
+#converterTab #convResult.conv-pop {
+    animation: convPop 280ms ease;
+}
+
+@keyframes convPop {
+    from { transform: scale(0.96); opacity: 0.55; }
+    to   { transform: none; opacity: 1; }
+}
+
+/* Swap button, same look as the toolbox button */
+#converterTab .conv-swap {
+    align-self: center;
+    position: relative;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    margin: -10px 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 50%;
+    background: var(--conv-gradient);
+    color: #ffffff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow:
+        0 8px 24px rgba(4, 63, 53, 0.25),
+        0 2px 8px rgba(0, 0, 0, 0.12);
+    transition: transform 350ms ease, filter 180ms ease;
+}
+
+#converterTab .conv-swap.flipped {
+    transform: rotate(180deg);
+}
+
+#converterTab .conv-swap:active {
+    filter: brightness(0.9);
+}
+
+#converterTab .conv-swap:focus-visible,
+#converterTab .conv-chip:focus-visible,
+#converterTab .conv-quick-chip:focus-visible,
+#converterTab .conv-copy:focus-visible {
+    outline: 2px solid var(--conv-accent);
+    outline-offset: 2px;
+}
+
+#converterTab .conv-copy {
+    flex-shrink: 0;
+    border: 1px solid var(--conv-border);
+    background: transparent;
+    color: var(--conv-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+#converterTab .conv-copy:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* Quick amounts */
+#converterTab .conv-quick {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0 6px;
+    margin-bottom: 14px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+#converterTab .conv-quick::-webkit-scrollbar {
+    display: none;
+}
+
+#converterTab .conv-quick-chip {
+    flex-shrink: 0;
+    border: 1px solid var(--conv-border);
+    background: var(--bg-card, #ffffff);
+    color: var(--conv-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#converterTab .conv-quick-chip:active {
+    transform: scale(0.95);
+}
+
+/* Rate card extras */
+#converterTab .conv-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#converterTab .conv-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+}
+
+#converterTab .conv-status-live .conv-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+
+#converterTab .conv-status-saved .conv-dot {
+    background: #f59e0b;
+}
+
+#converterTab .conv-status-approx .conv-dot {
+    background: #ef4444;
+}
+
+#converterTab .conv-refresh {
+    margin-left: 8px;
+    border: 0;
+    background: none;
+    color: var(--conv-accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+}
+
+#converterTab .conv-refresh.loading {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+@media (max-width: 480px) {
+    #converterTab .conv-box {
+        padding: 12px 14px 14px;
+        border-radius: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #converterTab .conv-swap,
+    #converterTab .conv-chip,
+    #converterTab .conv-box {
+        transition: none;
+    }
+
+    #converterTab #convResult.conv-pop {
+        animation: none;
+    }
+}
+
+/* Hide the portfolio cards while the converter is open */
+body.converter-tool-open .quick-stats,
+body.converter-tool-open .portfolio-card,
+body.converter-tool-open .mini-cards {
+    display: none !important;
+}

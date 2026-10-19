@@ -2,6 +2,7 @@ const axios = require('axios');
 const PriceSnapshot = require('../models/PriceSnapshot');
 const PriceHistory = require('../models/PriceHistory');
 const ProviderState = require('../models/ProviderState');
+const providerBudget = require('../services/providerBudget');
 
 
 
@@ -20,7 +21,9 @@ const TWELVE_DATA_BASE_URL = 'https://api.twelvedata.com';
 
 const PRICE_CACHE_TTL = 2 * 60 * 1000;
 const HISTORY_CACHE_TTL = 60 * 60 * 1000;
-const COMPANY_LIST_CACHE_TTL = 2 * 60 * 1000;
+// NGN Market free plan = 3,000 calls/month; one call returns every company
+const COMPANY_LIST_CACHE_TTL =
+    (Number(process.env.NGN_COMPANY_CACHE_MINUTES) || 5) * 60 * 1000;
 
 const priceCache = new Map();
 const historyCache = new Map();
@@ -80,6 +83,16 @@ async function processTwelveDataQueue() {
                     TWELVE_DATA_MIN_INTERVAL -
                     elapsed
                 );
+            }
+
+            const budget =
+                await providerBudget.spend(
+                    'twelvedata',
+                    'time_series'
+                );
+
+            if (!budget.ok) {
+                throw new Error(budget.reason);
             }
 
             lastTwelveDataRequestTime =
@@ -875,6 +888,17 @@ async function getNGNMarketCompanies() {
     companyListRequest =
         (async () => {
             try {
+                                const budget =
+                    await providerBudget.spend(
+                        'ngnmarket',
+                        'companies'
+                    );
+
+                if (!budget.ok) {
+                    // Serve the last list we have rather than letting
+                    // every NGX symbol fall through to Investo
+                    return companyListCache || [];
+                }
                 console.log(
                     '→ Requesting NGX company prices from NGN Market'
                 );
@@ -967,6 +991,11 @@ if (
                             body.meta.calls_remaining ??
                             'unknown'
                         } remaining`
+                    );
+                                        await providerBudget.noteReported(
+                        'ngnmarket',
+                        body.meta.calls_used,
+                        body.meta.calls_remaining
                     );
                 }
 
@@ -1126,6 +1155,15 @@ async function getInvestoCurrentPrice(
     const requestPromise =
         (async () => {
             try {
+                    const budget =
+                    await providerBudget.spend(
+                        'investo',
+                        'price'
+                    );
+
+                if (!budget.ok) {
+                    return null;
+                }
                 console.log(
                     `→ Requesting Investo current price for ${symbol}`
                 );
@@ -1317,7 +1355,26 @@ async function getInvestoCurrentPrice(
 // FINNHUB — CURRENT PRICE
 // ============================================================
 
-async function getFinnhubPrice(
+const finnhubInFlight = new Map();
+
+async function getFinnhubPrice(ticker) {
+    const symbol = normalizeTicker(ticker);
+
+    if (finnhubInFlight.has(symbol)) {
+        return finnhubInFlight.get(symbol);
+    }
+
+    const request =
+        fetchFinnhubPrice(symbol).finally(() => {
+            finnhubInFlight.delete(symbol);
+        });
+
+    finnhubInFlight.set(symbol, request);
+
+    return request;
+}
+
+async function fetchFinnhubPrice(
     ticker
 ) {
     const token =
@@ -1333,6 +1390,16 @@ async function getFinnhubPrice(
 
     const symbol =
         normalizeTicker(ticker);
+
+    const budget =
+        await providerBudget.spend(
+            'finnhub',
+            'quote'
+        );
+
+    if (!budget.ok) {
+        return null;
+    }
 
     try {
         const response =
@@ -1458,6 +1525,16 @@ async function getInvestoHistory(
 
     if (cached) {
         return cached;
+    }
+
+        const budget =
+        await providerBudget.spend(
+            'investo',
+            'history'
+        );
+
+    if (!budget.ok) {
+        return [];
     }
 
     try {
@@ -2133,6 +2210,17 @@ async function getHistoricalProviderStatus(
 // ========================================================
 
 if (normalizedMarket === 'US') {
+    const budgetCheck =
+        await providerBudget.check('twelvedata');
+
+    if (!budgetCheck.ok) {
+        return {
+            status: 'cooldown',
+            rows: [],
+            requestMade: false
+        };
+    }
+
     try {
         /*
          * getPriceHistory() already routes US history
@@ -2200,6 +2288,20 @@ if (normalizedMarket === 'US') {
         requestMade: false
     };
 }
+
+    const budget =
+        await providerBudget.spend(
+            'investo',
+            'history-status'
+        );
+
+    if (!budget.ok) {
+        return {
+            status: 'cooldown',
+            rows: [],
+            requestMade: false
+        };
+    }
 
     /*
      * Request extra calendar days because NGX has

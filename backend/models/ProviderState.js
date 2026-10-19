@@ -28,6 +28,21 @@ const providerStateSchema = new mongoose.Schema(
             default: ''
         },
 
+                reportedUsed: {
+            type: Number,
+            default: null
+        },
+
+        reportedRemaining: {
+            type: Number,
+            default: null
+        },
+
+        reportedAt: {
+            type: Date,
+            default: null
+        },
+
         updatedAt: {
             type: Date,
             default: Date.now

@@ -237,7 +237,18 @@
         'Converted': 'Converti',
         'Exchange rate': 'Taux de change',
         "Rates are approximate and for reference only. Your broker's rate may differ.":
-        'Les taux sont approximatifs et fournis à titre indicatif. Le taux de votre courtier peut différer.'
+        'Les taux sont approximatifs et fournis à titre indicatif. Le taux de votre courtier peut différer.',
+        'From': 'De',
+        'To': 'Vers',
+        'Copy': 'Copier',
+        'Refresh': 'Actualiser',
+        'Inverse rate': 'Taux inverse',
+        'Rate source': 'Source du taux',
+        'Last updated': 'Dernière mise à jour',
+        'Live rate': 'Taux en direct',
+        'Saved rate': 'Taux enregistré',
+        'Approximate rate': 'Taux approximatif',
+        'Just now': 'À l’instant',
     };
 
     const FR_GREETING = {
@@ -290,6 +301,7 @@
         ['#converterTab .settings-row-label'],
         ['#converterTab .calc-result-row > span'],
         ['#converterTab .calc-hint'],
+        ['#converterTab .conv-i18n'],
 
         ['.floating-tools-setting-row .settings-row-label'],
         ['.floating-tools-setting-hint'],
@@ -332,6 +344,9 @@
         });
 
         applyGreeting();
+                if (byId('converterTab')) {
+            runConverter();
+        }
     }
 
 
@@ -453,8 +468,9 @@ wrap('switchTab', {
 
         // The exchange rate may have loaded since last time,
         // so recalculate whenever the converter is opened.
-        if (tabName === 'converter') {
+                if (tabName === 'converter') {
             runConverter();
+            loadLiveFx();
         }
     }
 });
@@ -712,80 +728,524 @@ wrap('switchTab', {
         );
     }
 
-
     /* ============================================
-       5b. CURRENCY CONVERTER (₦ <-> $)
+       5b. CURRENCY CONVERTER (₦ · $ · £)
 
-       Uses the rate the app already loads:
-       state.exchangeRate.usdToNgn (the same one the
-       sector bar uses). If it is not available yet,
-       it falls back to 1650, matching the backend
-       fallback in exchangeRate.js, and says so.
+       Rates come from GET {API_BASE}/fx, which is public,
+       so this works whether or not the user is logged in.
 
-       The screen and its Settings row are created
-       here, so index.html does not need editing.
+       Order of trust:
+         1. live      fetched just now from /api/fx
+         2. saved     last good rate kept on this device
+         3. approx    app.js state rate / hardcoded fallback
        ============================================ */
 
-    const CONVERTER_FALLBACK_RATE = 1650;
+    const CONVERTER_FALLBACK_RATE = 1650;   // USD → NGN, last resort
+    const CONVERTER_FALLBACK_GBP = 1.3;     // GBP → USD, last resort
+    const FX_CACHE_KEY = 'gazeFxRates';     // shared with fx-rates.js
+    const CONV_PAIR_KEY = 'gazeConverterPair';
 
-    // 'NGN_USD' = Naira to Dollar, 'USD_NGN' = Dollar to Naira
-    let convDirection = 'NGN_USD';
+    const CONV_CURRENCIES = {
+        NGN: { symbol: '₦', name: 'Naira' },
+        USD: { symbol: '$', name: 'Dollar' },
+        GBP: { symbol: '£', name: 'Pound' }
+    };
+
+    const CONV_QUICK = {
+        NGN: [1000, 10000, 100000, 1000000],
+        USD: [10, 100, 1000, 10000],
+        GBP: [10, 100, 1000, 10000]
+    };
+
+    let convFrom = 'NGN';
+    let convTo = 'USD';
+    let convLive = null;
+    let convLoading = false;
 
 
-    // Money always shows 2 decimals, so $0.61 never rounds to $1.
-    function fmtMoney(value) {
+    // Restore the last pair the user used
+    (function restoreConverterPair() {
 
-        return Number(value).toLocaleString(
-            'en-US',
-            {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }
-        );
+        const saved =
+            String(store.get(CONV_PAIR_KEY) || '').split('_');
+
+        if (
+            CONV_CURRENCIES[saved[0]] &&
+            CONV_CURRENCIES[saved[1]] &&
+            saved[0] !== saved[1]
+        ) {
+            convFrom = saved[0];
+            convTo = saved[1];
+        }
+    })();
+
+
+    // Translates dynamic text (static labels use LANG_TARGETS)
+    function tr(text) {
+
+        return currentLang === 'fr' && FR[text]
+            ? FR[text]
+            : text;
     }
 
 
-    function getUsdToNgnRate() {
+    /* ---------- Rates ---------- */
 
-        const live = Number(
+    function readSavedFx() {
+
+        try {
+            const data = JSON.parse(
+                store.get(FX_CACHE_KEY) || 'null'
+            );
+
+            if (data && data.usdToNgn > 0 && data.gbpToUsd > 0) {
+                return data;
+            }
+        } catch (err) {
+            /* ignore corrupt cache */
+        }
+
+        return null;
+    }
+
+
+    function getConvRates() {
+
+        if (convLive) {
+            return Object.assign({ status: 'live' }, convLive);
+        }
+
+        const saved = readSavedFx();
+
+        if (saved) {
+            return Object.assign({ status: 'saved' }, saved);
+        }
+
+        const fromState = Number(
             typeof state !== 'undefined' && state.exchangeRate
                 ? state.exchangeRate.usdToNgn
                 : NaN
         );
 
-        return live > 0
-            ? { rate: live, approx: false }
-            : { rate: CONVERTER_FALLBACK_RATE, approx: true };
+        return {
+            usdToNgn:
+                fromState > 0
+                    ? fromState
+                    : CONVERTER_FALLBACK_RATE,
+            gbpToUsd: CONVERTER_FALLBACK_GBP,
+            updatedAt: null,
+            status: 'approx'
+        };
+    }
+
+
+    // How many units of this currency equal 1 USD
+    function unitsPerUsd(code, rates) {
+
+        if (code === 'NGN') return rates.usdToNgn;
+        if (code === 'GBP') return 1 / rates.gbpToUsd;
+
+        return 1;
+    }
+
+
+
+   
+    async function loadLiveFx(manual) {
+
+        if (convLoading || typeof API_BASE === 'undefined') {
+            return;
+        }
+
+        convLoading = true;
+
+        const refreshBtn = byId('convRefresh');
+
+        if (refreshBtn) {
+            refreshBtn.classList.add('loading');
+        }
+
+        try {
+
+            const res = await fetch(`${API_BASE}/fx${manual ? '?refresh=1' : ''}`);
+
+            if (!res.ok) {
+                throw new Error(`FX request failed: ${res.status}`);
+            }
+
+            const data = await res.json();
+
+            if (!(data.usdToNgn > 0 && data.gbpToUsd > 0)) {
+                throw new Error('Unexpected FX response');
+            }
+
+            convLive = data;
+            store.set(FX_CACHE_KEY, JSON.stringify(data));
+
+            if (manual && typeof showToast === 'function') {
+                showToast('Rates are up to date', 'success');
+                        }
+
+        } catch (err) {
+
+            console.warn('[converter] live rates unavailable:', err);
+
+            if (manual && typeof showToast === 'function') {
+                showToast('Could not refresh rates', 'warning');
+            }
+
+        } finally {
+
+            convLoading = false;
+
+            if (refreshBtn) {
+                refreshBtn.classList.remove('loading');
+            }
+
+            runConverter();
+        }
+    }
+
+
+    /* ---------- Formatting ---------- */
+
+    // 2 decimals normally, more for very small results
+    function fmtSmart(value) {
+
+        return Number(value).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: value < 0.01 ? 6 : 2
+        });
+    }
+
+
+    function fmtRate(rate) {
+
+        return Number(rate).toLocaleString('en-US', {
+            minimumFractionDigits: rate >= 100 ? 2 : 4,
+            maximumFractionDigits:
+                rate >= 100 ? 2 : rate >= 1 ? 4 : 6
+        });
+    }
+
+
+    function convTimeAgo(iso) {
+
+        const time = new Date(iso).getTime();
+
+        if (!iso || Number.isNaN(time)) {
+            return '—';
+        }
+
+        const mins =
+            Math.max(0, Math.round((Date.now() - time) / 60000));
+
+        const fr = currentLang === 'fr';
+
+        if (mins < 1) {
+            return tr('Just now');
+        }
+
+        if (mins < 60) {
+            return fr
+                ? `il y a ${mins} min`
+                : `${mins} min ago`;
+        }
+
+        const hours = Math.round(mins / 60);
+
+        return fr
+            ? `il y a ${hours} h`
+            : `${hours} h ago`;
+    }
+
+        function convFormatAsOf(iso, absolute) {
+
+        const date = new Date(iso);
+
+        if (Number.isNaN(date.getTime())) {
+            return '—';
+        }
+
+        return absolute
+            ? date.toLocaleString(
+                currentLang === 'fr' ? 'fr-FR' : 'en-GB',
+                { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }
+              )
+            : convTimeAgo(iso);
+    }
+
+
+    // Adds thousands commas while typing and keeps the cursor steady
+    function formatAmountInput(input) {
+
+        const raw = input.value;
+        const caret = input.selectionStart || 0;
+
+        const digitsBeforeCaret =
+            raw.slice(0, caret).replace(/[^\d.]/g, '').length;
+
+        let clean = raw.replace(/[^\d.]/g, '');
+
+        const firstDot = clean.indexOf('.');
+
+        if (firstDot !== -1) {
+            clean =
+                clean.slice(0, firstDot + 1) +
+                clean.slice(firstDot + 1).replace(/\./g, '');
+        }
+
+        const parts = clean.split('.');
+
+        const whole = parts[0]
+            .replace(/^0+(?=\d)/, '')
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+        const out =
+            parts.length > 1
+                ? `${whole}.${parts[1].slice(0, 2)}`
+                : whole;
+
+        input.value = out;
+
+        let pos = 0;
+        let seen = 0;
+
+        while (pos < out.length && seen < digitsBeforeCaret) {
+
+            if (/[\d.]/.test(out[pos])) {
+                seen++;
+            }
+
+            pos++;
+        }
+
+        try {
+            input.setSelectionRange(pos, pos);
+        } catch (err) {
+            /* some browsers block this on certain input types */
+        }
+    }
+
+
+    function parseConvAmount() {
+
+        const value = parseFloat(
+            String(byId('convAmount')?.value || '').replace(/,/g, '')
+        );
+
+        return value > 0 ? value : NaN;
+    }
+
+
+    /* ---------- Rendering ---------- */
+
+    function renderConvQuick() {
+
+        const box = byId('convQuick');
+
+        if (!box) {
+            return;
+        }
+
+        const symbol = CONV_CURRENCIES[convFrom].symbol;
+
+        box.innerHTML = CONV_QUICK[convFrom]
+            .map(value => `
+                <button type="button" class="conv-quick-chip" data-amount="${value}">
+                    ${symbol}${value.toLocaleString('en-US')}
+                </button>
+            `)
+            .join('');
     }
 
 
     function runConverter() {
 
-        const amount = parseFloat(byId('convAmount')?.value);
+        const resultEl = byId('convResult');
 
-        const { rate, approx } = getUsdToNgnRate();
-
-        const toUsd = convDirection === 'NGN_USD';
-        const targetSymbol = toUsd ? '$' : '₦';
-
-        setResult(
-            'convRate',
-            `$1 ${approx ? '≈' : '='} ₦${fmtMoney(rate)}`
-        );
-
-        if (!(amount > 0)) {
-            setResult('convResult', '—');
+        if (!resultEl) {
             return;
         }
 
-        const converted = toUsd
-            ? amount / rate
-            : amount * rate;
+        const rates = getConvRates();
+        const from = CONV_CURRENCIES[convFrom];
+        const to = CONV_CURRENCIES[convTo];
+        const amount = parseConvAmount();
 
-        setResult(
-            'convResult',
-            `${targetSymbol}${fmtMoney(converted)}`
-        );
+        // Symbol next to the input
+        byId('convFromSymbol').textContent = from.symbol;
+
+        // Highlight the active chip on each side
+        document
+            .querySelectorAll('#converterTab [data-conv-side]')
+            .forEach(group => {
+
+                const current =
+                    group.dataset.convSide === 'from'
+                        ? convFrom
+                        : convTo;
+
+                group
+                    .querySelectorAll('[data-code]')
+                    .forEach(chip =>
+                        chip.classList.toggle(
+                            'active',
+                            chip.dataset.code === current
+                        )
+                    );
+            });
+
+        // Rate card
+        const rate =
+            unitsPerUsd(convTo, rates) /
+            unitsPerUsd(convFrom, rates);
+
+        byId('convRate').textContent =
+            `${from.symbol}1 = ${to.symbol}${fmtRate(rate)}`;
+
+        byId('convRateInv').textContent =
+            `${to.symbol}1 = ${from.symbol}${fmtRate(1 / rate)}`;
+
+        const statusLabels = {
+            live: 'Live rate',
+            saved: 'Saved rate',
+            approx: 'Approximate rate'
+        };
+
+        const statusEl = byId('convStatus');
+
+        statusEl.className =
+            `conv-status conv-status-${rates.status}`;
+
+        statusEl.innerHTML =
+            `<i class="conv-dot"></i>${tr(statusLabels[rates.status])}`;
+
+        const asOf = rates.providerUpdatedAt || rates.updatedAt;
+
+        byId('convUpdated').textContent =
+            asOf
+                ? convFormatAsOf(asOf, Boolean(rates.providerUpdatedAt))
+                : '—';
+
+        // Result
+        const copyBtn = byId('convCopy');
+
+        if (!Number.isFinite(amount)) {
+
+            resultEl.textContent = '—';
+            delete resultEl.dataset.value;
+            copyBtn.disabled = true;
+            return;
+        }
+
+        const converted = amount * rate;
+        const next = `${to.symbol}${fmtSmart(converted)}`;
+
+        resultEl.dataset.value =
+            converted >= 1
+                ? converted.toFixed(2)
+                : converted.toFixed(6);
+
+        copyBtn.disabled = false;
+
+        if (resultEl.textContent !== next) {
+
+            resultEl.textContent = next;
+
+            resultEl.classList.remove('conv-pop');
+            void resultEl.offsetWidth;
+            resultEl.classList.add('conv-pop');
+        }
+    }
+
+
+    /* ---------- Actions ---------- */
+
+    function afterConvPairChange() {
+
+        store.set(CONV_PAIR_KEY, `${convFrom}_${convTo}`);
+
+        renderConvQuick();
+        runConverter();
+    }
+
+
+    function setConvCurrency(side, code) {
+
+        if (!CONV_CURRENCIES[code]) {
+            return;
+        }
+
+        // Picking the other side's currency swaps the pair
+        if (side === 'from') {
+
+            if (code === convTo) {
+                convTo = convFrom;
+            }
+
+            convFrom = code;
+
+        } else {
+
+            if (code === convFrom) {
+                convFrom = convTo;
+            }
+
+            convTo = code;
+        }
+
+        afterConvPairChange();
+    }
+
+
+    function swapConvCurrencies() {
+
+        const swapBtn = byId('convSwap');
+
+        if (swapBtn) {
+            swapBtn.classList.toggle('flipped');
+        }
+
+        const previousFrom = convFrom;
+        convFrom = convTo;
+        convTo = previousFrom;
+
+        afterConvPairChange();
+    }
+
+
+    function copyConvResult() {
+
+        const value = byId('convResult')?.dataset.value;
+
+        if (!value || !navigator.clipboard) {
+            return;
+        }
+
+        navigator.clipboard
+            .writeText(value)
+            .then(() => {
+
+                if (typeof showToast === 'function') {
+                    showToast('Copied', 'success');
+                }
+            })
+            .catch(() => { /* clipboard blocked: ignore */ });
+    }
+
+
+    /* ---------- Build the screen ---------- */
+
+    function convChipsHtml() {
+
+        return Object.entries(CONV_CURRENCIES)
+            .map(([code, currency]) => `
+                <button type="button" class="conv-chip" data-code="${code}">
+                    ${currency.symbol} ${code}
+                </button>
+            `)
+            .join('');
     }
 
 
@@ -798,7 +1258,7 @@ wrap('switchTab', {
 
         const calendarTab = byId('calendarTab');
 
-        // The new screen is placed right after the Market Calendar screen.
+        // The new screen goes right after the Market Calendar screen.
         if (!calendarTab) {
             return;
         }
@@ -809,33 +1269,68 @@ wrap('switchTab', {
                     <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
                     <h2 class="settings-title">Currency Converter</h2>
 
-                    <div class="settings-group">
-                        <div class="settings-row settings-row-stack">
-                            <div class="settings-row-top">
-                                <i class="fa-solid fa-right-left settings-row-icon"></i>
-                                <span class="settings-row-label">Convert</span>
+                    <div class="conv-card">
+
+                        <div class="conv-box">
+                            <div class="conv-box-top">
+                                <span class="conv-label conv-i18n">From</span>
+                                <div class="conv-chips" data-conv-side="from" role="group" aria-label="From currency">
+                                    ${convChipsHtml()}
+                                </div>
                             </div>
-                            <div class="segmented two">
-                                <button type="button" class="segmented-btn active" data-conv-dir="NGN_USD">₦ → $</button>
-                                <button type="button" class="segmented-btn" data-conv-dir="USD_NGN">$ → ₦</button>
+
+                            <div class="conv-amount-row">
+                                <span class="conv-symbol" id="convFromSymbol">₦</span>
+                                <input
+                                    type="text"
+                                    id="convAmount"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0"
+                                    aria-label="Amount to convert"
+                                >
                             </div>
                         </div>
 
-                        <label class="settings-row" for="convAmount">
-                            <i class="fa-solid fa-coins settings-row-icon"></i>
-                            <span class="settings-row-label">Amount</span>
-                            <input type="number" id="convAmount" class="settings-row-input" placeholder="1000" inputmode="decimal" step="0.01" min="0">
-                        </label>
+                        <button type="button" class="conv-swap" id="convSwap" aria-label="Swap currencies">⇅</button>
+
+                        <div class="conv-box conv-box-result">
+                            <div class="conv-box-top">
+                                <span class="conv-label conv-i18n">To</span>
+                                <div class="conv-chips" data-conv-side="to" role="group" aria-label="To currency">
+                                    ${convChipsHtml()}
+                                </div>
+                            </div>
+
+                            <div class="conv-result-row">
+                                <strong id="convResult">—</strong>
+                                <button type="button" class="conv-copy conv-i18n" id="convCopy" disabled>Copy</button>
+                            </div>
+                        </div>
+
                     </div>
+
+                    <div class="conv-quick" id="convQuick"></div>
 
                     <div class="calc-results">
                         <div class="calc-result-row calc-main">
-                            <span>Converted</span>
-                            <strong id="convResult">—</strong>
-                        </div>
-                        <div class="calc-result-row">
                             <span>Exchange rate</span>
                             <strong id="convRate">—</strong>
+                        </div>
+                        <div class="calc-result-row">
+                            <span>Inverse rate</span>
+                            <strong id="convRateInv">—</strong>
+                        </div>
+                        <div class="calc-result-row">
+                            <span>Rate source</span>
+                            <strong id="convStatus" class="conv-status">—</strong>
+                        </div>
+                        <div class="calc-result-row">
+                            <span>Rates as of</span>
+                            <strong>
+                                <span id="convUpdated">—</span>
+                                <button type="button" class="conv-refresh conv-i18n" id="convRefresh">Refresh</button>
+                            </strong>
                         </div>
                     </div>
 
@@ -850,6 +1345,7 @@ wrap('switchTab', {
         );
 
         if (calendarRow) {
+
             calendarRow.insertAdjacentHTML('afterend', `
                 <button type="button" class="settings-row settings-link" id="settingsConverterRow">
                     <i class="fa-solid fa-right-left settings-row-icon"></i>
@@ -864,32 +1360,52 @@ wrap('switchTab', {
             );
         }
 
-        // Recalculate as the user types.
-        byId('convAmount').addEventListener('input', runConverter);
+        // Typing
+        byId('convAmount').addEventListener('input', () => {
+            formatAmountInput(byId('convAmount'));
+            runConverter();
+        });
 
-        // Direction buttons.
-        document
-            .querySelectorAll('[data-conv-dir]')
-            .forEach(btn => {
+        // All buttons inside the screen (one listener)
+        byId('converterTab').addEventListener('click', event => {
 
-                btn.addEventListener('click', () => {
+            const chip = event.target.closest('.conv-chip');
 
-                    convDirection = btn.dataset.convDir;
+            if (chip) {
+                setConvCurrency(
+                    chip.closest('[data-conv-side]').dataset.convSide,
+                    chip.dataset.code
+                );
+                return;
+            }
 
-                    document
-                        .querySelectorAll('[data-conv-dir]')
-                        .forEach(b =>
-                            b.classList.toggle(
-                                'active',
-                                b === btn
-                            )
-                        );
+            const quick = event.target.closest('.conv-quick-chip');
 
-                    runConverter();
-                });
-            });
+            if (quick) {
+                byId('convAmount').value =
+                    Number(quick.dataset.amount).toLocaleString('en-US');
+                runConverter();
+                return;
+            }
 
+            if (event.target.closest('#convSwap')) {
+                swapConvCurrencies();
+                return;
+            }
+
+            if (event.target.closest('#convCopy')) {
+                copyConvResult();
+                return;
+            }
+
+            if (event.target.closest('#convRefresh')) {
+                loadLiveFx(true);
+            }
+        });
+
+        renderConvQuick();
         runConverter();
+        loadLiveFx();
     }
 
 
