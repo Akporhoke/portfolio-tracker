@@ -2,6 +2,10 @@
 node_modules/
 # Local testing / diagnostic scripts
 
+resetUsDividends.js
+probeFinnhubDividends.js
+probeUsDividendSources.js
+resetUsDividendState.js
 syncUSDirectory.js
 check-tsla.js
 checkHistoryCoverage.js

@@ -411,10 +411,7 @@ async function getHistoryStatus(
 // ============================================================
 // DAILY HISTORY SYNC
 // ============================================================
-        // Confidence only reads MongoDB now, so this costs no API calls.
-        if (totalFetches > 0) {
-            await runConfidenceCheck();
-        }
+        
 
 
 async function updateHistorySchedulerStatus(update) {
@@ -623,6 +620,11 @@ async function runHistorySync() {
         let alreadyCurrent = 0;
 
         let skipped = 0;
+
+                const expectedByMarket = {
+            NGX: await getExpectedCompletedDate('NGX'),
+            US: await getExpectedCompletedDate('US')
+        };
 
         for (
             const stock of
@@ -1069,6 +1071,14 @@ async function runHistorySync() {
 
                 if (result.requestMade !== false) {
 
+                                        historyCheckLog.set(
+                        `${ticker}|${market}`,
+                        {
+                            expectedDate:
+                                candidate.expectedLatestDate,
+                            at: Date.now()
+                        }
+                    );
                     totalFetches++;
 
                     if (fetchType === 'initial') {
@@ -1414,6 +1424,11 @@ async function runHistorySync() {
 
         console.log('');
 
+                // Confidence only reads MongoDB now, so this costs no API calls.
+        if (totalFetches > 0) {
+            await runConfidenceCheck();
+        }
+
         await updateHistorySchedulerStatus({
             status: 'success',
 
@@ -1733,10 +1748,7 @@ async function runConfidenceCheck() {
         let unchanged = 0;
         let skipped = 0;
         
-                const expectedByMarket = {
-            NGX: await getExpectedCompletedDate('NGX'),
-            US: await getExpectedCompletedDate('US')
-        };
+         
 
         for (const portfolio of portfolios) {
             let portfolioChanged = false;

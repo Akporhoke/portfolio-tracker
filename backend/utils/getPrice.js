@@ -739,6 +739,57 @@ async function getStoredHistoryRows(
     }
 }
 
+async function ensureStoredHistory(
+    ticker,
+    market,
+    minRows = 10,
+    days = 60
+) {
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    const stored =
+        await PriceHistory.countDocuments({
+            ticker: symbol,
+            market: normalizedMarket
+        });
+
+    if (stored >= minRows) {
+        return { fetched: false, count: stored };
+    }
+
+    const result =
+        await getHistoricalProviderStatus(
+            symbol,
+            days,
+            normalizedMarket,
+            null
+        );
+
+    if (
+        result.status === 'available' &&
+        Array.isArray(result.rows) &&
+        result.rows.length > 0
+    ) {
+        await savePriceHistory(
+            symbol,
+            normalizedMarket,
+            result.rows,
+            normalizedMarket === 'US'
+                ? 'twelvedata'
+                : 'investo'
+        );
+    }
+
+    return {
+        fetched: result.requestMade !== false,
+        status: result.status
+    };
+}
+
 // ============================================================
 // PRICE SNAPSHOT
 // ============================================================
@@ -2587,14 +2638,12 @@ async function getQuote(
 // ============================================================
 // EXPORTS
 // ============================================================
-
 module.exports = {
-    getCalendarMonth,
-    refreshCalendarMonth,
-    verifyCalendarMonth,
-    ensureRollingWindow,
-    cleanupOldMonths,
-    monthNeedsAttention,
-    getMismatches,
-    getLastCompletedTradingDate
+    getPrice,
+    getPriceHistory,
+    getStoredHistoryRows,
+    ensureStoredHistory,
+    getInvestoHistory,
+    getHistoricalProviderStatus,
+    getQuote
 };

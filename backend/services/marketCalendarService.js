@@ -540,5 +540,6 @@ module.exports = {
     ensureRollingWindow,
     cleanupOldMonths,
     monthNeedsAttention,
-    getMismatches
+    getMismatches,
+    getLastCompletedTradingDate
 };

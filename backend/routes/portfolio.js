@@ -5,12 +5,13 @@ const ConfidenceSnapshot =
     require('../models/ConfidenceSnapshot');
 const Portfolio = require('../models/portfolio');
 
+
 const {
     getPrice,
     getPriceHistory,
-    getStoredHistoryRows
+    getStoredHistoryRows,
+    ensureStoredHistory
 } = require('../utils/getPrice');
-
 // ============================================================
 // CONFIDENCE SYSTEM SETTINGS
 // ============================================================
@@ -1812,13 +1813,19 @@ router.post(
         portfolio.watchlist.length - 1
     ];
 
-try {
+    try {
+    await ensureStoredHistory(
+        normalizedTicker,
+        normalizedMarket
+    );
+
     await updateWatchlistConfidence(
         portfolio,
         added
     );
 
     await portfolio.save();
+
 
 } catch (error) {
     console.error(
