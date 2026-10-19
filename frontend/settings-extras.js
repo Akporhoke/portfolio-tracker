@@ -440,15 +440,27 @@
         after: syncSettingsProfile
     });
 
+    // Hides/shows the Home portfolio cards directly (no CSS needed)
+    function setPortfolioCardsHidden(hidden) {
 
+        document
+            .querySelectorAll('.quick-stats, .portfolio-card, .mini-cards')
+            .forEach(el => {
+                el.style.display = hidden ? 'none' : '';
+            });
+    }
 // Fill the inputs whenever Settings is opened.
 // Preserve the existing switchTab function from app.js.
 wrap('switchTab', {
     after(tabName) {
+
         document.body.classList.toggle(
             'calendar-tool-open',
             tabName === 'calendar'
         );
+
+        // Hide the portfolio cards while the converter is open
+        setPortfolioCardsHidden(tabName === 'converter');
 
         // Hide Back during normal navigation, but preserve it
         // while a floating tool is opening or Back is returning.
@@ -460,6 +472,8 @@ wrap('switchTab', {
             floatingToolBackButton.style.display = 'none';
             floatingToolReturnTab = null;
         }
+
+        // ...everything below stays exactly as it is
 
         if (tabName === 'settings') {
             fillSettingsInputs();
@@ -474,6 +488,8 @@ wrap('switchTab', {
         }
     }
 });
+
+
 
 
     // Remember the goal on this device. Without this,
@@ -1859,6 +1875,17 @@ function openFloatingTool(tool) {
     }
 }
 
+    };
+
+        // Lets other scripts (like the Home FX card) open a tool with the
+    // animated Back button, exactly like the Floating Tools menu does.
+    window.openGazeTool = function (toolId) {
+
+        const tool = FLOATING_TOOLS[toolId];
+
+        if (tool) {
+            openFloatingTool(tool);
+        }
     };
 
     function getFloatingToolsEnabled() {
