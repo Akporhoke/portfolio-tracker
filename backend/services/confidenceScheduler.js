@@ -23,6 +23,9 @@ const SchedulerStatus =
 
 const portfolioRoutes =
     require('../routes/portfolio');
+    
+const calendarService =
+    require('./marketCalendarService');
 
 // ============================================================
 // CONFIG
@@ -103,6 +106,20 @@ const MAX_HISTORY_FETCHES_PER_RUN = null;
  */
 const HISTORY_RETRY_BASE_MINUTES = 30;
 const HISTORY_RETRY_MAX_MINUTES = 24 * 60;
+
+/*
+ * After a provider check for a given expected date, do not
+ * check that stock again for this long, whether or not the
+ * provider returned the new bar. Stops late-publishing
+ * providers from being polled every 30 minutes.
+ * (In memory for now; Phase 1 makes this persistent.)
+ */
+const HISTORY_RECHECK_AFTER_MS =
+    6 * 60 * 60 * 1000;
+
+const historyCheckLog =
+    new Map();
+
 
 /*
  * Recheck stocks whose historical data is
@@ -246,6 +263,27 @@ function getLatestExpectedCompletedTradingDate(market) {
     );
 }
 
+async function getExpectedCompletedDate(market) {
+    try {
+        const date =
+            await calendarService
+                .getLastCompletedTradingDate(market);
+
+        if (date) {
+            return date;
+        }
+    } catch (error) {
+        console.error(
+            `[ExpectedDate] ${market}:`,
+            error.message
+        );
+    }
+
+    return getLatestExpectedCompletedTradingDate(
+        market
+    );
+}
+
 
 function shiftMarketDate(
     dateString,
@@ -373,6 +411,11 @@ async function getHistoryStatus(
 // ============================================================
 // DAILY HISTORY SYNC
 // ============================================================
+        // Confidence only reads MongoDB now, so this costs no API calls.
+        if (totalFetches > 0) {
+            await runConfidenceCheck();
+        }
+
 
 async function updateHistorySchedulerStatus(update) {
     try {
@@ -380,7 +423,7 @@ async function updateHistorySchedulerStatus(update) {
             {
                 job: 'history_sync'
             },
-            {
+            { 
                 $set: update
             },
             {
@@ -639,11 +682,9 @@ async function runHistorySync() {
              * ----------------------------------------------------
              */
 
-            const expectedLatestDate =
-                getLatestExpectedCompletedTradingDate(
-                    stock.market
-                );
-
+                        const expectedLatestDate =
+                expectedByMarket[stock.market];
+                
             const isCurrent =
                 count > 0 &&
                 latestDate &&
@@ -729,6 +770,30 @@ async function runHistorySync() {
 
                 console.log(
                     `⏳ ${stock.ticker} (${stock.market}) retry deferred until ${new Date(stockRecord.nextRetryAt).toISOString()}`
+                );
+
+                skipped++;
+
+                continue;
+            }
+            
+            
+                        /*
+             * Already checked against this expected date recently?
+             * Do not hit the provider again yet.
+             */
+            const lastCheck =
+                historyCheckLog.get(key);
+
+            if (
+                lastCheck &&
+                lastCheck.expectedDate ===
+                    expectedLatestDate &&
+                Date.now() - lastCheck.at <
+                    HISTORY_RECHECK_AFTER_MS
+            ) {
+                console.log(
+                    `⏳ ${stock.ticker} (${stock.market}) checked recently for ${expectedLatestDate}; not rechecking yet`
                 );
 
                 skipped++;
@@ -1667,6 +1732,11 @@ async function runConfidenceCheck() {
         let recalculated = 0;
         let unchanged = 0;
         let skipped = 0;
+        
+                const expectedByMarket = {
+            NGX: await getExpectedCompletedDate('NGX'),
+            US: await getExpectedCompletedDate('US')
+        };
 
         for (const portfolio of portfolios) {
             let portfolioChanged = false;

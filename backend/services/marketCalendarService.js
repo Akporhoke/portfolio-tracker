@@ -442,6 +442,97 @@ async function getMismatches() {
 }
 
 
+/* ============================================================
+   LAST COMPLETED TRADING DATE
+   ============================================================ */
+
+const MARKET_TZ = {
+    NGX: 'Africa/Lagos',
+    US: 'America/New_York'
+};
+
+// Used when a calendar day has no stored session close.
+// NGX session times are intentionally empty in the calendar.
+const CLOSE_FALLBACK = {
+    NGX: '14:30',
+    US: '16:00'
+};
+
+// Providers publish the day's bar some time after the close
+const PUBLISH_BUFFER_MINUTES = 60;
+
+function marketLocalNow(market, now = new Date()) {
+    const parts = new Intl.DateTimeFormat(
+        'en-CA',
+        {
+            timeZone: MARKET_TZ[market],
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hourCycle: 'h23'
+        }
+    ).formatToParts(now);
+
+    const v = {};
+
+    for (const part of parts) {
+        v[part.type] = part.value;
+    }
+
+    return {
+        date: `${v.year}-${v.month}-${v.day}`,
+        minutes: Number(v.hour) * 60 + Number(v.minute)
+    };
+}
+
+function toMinutes(hhmm) {
+    const [h, m] = String(hhmm).split(':').map(Number);
+    return h * 60 + m;
+}
+
+// Returns a date string, or null when the calendar has no data
+// (the caller then falls back to its own weekday logic).
+async function getLastCompletedTradingDate(
+    market,
+    now = new Date()
+) {
+    const m = market === 'US' ? 'US' : 'NGX';
+
+    const local = marketLocalNow(m, now);
+
+    const docs =
+        await MarketCalendar.find({
+            market: m,
+            date: { $lte: local.date },
+            status: { $ne: 'closed' }
+        })
+            .sort({ date: -1 })
+            .limit(5)
+            .lean();
+
+    for (const doc of docs) {
+        if (doc.date < local.date) {
+            return doc.date;
+        }
+
+        // Today only counts after close + publish buffer
+        const close =
+            (doc.session && doc.session.close) ||
+            CLOSE_FALLBACK[m];
+
+        if (
+            local.minutes >=
+            toMinutes(close) + PUBLISH_BUFFER_MINUTES
+        ) {
+            return doc.date;
+        }
+    }
+
+    return null;
+}
+
 module.exports = {
     getCalendarMonth,
     refreshCalendarMonth,

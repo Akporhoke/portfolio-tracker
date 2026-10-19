@@ -7,9 +7,9 @@ const Portfolio = require('../models/portfolio');
 
 const {
     getPrice,
-    getPriceHistory
+    getPriceHistory,
+    getStoredHistoryRows
 } = require('../utils/getPrice');
-
 
 // ============================================================
 // CONFIDENCE SYSTEM SETTINGS
@@ -899,7 +899,7 @@ async function buildWatchlistConfidence(stock, userId) {
     let history = [];
 
     try {
-        history = await getPriceHistory(ticker, 60, market);
+        history = await getStoredHistoryRows(ticker, market, 60);
     } catch (error) {
         console.error(
             `[Confidence] Failed history for ${ticker}:`,
@@ -2249,10 +2249,8 @@ router.post(
             // Get current market price
             // ------------------------------------------------
 
-            let sellPrice =
-                Number(
-                    stock.currentPrice
-                );
+                        // Only a fresh price may be used as the sell price
+            let sellPrice = null;
 
             try {
                 const livePrice =
@@ -2281,17 +2279,16 @@ router.post(
             // ------------------------------------------------
             // Require a valid selling price
             // ------------------------------------------------
-
             if (
                 !isValidPrice(
                     sellPrice
                 )
             ) {
-                return res.status(400).json({
+                return res.status(503).json({
                     error:
-                        'Unable to determine a valid sell price'
+                        'Live price unavailable right now. Please try again in a moment.'
                 });
-            }
+            } 
 
             const buyPrice =
                 Number(

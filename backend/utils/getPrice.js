@@ -655,6 +655,90 @@ async function getStoredPriceHistory(
     }
 }
 
+
+// ============================================================
+// STORED HISTORY ONLY (never calls a provider)
+// ============================================================
+
+async function getStoredHistoryRows(
+    ticker,
+    market,
+    days = 60,
+    endDate = null
+) {
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    const safeDays =
+        Math.min(
+            Math.max(
+                Number(days) || 60,
+                1
+            ),
+            365
+        );
+
+    const end =
+        endDate
+            ? dateOnly(endDate)
+            : todayStr();
+
+    if (!end) {
+        return [];
+    }
+
+    const start =
+        subtractDays(
+            end,
+            Math.max(30, safeDays * 3)
+        );
+
+    try {
+        const rows =
+            await PriceHistory.find({
+                ticker: symbol,
+                market: normalizedMarket,
+                date: {
+                    $gte: start,
+                    $lte: end
+                }
+            })
+                .sort({ date: 1 })
+                .lean();
+
+        const normalized =
+            normalizeHistoricalRows(rows)
+                .slice(-safeDays);
+
+        if (normalized.length > 0) {
+            return normalized;
+        }
+
+        // Same fallback the old path had: real snapshots
+        // Gaze observed itself (NGX only)
+        if (normalizedMarket === 'NGX') {
+            return await getSnapshotHistory(
+                symbol,
+                safeDays,
+                end
+            );
+        }
+
+        return [];
+
+    } catch (error) {
+        console.error(
+            `[getStoredHistoryRows] ${symbol}:`,
+            error.message
+        );
+
+        return [];
+    }
+}
+
 // ============================================================
 // PRICE SNAPSHOT
 // ============================================================
@@ -1500,9 +1584,10 @@ async function getTwelveDataHistory(
             calendarWindow
         );
 
-    // Shared cache for all history lengths.
+        // Cached per history length so a short fetch never
+    // serves a longer request.
     const cacheKey =
-        `twelvedata-history:${symbol}:${end}`;
+        `twelvedata-history:${symbol}:${safeDays}:${end}`;
 
     if (!forceRefresh) {
     const cached =
@@ -1527,8 +1612,8 @@ async function getTwelveDataHistory(
     // Request deduplication
     // --------------------------------------------------------
 
-    const inFlightKey =
-        `twelvedata-history:${symbol}:${end}`;
+        const inFlightKey =
+        `twelvedata-history:${symbol}:${safeDays}:${end}`;
 
     const existingRequest =
         twelveDataInFlight.get(
@@ -2504,9 +2589,12 @@ async function getQuote(
 // ============================================================
 
 module.exports = {
-    getPrice,
-    getPriceHistory,
-    getInvestoHistory,
-    getHistoricalProviderStatus,
-    getQuote
+    getCalendarMonth,
+    refreshCalendarMonth,
+    verifyCalendarMonth,
+    ensureRollingWindow,
+    cleanupOldMonths,
+    monthNeedsAttention,
+    getMismatches,
+    getLastCompletedTradingDate
 };
