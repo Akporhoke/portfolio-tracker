@@ -3,7 +3,7 @@ const PriceSnapshot = require('../models/PriceSnapshot');
 const PriceHistory = require('../models/PriceHistory');
 const ProviderState = require('../models/ProviderState');
 const providerBudget = require('../services/providerBudget');
-
+const quoteStore = require('../services/quoteStore');
 
 
 // ============================================================
@@ -27,6 +27,21 @@ const COMPANY_LIST_CACHE_TTL =
 
 const priceCache = new Map();
 const historyCache = new Map();
+
+// Symbols whose last price lookup failed: do not retry until this time
+const priceFailCache = new Map();
+
+const PRICE_FAIL_TTL =
+    (Number(process.env.PRICE_FAIL_CACHE_SECONDS) || 60) * 1000;
+
+// Source details for the price held in priceCache
+const priceMetaCache = new Map();
+
+// Details a provider supplies about a quote, e.g. "US:AAPL" -> { sourceTimestamp }
+const quoteMeta = new Map();
+
+// After a failed or empty NGN Market list, do not retry until this time
+let companyListFailUntil = 0;
 
 // Prevent duplicate Twelve Data requests
 const twelveDataInFlight = new Map();
@@ -885,6 +900,12 @@ async function getNGNMarketCompanies() {
         return companyListRequest;
     }
 
+        // Last attempt failed or came back empty: do not retry yet
+    if (Date.now() < companyListFailUntil) {
+        return companyListCache || [];
+    }
+    
+
     companyListRequest =
         (async () => {
             try {
@@ -1025,7 +1046,17 @@ await activateNGNMarketQuotaCooldown();
             }
         })();
 
+            companyListRequest
+        .then(list => {
+            companyListFailUntil =
+                Array.isArray(list) && list.length > 0
+                    ? 0
+                    : Date.now() + PRICE_FAIL_TTL;
+        })
+        .catch(() => {});
+
     return companyListRequest;
+
 }
 
 // ============================================================
@@ -1381,6 +1412,19 @@ async function fetchFinnhubPrice(
         getFinnhubToken();
 
     if (!token) {
+
+                // Finnhub's "t" is the Unix time (seconds) of the last trade
+        const tradeTime = Number(response.data?.t);
+
+        if (Number.isFinite(tradeTime) && tradeTime > 0) {
+            quoteMeta.set(
+                `US:${symbol}`,
+                { sourceTimestamp: new Date(tradeTime * 1000) }
+            );
+        } else {
+            quoteMeta.delete(`US:${symbol}`);
+        }
+
         console.error(
             '❌ FINNHUB_API_KEY is missing from .env'
         );
@@ -2633,7 +2677,7 @@ async function getPriceHistory(
 // CURRENT PRICE
 // ============================================================
 
-async function getPrice(
+async function getPriceWithMeta(
     ticker,
     market = 'NGX'
 ) {
@@ -2646,6 +2690,17 @@ async function getPrice(
     const cacheKey =
         `price:${normalizedMarket}:${symbol}`;
 
+    const none = {
+        price: null,
+        source: null,
+        sourceTimestamp: null,
+        fetchedAt: null
+    };
+
+    // --------------------------------------------------------
+    // Fresh enough in memory
+    // --------------------------------------------------------
+
     const cached =
         cacheGet(
             priceCache,
@@ -2657,10 +2712,33 @@ async function getPrice(
             `✓ Cached ${normalizedMarket} price for ${symbol}: ${cached}`
         );
 
-        return cached;
+        const meta =
+            priceMetaCache.get(cacheKey) || {};
+
+        return {
+            price: cached,
+            source: meta.source || null,
+            sourceTimestamp: meta.sourceTimestamp || null,
+            fetchedAt: meta.fetchedAt || null
+        };
+    }
+
+    // --------------------------------------------------------
+    // Failed a moment ago: do not ask the providers again yet
+    // --------------------------------------------------------
+
+    const failedUntil =
+        priceFailCache.get(cacheKey);
+
+    if (
+        failedUntil &&
+        failedUntil > Date.now()
+    ) {
+        return none;
     }
 
     let price = null;
+    let source = null;
 
     // --------------------------------------------------------
     // US
@@ -2669,6 +2747,8 @@ async function getPrice(
     if (
         normalizedMarket === 'US'
     ) {
+        source = 'finnhub';
+
         price =
             await getFinnhubPrice(
                 symbol
@@ -2680,12 +2760,16 @@ async function getPrice(
     // --------------------------------------------------------
 
     else {
+        source = 'ngnmarket';
+
         price =
             await getNGNMarketPrice(
                 symbol
             );
 
         if (!isValidPrice(price)) {
+            source = 'investo';
+
             price =
                 await getInvestoCurrentPrice(
                     symbol
@@ -2693,9 +2777,21 @@ async function getPrice(
         }
     }
 
+    // --------------------------------------------------------
+    // Success: remember it in memory and in MongoDB
+    // --------------------------------------------------------
+
     if (isValidPrice(price)) {
         const numericPrice =
             Number(price);
+
+        const fetchedAt =
+            new Date();
+
+        const sourceTimestamp =
+            (quoteMeta.get(
+                `${normalizedMarket}:${symbol}`
+            ) || {}).sourceTimestamp || null;
 
         cacheSet(
             priceCache,
@@ -2704,37 +2800,121 @@ async function getPrice(
             PRICE_CACHE_TTL
         );
 
-        return numericPrice;
+        priceMetaCache.set(
+            cacheKey,
+            {
+                source,
+                sourceTimestamp,
+                fetchedAt
+            }
+        );
+
+        priceFailCache.delete(cacheKey);
+
+        // Not awaited on purpose: saving must never slow a lookup
+        void quoteStore.saveQuote({
+            ticker: symbol,
+            market: normalizedMarket,
+            price: numericPrice,
+            source,
+            sourceTimestamp
+        });
+
+        return {
+            price: numericPrice,
+            source,
+            sourceTimestamp,
+            fetchedAt
+        };
     }
+
+    // --------------------------------------------------------
+    // Failure: remember it briefly
+    // --------------------------------------------------------
+
+    priceFailCache.set(
+        cacheKey,
+        Date.now() + PRICE_FAIL_TTL
+    );
+
+    void quoteStore.noteFailure({
+        ticker: symbol,
+        market: normalizedMarket,
+        error: 'no price returned by providers'
+    });
 
     console.warn(
         `⚠️ No real ${normalizedMarket} price available for ${symbol}`
     );
 
-    return null;
+    return none;
+}
+
+
+async function getPrice(
+    ticker,
+    market = 'NGX'
+) {
+    const result =
+        await getPriceWithMeta(
+            ticker,
+            market
+        );
+
+    return result.price;
 }
 
 // ============================================================
-// QUOTE ALIAS
+// QUOTE (price plus where it came from)
 // ============================================================
 
 async function getQuote(
     ticker,
     market = 'NGX'
 ) {
-    const price =
-        await getPrice(
-            ticker,
-            market
+    const symbol =
+        normalizeTicker(ticker);
+
+    const normalizedMarket =
+        normalizeMarket(market);
+
+    const live =
+        await getPriceWithMeta(
+            symbol,
+            normalizedMarket
         );
 
-    return {
-        ticker:
-            normalizeTicker(ticker),
-        market:
-            normalizeMarket(market),
-        price
+    const quote = {
+        ticker: symbol,
+        market: normalizedMarket,
+        price: live.price,
+        source: live.source,
+        sourceTimestamp: live.sourceTimestamp,
+        fetchedAt: live.fetchedAt
     };
+
+    // No live price: say so, and show the last one we really had
+    if (live.price === null) {
+        const stored =
+            await quoteStore.getStoredQuote(
+                symbol,
+                normalizedMarket
+            );
+
+        if (
+            stored &&
+            isValidPrice(stored.price)
+        ) {
+            quote.lastKnown = {
+                price: stored.price,
+                source: stored.source,
+                sourceTimestamp: stored.sourceTimestamp,
+                fetchedAt: stored.fetchedAt
+            };
+        }
+    }
+
+    return quote;
 }
 
 // ============================================================
@@ -2742,6 +2922,7 @@ async function getQuote(
 // ============================================================
 module.exports = {
     getPrice,
+    getPriceWithMeta,
     getPriceHistory,
     getStoredHistoryRows,
     ensureStoredHistory,

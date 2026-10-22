@@ -12,6 +12,11 @@ const {
     getStoredHistoryRows,
     ensureStoredHistory
 } = require('../utils/getPrice');
+const quoteStore =
+    require('../services/quoteStore');
+
+const calendarService =
+    require('../services/marketCalendarService');
 // ============================================================
 // CONFIDENCE SYSTEM SETTINGS
 // ============================================================
@@ -1207,7 +1212,79 @@ router.get(
 
 
 
+// ============================================================
+// PRICE FRESHNESS HELPERS
+// ============================================================
 
+const refreshInFlight = new Set();
+
+
+async function safeMarketState(market) {
+    try {
+        return await calendarService.getMarketState(market);
+    } catch (error) {
+        console.error(
+            `[Portfolio] market state failed for ${market}:`,
+            error.message
+        );
+
+        return {
+            market,
+            isOpen: false,
+            localDate: null,
+            lastSessionDate: null,
+            lastCloseMinutes: 0
+        };
+    }
+}
+
+
+// Refresh prices after the reply has been sent, four at a time.
+// getPrice() goes through the cache and the quota budgeter.
+function refreshInBackground(items) {
+    const queue =
+        items.filter(item => {
+            const key =
+                `${item.market}|${item.ticker}`;
+
+            if (refreshInFlight.has(key)) {
+                return false;
+            }
+
+            refreshInFlight.add(key);
+
+            return true;
+        });
+
+    if (queue.length === 0) {
+        return;
+    }
+
+    const workers =
+        Array.from({ length: 4 }, async () => {
+            while (queue.length > 0) {
+                const item = queue.shift();
+
+                try {
+                    await getPrice(
+                        item.ticker,
+                        item.market
+                    );
+                } catch (error) {
+                    console.error(
+                        `[Portfolio] background price ${item.ticker}:`,
+                        error.message
+                    );
+                } finally {
+                    refreshInFlight.delete(
+                        `${item.market}|${item.ticker}`
+                    );
+                }
+            }
+        });
+
+    Promise.all(workers).catch(() => {});
+}
 
 
 // ============================================================
@@ -1226,115 +1303,132 @@ router.get(
                     userId
                 });
 
-            // ------------------------------------------------
             // Create portfolio if it doesn't exist
-            // ------------------------------------------------
-
             if (!portfolio) {
                 portfolio =
                     new Portfolio({
                         userId,
-
                         stocks: [],
-
                         watchlist: [],
-
                         sold: [],
-
                         activity: [],
-
                         settings: {
-                            goalAmount:
-                                1000000,
-
-                            displayCurrency:
-                                'NGN'
+                            goalAmount: 1000000,
+                            displayCurrency: 'NGN'
                         }
                     });
 
                 await portfolio.save();
             }
 
-            // ------------------------------------------------
-            // Refresh live prices
-            // ------------------------------------------------
+            // --------------------------------------------------
+            // Stored prices: one query, no provider calls
+            // --------------------------------------------------
 
-            const collections = [
-                portfolio.stocks,
-                portfolio.watchlist
-            ];
+            const items = [];
 
             for (
-                const collection of
-                collections
+                const list of
+                [portfolio.stocks, portfolio.watchlist]
             ) {
-                if (
-                    !Array.isArray(collection)
-                ) {
+                if (!Array.isArray(list)) {
                     continue;
                 }
 
-                for (
-                    const stock of
-                    collection
-                ) {
+                for (const stock of list) {
                     if (!stock) {
                         continue;
                     }
 
-                    try {
-                        const ticker =
-                            normalizeTicker(
-                                stock.ticker
-                            );
-
-                        const market =
-                            normalizeMarket(
-                                stock.market
-                            );
-
-                        const currentPrice =
-                            await getPrice(
-                                ticker,
-                                market
-                            );
-
-                        if (
-                            isValidPrice(
-                                currentPrice
-                            )
-                        ) {
-                            stock.currentPrice =
-                                Number(
-                                    currentPrice
-                                );
-                        }
-
-                    } catch (error) {
-                        console.error(
-                            `[Price] ${stock.ticker}:`,
-                            error.message
-                        );
-                    }
+                    items.push({
+                        ticker: normalizeTicker(stock.ticker),
+                        market: normalizeMarket(stock.market)
+                    });
                 }
             }
-// ------------------------------------------------
-// Confidence
-// ------------------------------------------------
-//
-// Confidence is calculated when a stock is added
-// and updated by the appropriate write flow.
-// Do NOT recalculate it during GET requests.
-//
-// This prevents duplicate confidence calculations
-// whenever the frontend loads the portfolio.
 
-            // ------------------------------------------------
-            // Return clean JSON
-            // ------------------------------------------------
+            const quotes =
+                await quoteStore.getStoredQuotes(items);
+
+            const states = {
+                NGX: await safeMarketState('NGX'),
+                US: await safeMarketState('US')
+            };
 
             const result =
                 portfolio.toObject();
+
+            const needRefresh =
+                new Map();
+
+            const decorate = list => {
+                for (const stock of list || []) {
+                    const ticker =
+                        normalizeTicker(stock.ticker);
+
+                    const market =
+                        normalizeMarket(stock.market);
+
+                    const quote =
+                        quotes.get(`${ticker}|${market}`);
+
+                    const state =
+                        states[market] || states.NGX;
+
+                    if (quote && isValidPrice(quote.price)) {
+                        stock.currentPrice =
+                            Number(quote.price);
+                    }
+
+                    const assessed =
+                        calendarService.assessQuote(
+                            market,
+                            quote,
+                            state
+                        );
+
+                    let status =
+                        assessed.status;
+
+                    // Only the price saved when the stock was added
+                    if (
+                        status === 'unavailable' &&
+                        isValidPrice(stock.currentPrice)
+                    ) {
+                        status = 'stale';
+                    }
+
+                    stock.priceStatus = status;
+
+                    stock.priceAsOf =
+                        quote && quote.fetchedAt
+                            ? quote.fetchedAt
+                            : null;
+
+                    stock.priceSource =
+                        quote && quote.source
+                            ? quote.source
+                            : null;
+
+                    stock.priceSourceTimestamp =
+                        quote && quote.sourceTimestamp
+                            ? quote.sourceTimestamp
+                            : null;
+
+                    if (assessed.shouldRefresh) {
+                        needRefresh.set(
+                            `${market}|${ticker}`,
+                            { ticker, market }
+                        );
+                    }
+                }
+            };
+
+            decorate(result.stocks);
+            decorate(result.watchlist);
+
+            // Confidence is NOT recalculated here (see the note in
+            // the add/watchlist routes).
 
             res.json({
                 portfolio:
@@ -1350,8 +1444,17 @@ router.get(
                     result.activity || [],
 
                 settings:
-                    result.settings || {}
+                    result.settings || {},
+
+                meta: {
+                    pricesRefreshing: needRefresh.size
+                }
             });
+
+            // After the reply: refresh whatever is due
+            refreshInBackground(
+                Array.from(needRefresh.values())
+            );
 
         } catch (error) {
             console.error(

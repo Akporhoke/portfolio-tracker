@@ -99,7 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     syncCurrencyToggleUI();
 
-    setInterval(fetchAllData, REFRESH_INTERVAL);
+    setInterval(
+        () => fetchAllData({ background: true }),
+        REFRESH_INTERVAL
+    );
 });
 
 
@@ -1191,16 +1194,265 @@ function getConfidenceBreakdown(stock) {
 
 
 /* ============================================
+   PRICE FRESHNESS
+   ============================================ */
+
+function ensurePriceFreshnessStyles() {
+
+    if (document.getElementById('priceFreshnessStyles')) {
+        return;
+    }
+
+    const style = document.createElement('style');
+    style.id = 'priceFreshnessStyles';
+
+    style.textContent = `
+        .price-freshness {
+            margin: 2px 0 0;
+            font-size: 10px;
+            line-height: 1.2;
+            text-align: right;
+            white-space: nowrap;
+            color: #999;
+        }
+
+        .price-freshness.price-fresh {
+            color: #059669;
+        }
+
+        .price-freshness.price-delayed {
+            color: #d97706;
+        }
+
+        .price-freshness.price-stale,
+        .price-freshness.price-unavailable {
+            color: #dc2626;
+        }
+
+        .price-freshness.price-closed,
+        .price-freshness.price-cached {
+            color: #999;
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+
+function formatPriceAge(dateValue) {
+
+    const time = new Date(dateValue).getTime();
+
+    if (!Number.isFinite(time)) {
+        return '';
+    }
+
+    const minutes =
+        Math.max(0, Math.round((Date.now() - time) / 60000));
+
+    if (minutes < 1) {
+        return 'just now';
+    }
+
+    if (minutes < 60) {
+        return `${minutes}m ago`;
+    }
+
+    const hours = Math.floor(minutes / 60);
+
+    if (hours < 24) {
+        return `${hours}h ago`;
+    }
+
+    return `${Math.floor(hours / 24)}d ago`;
+}
+
+
+function formatPriceTime(dateValue) {
+
+    const d = new Date(dateValue);
+
+    if (Number.isNaN(d.getTime())) {
+        return '';
+    }
+
+    return d.toLocaleString(
+        'en-US',
+        {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        }
+    );
+}
+
+
+// Small label shown under a price. Returns '' when the server did not
+// send freshness information (for example an old saved copy).
+function priceFreshnessHtml(stock) {
+
+    if (!stock || !stock.priceStatus) {
+        return '';
+    }
+
+    ensurePriceFreshnessStyles();
+
+    const status = stock.priceStatus;
+
+    const age =
+        stock.priceAsOf
+            ? formatPriceAge(stock.priceAsOf)
+            : '';
+
+    let cls = status;
+    let text = '';
+
+    if (!state.pricesFromServer) {
+
+        // Showing prices saved on this device, not yet confirmed
+        cls = 'cached';
+        text = age ? `Saved · ${age}` : 'Saved price';
+
+    } else if (status === 'fresh') {
+
+        text = age ? `Updated ${age}` : 'Updated';
+
+    } else if (status === 'delayed') {
+
+        text = age ? `Delayed · ${age}` : 'Delayed';
+
+    } else if (status === 'closed') {
+
+        text = 'Market closed';
+
+    } else if (status === 'stale') {
+
+        text = age ? `Stale · ${age}` : 'Price may be out of date';
+
+    } else if (status === 'unavailable') {
+
+        text = 'Price unavailable';
+
+    } else {
+
+        return '';
+    }
+
+    const details = [];
+
+    if (stock.priceSource) {
+        details.push(`Source: ${stock.priceSource}`);
+    }
+
+    if (stock.priceAsOf) {
+        details.push(`Fetched: ${formatPriceTime(stock.priceAsOf)}`);
+    }
+
+    if (stock.priceSourceTimestamp) {
+        details.push(
+            `Last trade: ${formatPriceTime(stock.priceSourceTimestamp)}`
+        );
+    }
+
+    return `<p class="price-freshness price-${escapeHtml(cls)}" ` +
+           `title="${escapeHtml(details.join(' | '))}">` +
+           `${escapeHtml(text)}</p>`;
+}
+
+
+// True while the user has a panel or popup open (so an automatic refresh
+// must not rebuild the lists underneath them)
+function isUserInteractingWithLists() {
+
+    if (document.querySelector('.watchlist-analysis.active')) {
+        return true;
+    }
+
+    return [
+        'addStockModal',
+        'confirmModal',
+        'marketModal',
+        'stockDetailModal'
+    ].some(id => {
+        const el = document.getElementById(id);
+        return Boolean(el && el.classList.contains('active'));
+    });
+}
+
+
+// After a reply, the server may still be refreshing some prices.
+// Check again shortly, twice at most, then wait for the regular refresh.
+let priceFollowUpTimer = null;
+let priceFollowUpCount = 0;
+
+const PRICE_FOLLOW_UP_DELAYS = [8000, 20000];
+
+function schedulePriceFollowUp(pending) {
+
+    clearTimeout(priceFollowUpTimer);
+
+    if (!pending || pending < 1 || document.hidden) {
+        priceFollowUpCount = 0;
+        return;
+    }
+
+    if (priceFollowUpCount >= PRICE_FOLLOW_UP_DELAYS.length) {
+        return;
+    }
+
+    const delay = PRICE_FOLLOW_UP_DELAYS[priceFollowUpCount];
+
+    priceFollowUpCount++;
+
+    priceFollowUpTimer = setTimeout(
+        () => {
+            fetchAllData({ background: true, followUp: true });
+        },
+        delay
+    );
+}
+
+
+// Coming back to the tab: refresh if the last refresh was over a minute ago
+document.addEventListener(
+    'visibilitychange',
+    () => {
+
+        if (document.hidden) {
+            return;
+        }
+
+        const last =
+            state.lastUpdated
+                ? new Date(state.lastUpdated).getTime()
+                : 0;
+
+        if (Date.now() - last > 60000) {
+            fetchAllData({ background: true });
+        }
+    }
+);
+
+
+/* ============================================
    API CALLS
    ============================================ */
 
-async function fetchAllData() {
+async function fetchAllData(options = {}) {
 
     if (!state.isOnline) {
         return;
     }
 
-    showSyncIndicator(true);
+    const isFollowUp = Boolean(options && options.followUp);
+    const isBackground = Boolean(options && options.background);
+
+    // A regular refresh restarts the follow-up count
+    if (!isFollowUp) {
+        priceFollowUpCount = 0;
+        showSyncIndicator(true);
+    }
 
 
     try {
@@ -1227,35 +1479,12 @@ async function fetchAllData() {
             await portfolioRes.json();
 
 
-        /*
-         * IMPORTANT:
-         *
-         * Backend returns the portfolio document
-         * directly:
-         *
-         * {
-         *   userId,
-         *   stocks: [],
-         *   watchlist: [],
-         *   sold: [],
-         *   activity: [],
-         *   settings: {}
-         * }
-         *
-         * The frontend state uses:
-         *
-         * state.portfolio.stocks
-         * state.watchlist.stocks
-         * state.sold.stocks
-         */
-
-
         state.portfolio = {
-    stocks:
-        Array.isArray(data.portfolio)
-            ? data.portfolio
-            : []
-};
+            stocks:
+                Array.isArray(data.portfolio)
+                    ? data.portfolio
+                    : []
+        };
 
 
         state.watchlist = {
@@ -1297,9 +1526,10 @@ async function fetchAllData() {
         }
 
 
-        /*
-         * Save the correctly structured state.
-         */
+        // These prices now come from the server, not from the saved copy
+        state.pricesFromServer = true;
+
+
         saveToLocalStorage();
 
 
@@ -1322,6 +1552,12 @@ async function fetchAllData() {
         );
 
 
+        // The server may still be refreshing some prices: look again shortly
+        schedulePriceFollowUp(
+            data.meta && data.meta.pricesRefreshing
+        );
+
+
     } catch (err) {
 
         console.error(
@@ -1329,10 +1565,12 @@ async function fetchAllData() {
             err
         );
 
-        showToast(
-            'Failed to load portfolio data',
-            'error'
-        );
+        if (!isFollowUp) {
+            showToast(
+                'Failed to load portfolio data',
+                'error'
+            );
+        }
 
 
     } finally {
@@ -1342,7 +1580,12 @@ async function fetchAllData() {
         state.initialLoadComplete =
             true;
 
-        updateUI();
+        // Automatic refresh while something is open: update the numbers
+        // but do not rebuild the lists
+        updateUI({
+            skipListRender:
+                isBackground && isUserInteractingWithLists()
+        });
 
         state.lastUpdated =
             new Date();
@@ -3303,6 +3546,35 @@ async function fetchAndDisplayStockStats(
                 data.changePercent
             );
 
+        const extraRows = [];
+
+        if (data.fetchedAt) {
+            extraRows.push(['As of', formatPriceTime(data.fetchedAt)]);
+        }
+
+        if (data.sourceTimestamp) {
+            extraRows.push(['Last trade', formatPriceTime(data.sourceTimestamp)]);
+        }
+
+        if (
+            data.price == null &&
+            data.lastKnown &&
+            data.lastKnown.price != null
+        ) {
+            extraRows.push([
+                'Last known',
+                `${currencySign}${formatNumber(data.lastKnown.price)} ` +
+                `(${formatPriceTime(data.lastKnown.fetchedAt)})`
+            ]);
+        }
+
+        const extraRowsHtml = extraRows.map(([label, value]) => `
+            <div class="stat-row">
+                <span class="stat-label">${escapeHtml(label)}</span>
+                <span class="stat-value">${escapeHtml(value)}</span>
+            </div>
+        `).join('');
+
 
         const statsHtml = `
 
@@ -3407,6 +3679,8 @@ async function fetchAndDisplayStockStats(
                 </span>
 
             </div>
+
+            ${extraRowsHtml}
         `;
 
 
@@ -3810,7 +4084,7 @@ function renderSkeletons() {
    UI RENDERING
    ============================================ */
 
-function updateUI() {
+function updateUI(options = {}) {
 
     updateHeader();
 
@@ -3822,6 +4096,12 @@ function updateUI() {
 
 
     renderActivity();
+        // Automatic refresh while the user has something open: keep the numbers
+    // above up to date, but do not rebuild the lists (it would close panels)
+    if (options && options.skipListRender) {
+        return;
+    }
+
 
 
     if (
@@ -5603,6 +5883,8 @@ function renderWatchlist() {
                                     >
                                         ${changeLabel}
                                     </p>
+
+                                     ${priceFreshnessHtml(stock)}
 
                                 </div>
 
@@ -7472,6 +7754,8 @@ function renderPortfolio() {
 
                                 </p>
 
+                              ${priceFreshnessHtml(stock)}
+
                             </div>
 
 
@@ -7796,8 +8080,12 @@ function renderMarketStockList(
 
                                 </p>
 
+                                ${priceFreshnessHtml(stock)}
+
+
                             </div>
 
+                            
 
                             <div class="stock-actions">
 

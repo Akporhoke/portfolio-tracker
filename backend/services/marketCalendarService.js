@@ -533,6 +533,159 @@ async function getLastCompletedTradingDate(
     return null;
 }
 
+/* ============================================================
+   MARKET STATE AND PRICE FRESHNESS
+   ============================================================ */
+
+const OPEN_FALLBACK = {
+    NGX: '10:00',
+    US: '09:30'
+};
+
+// How old a price may get before it is refreshed / labelled (minutes)
+const REFRESH_MINUTES = { NGX: 5, US: 2 };
+const FRESH_MINUTES = { NGX: 10, US: 5 };
+const DELAYED_MINUTES = { NGX: 30, US: 30 };
+
+
+async function getMarketState(market, now = new Date()) {
+    const m = market === 'US' ? 'US' : 'NGX';
+
+    const local = marketLocalNow(m, now);
+
+    const todayDoc =
+        await MarketCalendar.findOne({
+            market: m,
+            date: local.date
+        }).lean();
+
+    const tradingToday =
+        todayDoc
+            ? todayDoc.status !== 'closed'
+            : !dates.isWeekend(local.date);
+
+    const openMinutes =
+        toMinutes(
+            (todayDoc && todayDoc.session && todayDoc.session.open) ||
+            OPEN_FALLBACK[m]
+        );
+
+    const closeMinutes =
+        toMinutes(
+            (todayDoc && todayDoc.session && todayDoc.session.close) ||
+            CLOSE_FALLBACK[m]
+        );
+
+    const isOpen =
+        tradingToday &&
+        local.minutes >= openMinutes &&
+        local.minutes < closeMinutes;
+
+    // The most recent session that has already ended
+    let lastSessionDate = null;
+    let lastCloseMinutes = toMinutes(CLOSE_FALLBACK[m]);
+
+    if (tradingToday && local.minutes >= closeMinutes) {
+        lastSessionDate = local.date;
+        lastCloseMinutes = closeMinutes;
+    } else {
+        const prior =
+            await MarketCalendar.find({
+                market: m,
+                date: { $lt: local.date },
+                status: { $ne: 'closed' }
+            })
+                .sort({ date: -1 })
+                .limit(1)
+                .lean();
+
+        if (prior[0]) {
+            lastSessionDate = prior[0].date;
+
+            lastCloseMinutes =
+                toMinutes(
+                    (prior[0].session && prior[0].session.close) ||
+                    CLOSE_FALLBACK[m]
+                );
+        }
+    }
+
+    return {
+        market: m,
+        isOpen,
+        localDate: local.date,
+        lastSessionDate,
+        lastCloseMinutes
+    };
+}
+
+
+// Pure function: no database access.
+function assessQuote(market, quote, state, now = new Date()) {
+    const m = market === 'US' ? 'US' : 'NGX';
+
+    if (
+        !quote ||
+        !(Number(quote.price) > 0) ||
+        !quote.fetchedAt
+    ) {
+        return {
+            status: 'unavailable',
+            shouldRefresh: true,
+            ageMinutes: null
+        };
+    }
+
+    const fetchedAt =
+        new Date(quote.fetchedAt);
+
+    const ageMinutes =
+        Math.max(
+            0,
+            Math.round((now - fetchedAt) / 60000)
+        );
+
+    // Market open: judge by age
+    if (state.isOpen) {
+        const status =
+            ageMinutes <= FRESH_MINUTES[m]
+                ? 'fresh'
+                : ageMinutes <= DELAYED_MINUTES[m]
+                    ? 'delayed'
+                    : 'stale';
+
+        return {
+            status,
+            shouldRefresh: ageMinutes >= REFRESH_MINUTES[m],
+            ageMinutes
+        };
+    }
+
+    // No calendar data at all: fall back to age
+    if (!state.lastSessionDate) {
+        return {
+            status: ageMinutes <= 24 * 60 ? 'closed' : 'stale',
+            shouldRefresh: ageMinutes > 24 * 60,
+            ageMinutes
+        };
+    }
+
+    // Market closed: good if it was fetched after the last session ended
+    const fetchedLocal =
+        marketLocalNow(m, fetchedAt);
+
+    const afterLastClose =
+        fetchedLocal.date > state.lastSessionDate ||
+        (
+            fetchedLocal.date === state.lastSessionDate &&
+            fetchedLocal.minutes >= state.lastCloseMinutes
+        );
+
+    return afterLastClose
+        ? { status: 'closed', shouldRefresh: false, ageMinutes }
+        : { status: 'stale', shouldRefresh: true, ageMinutes };
+}
+
 module.exports = {
     getCalendarMonth,
     refreshCalendarMonth,
@@ -541,5 +694,7 @@ module.exports = {
     cleanupOldMonths,
     monthNeedsAttention,
     getMismatches,
-    getLastCompletedTradingDate
+    getLastCompletedTradingDate,
+    getMarketState,
+    assessQuote
 };

@@ -27,6 +27,9 @@ const portfolioRoutes =
 const calendarService =
     require('./marketCalendarService');
 
+const syncState =
+    require('./historySyncState');
+
 // ============================================================
 // CONFIG
 // ============================================================
@@ -117,8 +120,7 @@ const HISTORY_RETRY_MAX_MINUTES = 24 * 60;
 const HISTORY_RECHECK_AFTER_MS =
     6 * 60 * 60 * 1000;
 
-const historyCheckLog =
-    new Map();
+ 
 
 
 /*
@@ -436,6 +438,56 @@ async function updateHistorySchedulerStatus(update) {
 }
 
 
+function toTime(value) {
+    return value
+        ? new Date(value).getTime()
+        : 0;
+}
+
+
+async function registerHistoryFailure({
+    ticker,
+    market,
+    failCount,
+    hasDirectory,
+    errorMessage
+}) {
+    const newFailCount =
+        Number(failCount || 0) + 1;
+
+    const nextRetryAt =
+        calculateNextRetryAt(
+            newFailCount
+        );
+
+    await syncState.recordFailure({
+        ticker,
+        market,
+        failCount: newFailCount,
+        nextRetryAt,
+        error: errorMessage
+    });
+
+    if (hasDirectory) {
+        await Stock.updateOne(
+            { ticker, market },
+            {
+                $set: {
+                    historySyncStatus: 'failed',
+                    lastAttemptAt: new Date(),
+                    lastCheckedDate: marketToday(market),
+                    failCount: newFailCount,
+                    nextRetryAt,
+                    lastStatusCheck: new Date()
+                }
+            }
+        );
+    }
+
+    return nextRetryAt;
+}
+
+
 async function runHistorySync() {
 
     if (historySyncRunning) {
@@ -448,11 +500,9 @@ async function runHistorySync() {
 
     historySyncRunning = true;
 
-    const syncStartedAt = new Date();
-
     await updateHistorySchedulerStatus({
         status: 'running',
-        startedAt: syncStartedAt,
+        startedAt: new Date(),
         completedAt: null,
         error: null,
         stocksFound: 0,
@@ -466,85 +516,40 @@ async function runHistorySync() {
     });
 
     console.log('');
-    console.log(
-        '================================'
-    );
-    console.log(
-        'GAZE DAILY HISTORY SYNC'
-    );
-    console.log(
-        '================================'
-    );
+    console.log('================================');
+    console.log('GAZE DAILY HISTORY SYNC');
+    console.log('================================');
 
     try {
         const portfolios =
             await Portfolio.find({});
 
+        // ----------------------------------------------------
+        // One unique ticker/market list (holdings + watchlists)
+        // ----------------------------------------------------
+
         const uniqueStocks =
             new Map();
 
-        /*
-         * --------------------------------------------------------
-         * Build one unique ticker/market list
-         * --------------------------------------------------------
-         */
-
         for (const portfolio of portfolios) {
-
-            /*
-             * --------------------------------------------------------
-             * Portfolio holdings
-             * --------------------------------------------------------
-             */
-
-            if (Array.isArray(portfolio.stocks)) {
-                for (const stock of portfolio.stocks) {
-                    if (!stock) {
-                        continue;
-                    }
-
-                    const ticker =
-                        normalizeTicker(stock.ticker);
-
-                    const market =
-                        normalizeMarket(stock.market);
-
-                    if (!ticker) {
-                        continue;
-                    }
-
-                    const key =
-                        `${ticker}|${market}`;
-
-                    if (!uniqueStocks.has(key)) {
-                        uniqueStocks.set(
-                            key,
-                            {
-                                ticker,
-                                market
-                            }
-                        );
-                    }
+            for (
+                const list of
+                [portfolio.stocks, portfolio.watchlist]
+            ) {
+                if (!Array.isArray(list)) {
+                    continue;
                 }
-            }
 
-            /*
-             * --------------------------------------------------------
-             * Watchlist
-             * --------------------------------------------------------
-             */
-
-            if (Array.isArray(portfolio.watchlist)) {
-                for (const stock of portfolio.watchlist) {
-                    if (!stock) {
+                for (const item of list) {
+                    if (!item) {
                         continue;
                     }
 
                     const ticker =
-                        normalizeTicker(stock.ticker);
+                        normalizeTicker(item.ticker);
 
                     const market =
-                        normalizeMarket(stock.market);
+                        normalizeMarket(item.market);
 
                     if (!ticker) {
                         continue;
@@ -556,54 +561,36 @@ async function runHistorySync() {
                     if (!uniqueStocks.has(key)) {
                         uniqueStocks.set(
                             key,
-                            {
-                                ticker,
-                                market
-                            }
+                            { ticker, market }
                         );
                     }
                 }
             }
         }
 
-        /*
-         * --------------------------------------------------------
-         * Determine which stocks need history
-         * --------------------------------------------------------
-         */
-
         let initialFetches = 0;
         let incrementalFetches = 0;
         let failed = 0;
         let totalFetches = 0;
         let safetyCapReached = false;
+        let alreadyCurrent = 0;
+        let skipped = 0;
 
         const stockKeys =
-            Array.from(
-                uniqueStocks.values()
-            ).map(stock => ({
-                ticker: stock.ticker,
-                market: stock.market
-            }));
+            Array.from(uniqueStocks.values());
 
         const directoryStocks =
-            await Stock.find({
-                $or: stockKeys
-            })
-                .select({
-                    ticker: 1,
-                    market: 1,
-                    active: 1,
-                    historyStatus: 1,
-                    historySyncStatus: 1,
-                    historyLatestDate: 1,
-                    lastHistoryDate: 1,
-                    lastCheckedDate: 1,
-                    lastAttemptAt: 1,
-                    failCount: 1,
-                    nextRetryAt: 1
-                })
-                .lean();
+            stockKeys.length > 0
+                ? await Stock.find({ $or: stockKeys })
+                    .select({
+                        ticker: 1,
+                        market: 1,
+                        historyStatus: 1,
+                        failCount: 1,
+                        nextRetryAt: 1
+                    })
+                    .lean()
+                : [];
 
         const directoryMap =
             new Map();
@@ -615,57 +602,31 @@ async function runHistorySync() {
             );
         }
 
-        const candidates = [];
+        const stateMap =
+            await syncState.loadStates(stockKeys);
 
-        let alreadyCurrent = 0;
-
-        let skipped = 0;
-
-                const expectedByMarket = {
+        const expectedByMarket = {
             NGX: await getExpectedCompletedDate('NGX'),
             US: await getExpectedCompletedDate('US')
         };
 
-        for (
-            const stock of
-            uniqueStocks.values()
-        ) {
+        // ----------------------------------------------------
+        // Decide which stocks need a provider request
+        // ----------------------------------------------------
 
+        const candidates = [];
+
+        for (const stock of uniqueStocks.values()) {
             const key =
                 `${stock.ticker}|${stock.market}`;
 
             const stockRecord =
                 directoryMap.get(key);
 
-            /*
-             * ----------------------------------------------------
-             * NO STOCK DIRECTORY RECORD
-             * ----------------------------------------------------
-             */
+            const state =
+                stateMap.get(key);
 
-            if (!stockRecord) {
-
-                console.log(
-                    `ℹ️ ${stock.ticker} (${stock.market}): no Stock directory record; using portfolio/watchlist as history source`
-                );
-
-            }
-
-            /*
-             * ----------------------------------------------------
-             * GET STORED HISTORY STATUS
-             * ----------------------------------------------------
-             *
-             * IMPORTANT:
-             *
-             * MongoDB PriceHistory is checked BEFORE
-             * historyStatus / retry state.
-             *
-             * This means existing fresh MongoDB history
-             * is always respected and does not trigger
-             * a provider request.
-             */
-
+            // MongoDB history is checked first, before any state
             const status =
                 await getHistoryStatus(
                     stock.ticker,
@@ -678,28 +639,16 @@ async function runHistorySync() {
             const latestDate =
                 status.latestDate;
 
-            /*
-             * ----------------------------------------------------
-             * DETERMINE WHETHER HISTORY IS CURRENT
-             * ----------------------------------------------------
-             */
-
-                        const expectedLatestDate =
+            const expectedLatestDate =
                 expectedByMarket[stock.market];
-                
+
             const isCurrent =
                 count > 0 &&
                 latestDate &&
                 latestDate >= expectedLatestDate;
 
-            /*
-             * ----------------------------------------------------
-             * CURRENT
-             * ----------------------------------------------------
-             */
-
+            // Current: nothing to fetch
             if (isCurrent) {
-
                 console.log(
                     `✓ ${stock.ticker} (${stock.market}) is current through ${latestDate}`
                 );
@@ -709,11 +658,8 @@ async function runHistorySync() {
                 if (stockRecord) {
                     await Stock.updateOne(
                         {
-                            ticker:
-                                stock.ticker,
-
-                            market:
-                                stock.market
+                            ticker: stock.ticker,
+                            market: stock.market
                         },
                         {
                             $set: {
@@ -727,24 +673,18 @@ async function runHistorySync() {
                 continue;
             }
 
-            /*
-             * ----------------------------------------------------
-             * HISTORICAL DATA PERMANENTLY UNAVAILABLE
-             * ----------------------------------------------------
-             *
-             * Only apply this after MongoDB has been checked.
-             *
-             * If MongoDB already contains history, that history
-             * remains the source of truth for freshness.
-             */
+            // Provider has no history for this stock
+            const noHistory =
+                (
+                    stockRecord &&
+                    stockRecord.historyStatus === 'unavailable'
+                ) ||
+                (
+                    state &&
+                    state.status === 'no_data'
+                );
 
-            if (
-                stockRecord &&
-                stockRecord.historyStatus ===
-                    'unavailable' &&
-                count === 0
-            ) {
-
+            if (noHistory && count === 0) {
                 console.log(
                     `⏭️ ${stock.ticker} (${stock.market}) skipped: historical data unavailable`
                 );
@@ -754,44 +694,29 @@ async function runHistorySync() {
                 continue;
             }
 
-            /*
-             * ----------------------------------------------------
-             * RETRY BACKOFF
-             * ----------------------------------------------------
-             *
-             * If this stock recently failed, do not immediately
-             * hit the provider again.
-             */
+            // Retry / back-off time (saved state wins)
+            const retryAt =
+                Math.max(
+                    toTime(state && state.nextRetryAt),
+                    toTime(stockRecord && stockRecord.nextRetryAt)
+                );
 
-            if (
-                stockRecord &&
-                stockRecord.nextRetryAt &&
-                new Date(stockRecord.nextRetryAt) >
-                    new Date()
-            ) {
-
+            if (retryAt > Date.now()) {
                 console.log(
-                    `⏳ ${stock.ticker} (${stock.market}) retry deferred until ${new Date(stockRecord.nextRetryAt).toISOString()}`
+                    `⏳ ${stock.ticker} (${stock.market}) retry deferred until ${new Date(retryAt).toISOString()}`
                 );
 
                 skipped++;
 
                 continue;
             }
-            
-            
-                        /*
-             * Already checked against this expected date recently?
-             * Do not hit the provider again yet.
-             */
-            const lastCheck =
-                historyCheckLog.get(key);
 
+            // Already checked for this expected date recently
             if (
-                lastCheck &&
-                lastCheck.expectedDate ===
-                    expectedLatestDate &&
-                Date.now() - lastCheck.at <
+                state &&
+                state.lastCheckedFor === expectedLatestDate &&
+                state.lastCheckedAt &&
+                Date.now() - toTime(state.lastCheckedAt) <
                     HISTORY_RECHECK_AFTER_MS
             ) {
                 console.log(
@@ -803,70 +728,36 @@ async function runHistorySync() {
                 continue;
             }
 
-            /*
-             * ----------------------------------------------------
-             * STALE / INITIAL CANDIDATE
-             * ----------------------------------------------------
-             */
-
             candidates.push({
-                ticker:
-                    stock.ticker,
-
-                market:
-                    stock.market,
-
-                count:
-                    count,
-
-                latestDate:
-                    latestDate,
-
-                expectedLatestDate:
-                    expectedLatestDate,
-
-                failCount:
-                    Number(
-                        stockRecord?.failCount || 0
-                    )
+                ticker: stock.ticker,
+                market: stock.market,
+                count,
+                latestDate,
+                expectedLatestDate,
+                failCount: Math.max(
+                    Number((state && state.failCount) || 0),
+                    Number((stockRecord && stockRecord.failCount) || 0)
+                ),
+                behindCount: Number(
+                    (state && state.behindCount) || 0
+                )
             });
         }
 
-        /*
-         * --------------------------------------------------------
-         * PRIORITY
-         * --------------------------------------------------------
-         *
-         * 1. Stocks with no history.
-         *
-         * 2. Stocks with the oldest stored history.
-         *
-         * With no scheduler-level cap, all eligible
-         * candidates can now be processed. Provider-specific
-         * queues/cooldowns still control actual requests.
-         */
+        // ----------------------------------------------------
+        // Priority: no history first, then oldest history
+        // ----------------------------------------------------
 
         candidates.sort(
             (a, b) => {
-                const aHasHistory =
-                    a.count > 0;
+                const aHas = a.count > 0;
+                const bHas = b.count > 0;
 
-                const bHasHistory =
-                    b.count > 0;
-
-                if (
-                    aHasHistory !==
-                    bHasHistory
-                ) {
-                    return aHasHistory
-                        ? 1
-                        : -1;
+                if (aHas !== bHas) {
+                    return aHas ? 1 : -1;
                 }
 
-                if (
-                    !a.latestDate &&
-                    !b.latestDate
-                ) {
+                if (!a.latestDate && !b.latestDate) {
                     return 0;
                 }
 
@@ -884,33 +775,15 @@ async function runHistorySync() {
             }
         );
 
-        /*
-         * --------------------------------------------------------
-         * SYNC
-         * --------------------------------------------------------
-         */
+        // ----------------------------------------------------
+        // Sync
+        // ----------------------------------------------------
 
-        for (
-            const candidate of
-            candidates
-        ) {
-
-            /*
-             * ----------------------------------------------------
-             * SCHEDULER FETCH CAP
-             * ----------------------------------------------------
-             *
-             * null = no scheduler-level cap.
-             *
-             * Provider-specific protection still applies.
-             */
-
+        for (const candidate of candidates) {
             if (
                 MAX_HISTORY_FETCHES_PER_RUN !== null &&
-                totalFetches >=
-                    MAX_HISTORY_FETCHES_PER_RUN
+                totalFetches >= MAX_HISTORY_FETCHES_PER_RUN
             ) {
-
                 console.log(
                     `⏸️ Temporary history sync cap reached (${MAX_HISTORY_FETCHES_PER_RUN} fetches).`
                 );
@@ -924,141 +797,45 @@ async function runHistorySync() {
                 ticker,
                 market,
                 count,
-                latestDate
+                latestDate,
+                expectedLatestDate,
+                failCount,
+                behindCount
             } = candidate;
 
-            let historyDays;
-            let fetchType;
-
-            /*
-             * ----------------------------------------------------
-             * INITIAL HISTORY
-             * ----------------------------------------------------
-             *
-             * No stored history at all.
-             */
-
-            if (
+            const fetchType =
                 count === 0
-            ) {
+                    ? 'initial'
+                    : 'incremental';
 
-                historyDays =
-                    INITIAL_HISTORY_DAYS;
+            const historyDays =
+                count === 0
+                    ? INITIAL_HISTORY_DAYS
+                    : INCREMENTAL_HISTORY_DAYS;
 
-                fetchType =
-                    'initial';
-
-            }
-
-            /*
-             * ----------------------------------------------------
-             * PARTIAL / EXISTING HISTORY
-             * ----------------------------------------------------
-             *
-             * Any stock that already has real history uses
-             * the small incremental window.
-             *
-             * This includes newly listed stocks such as AVACAP.
-             */
-
-            else {
-
-                historyDays =
-                    INCREMENTAL_HISTORY_DAYS;
-
-                fetchType =
-                    'incremental';
-            }
-
-            /*
-             * Keep this outside the try block so the catch
-             * handler can safely use the directory record
-             * if an unexpected error occurs.
-             */
-
-            const directoryStock =
-                await Stock.findOne({
-                    ticker,
-                    market
-                }).lean();
+            const hasDirectory =
+                directoryMap.has(`${ticker}|${market}`);
 
             try {
-
-                // ------------------------------------------------------------
-                // Missing Stock directory record
-                // ------------------------------------------------------------
-
-                if (!directoryStock) {
-                    console.log(
-                        `ℹ️ ${ticker} (${market}): no Stock directory record; continuing with history sync`
-                    );
-                }
-
-                if (directoryStock) {
-                    await Stock.updateOne(
-                        {
-                            ticker,
-                            market
-                        },
-                        {
-                            $set: {
-                                historySyncStatus:
-                                    'updating'
-                            }
-                        }
-                    );
-                }
-
                 const today =
                     marketToday(market);
 
-                /*
-                 * ----------------------------------------------------
-                 * DRY RUN
-                 * ----------------------------------------------------
-                 *
-                 * Identify what Gaze WOULD fetch without making
-                 * a provider request.
-                 */
-
+                // Report only, no provider request
                 if (DRY_RUN) {
-
-                    console.log(
-                        `🧪 DRY RUN → ${ticker} (${market})`
-                    );
-
-                    console.log(
-                        `   Type: ${fetchType}`
-                    );
-
-                    console.log(
-                        `   Days: ${historyDays}`
-                    );
-
-                    console.log(
-                        `   Existing rows: ${count}`
-                    );
-
-                    console.log(
-                        `   Latest stored date: ${latestDate || 'none'}`
-                    );
-
-                    if (directoryStock) {
-                        await Stock.updateOne(
-                            {
-                                ticker,
-                                market
-                            },
-                            {
-                                $set: {
-                                    lastCheckedDate:
-                                        today
-                                }
-                            }
-                        );
-                    }
+                    console.log(`🧪 DRY RUN → ${ticker} (${market})`);
+                    console.log(`   Type: ${fetchType}`);
+                    console.log(`   Days: ${historyDays}`);
+                    console.log(`   Existing rows: ${count}`);
+                    console.log(`   Latest stored date: ${latestDate || 'none'}`);
 
                     continue;
+                }
+
+                if (hasDirectory) {
+                    await Stock.updateOne(
+                        { ticker, market },
+                        { $set: { historySyncStatus: 'updating' } }
+                    );
                 }
 
                 const result =
@@ -1069,16 +846,8 @@ async function runHistorySync() {
                         today
                     );
 
+                // A real provider request was made
                 if (result.requestMade !== false) {
-
-                                        historyCheckLog.set(
-                        `${ticker}|${market}`,
-                        {
-                            expectedDate:
-                                candidate.expectedLatestDate,
-                            at: Date.now()
-                        }
-                    );
                     totalFetches++;
 
                     if (fetchType === 'initial') {
@@ -1086,42 +855,34 @@ async function runHistorySync() {
                     } else {
                         incrementalFetches++;
                     }
+
+                    await syncState.recordCheck({
+                        ticker,
+                        market,
+                        expectedDate: expectedLatestDate
+                    });
                 }
 
-                /*
-                 * ----------------------------------------------------
-                 * PROVIDER COOLDOWN
-                 * ----------------------------------------------------
-                 *
-                 * No provider request was made.
-                 *
-                 * Do not count this as a failure and do not create
-                 * a retry backoff. The provider's own cooldown
-                 * system controls when another request can be made.
-                 */
-
-                if (
-                    result.status ===
-                    'cooldown'
-                ) {
-
+                // Cooldown or budget used up: no request, no failure
+                if (result.status === 'cooldown') {
                     console.log(
-                        `⏸️ ${ticker} (${market}): provider cooldown active; will retry on a later freshness cycle`
+                        `⏸️ ${ticker} (${market}): provider cooldown or budget; will retry on a later cycle`
                     );
+
+                    if (hasDirectory) {
+                        await Stock.updateOne(
+                            { ticker, market },
+                            { $set: { historySyncStatus: 'stale' } }
+                        );
+                    }
 
                     skipped++;
 
                     continue;
                 }
 
-                /*
-                 * Real provider history is available.
-                 */
-
-                if (
-                    result.status ===
-                    'available'
-                ) {
+                // Real provider history
+                if (result.status === 'available') {
                     const rows =
                         result.rows || [];
 
@@ -1130,7 +891,7 @@ async function runHistorySync() {
                     );
 
                     if (rows.length > 0) {
-                        const historyOperations =
+                        await PriceHistory.bulkWrite(
                             rows.map(row => ({
                                 updateOne: {
                                     filter: {
@@ -1141,21 +902,11 @@ async function runHistorySync() {
 
                                     update: {
                                         $set: {
-                                            open:
-                                                row.open,
-
-                                            high:
-                                                row.high,
-
-                                            low:
-                                                row.low,
-
-                                            close:
-                                                row.close,
-
-                                            volume:
-                                                row.volume,
-
+                                            open: row.open,
+                                            high: row.high,
+                                            low: row.low,
+                                            close: row.close,
+                                            volume: row.volume,
                                             source:
                                                 market === 'US'
                                                     ? 'twelvedata'
@@ -1165,13 +916,8 @@ async function runHistorySync() {
 
                                     upsert: true
                                 }
-                            }));
-
-                        await PriceHistory.bulkWrite(
-                            historyOperations,
-                            {
-                                ordered: false
-                            }
+                            })),
+                            { ordered: false }
                         );
 
                         console.log(
@@ -1179,204 +925,108 @@ async function runHistorySync() {
                         );
                     }
 
-                    if (directoryStock) {
+                    const newestDate =
+                        rows
+                            .map(row => row.date)
+                            .sort()
+                            .at(-1) || null;
 
+                    const outcome =
+                        await syncState.recordSuccess({
+                            ticker,
+                            market,
+                            newestDate,
+                            expectedDate: expectedLatestDate,
+                            previousBehindCount: behindCount
+                        });
+
+                    if (outcome.behind) {
+                        console.log(
+                            `   ↳ ${ticker}: provider data ends ${newestDate || 'never'}, expected ${expectedLatestDate}; next check in ${Math.round(outcome.delayMs / 3600000)}h`
+                        );
+                    }
+
+                    if (hasDirectory) {
                         await Stock.updateOne(
-                            {
-                                ticker,
-                                market
-                            },
+                            { ticker, market },
                             {
                                 $set: {
-                                    historyStatus:
-                                        'available',
-
-                                    historySyncStatus:
-                                        'current',
-
-                                    historyLastUpdated:
-                                        new Date(),
-
-                                    historyLatestDate:
-                                        rows.length > 0
-                                            ? rows
-                                                .map(row => row.date)
-                                                .sort()
-                                                .at(-1)
-                                            : null,
-
-                                    lastHistoryDate:
-                                        rows.length > 0
-                                            ? rows
-                                                .map(row => row.date)
-                                                .sort()
-                                                .at(-1)
-                                            : null,
-
-                                    lastCheckedDate:
-                                        today,
-
-                                    lastAttemptAt:
-                                        new Date(),
-
-                                    lastStatusCheck:
-                                        new Date(),
-
-                                    failCount:
-                                        0,
-
-                                    nextRetryAt:
-                                        null
+                                    historyStatus: 'available',
+                                    historySyncStatus: 'current',
+                                    historyLastUpdated: new Date(),
+                                    historyLatestDate: newestDate,
+                                    lastHistoryDate: newestDate,
+                                    lastCheckedDate: today,
+                                    lastAttemptAt: new Date(),
+                                    lastStatusCheck: new Date(),
+                                    failCount: 0,
+                                    nextRetryAt: null
                                 }
                             }
                         );
                     }
+
+                    continue;
                 }
 
-                /*
-                 * Provider responded successfully,
-                 * but has no historical data.
-                 *
-                 * This is the condition that freezes
-                 * future daily historical requests.
-                 */
-
-                else if (
-                    result.status ===
-                    'no_data'
-                ) {
-
+                // Provider answered but has no history for this stock
+                if (result.status === 'no_data') {
                     console.log(
                         `⏸️ ${ticker} (${market}): provider has no historical data`
                     );
 
-                    if (directoryStock) {
+                    await syncState.recordNoData({
+                        ticker,
+                        market
+                    });
 
+                    if (hasDirectory) {
                         await Stock.updateOne(
-                            {
-                                ticker,
-                                market
-                            },
+                            { ticker, market },
                             {
                                 $set: {
-                                    historyStatus:
-                                        'unavailable',
-
-                                    lastStatusCheck:
-                                        new Date()
-                                }
-                            }
-                        );
-
-                    }
-                }
-
-                /*
-                 * Provider failure / quota.
-                 *
-                 * Do NOT change historyStatus.
-                 * The existing historical data may still be valid.
-                 * Only mark the synchronization attempt as failed.
-                 */
-
-                else {
-
-                    const newFailCount =
-                        Number(
-                            directoryStock?.failCount || 0
-                        ) + 1;
-
-                    const nextRetryAt =
-                        calculateNextRetryAt(
-                            newFailCount
-                        );
-
-                    if (directoryStock) {
-
-                        await Stock.updateOne(
-                            {
-                                ticker,
-                                market
-                            },
-                            {
-                                $set: {
-                                    historySyncStatus:
-                                        'failed',
-
-                                    lastAttemptAt:
-                                        new Date(),
-
-                                    lastCheckedDate:
-                                        today,
-
-                                    failCount:
-                                        newFailCount,
-
-                                    nextRetryAt:
-                                        nextRetryAt,
-
-                                    lastStatusCheck:
-                                        new Date()
+                                    historyStatus: 'unavailable',
+                                    historySyncStatus: 'stale',
+                                    lastStatusCheck: new Date()
                                 }
                             }
                         );
                     }
 
-                    failed++;
-
-                    console.log(
-                        `⚠️ ${ticker} (${market}): historical provider unavailable`
-                    );
-
-                    console.log(
-                        `   ↳ Retry scheduled for ${nextRetryAt.toISOString()}`
-                    );
+                    continue;
                 }
 
-            } catch (error) {
+                // Provider failure or quota error
+                const nextRetryAt =
+                    await registerHistoryFailure({
+                        ticker,
+                        market,
+                        failCount,
+                        hasDirectory,
+                        errorMessage: result.status
+                    });
 
                 failed++;
 
-                const newFailCount =
-                    Number(
-                        directoryStock?.failCount || 0
-                    ) + 1;
+                console.log(
+                    `⚠️ ${ticker} (${market}): historical provider unavailable`
+                );
+
+                console.log(
+                    `   ↳ Retry scheduled for ${nextRetryAt.toISOString()}`
+                );
+
+            } catch (error) {
+                failed++;
 
                 const nextRetryAt =
-                    calculateNextRetryAt(
-                        newFailCount
-                    );
-
-                if (directoryStock) {
-
-                    await Stock.updateOne(
-                        {
-                            ticker,
-                            market
-                        },
-                        {
-                            $set: {
-                                historySyncStatus:
-                                    'failed',
-
-                                lastAttemptAt:
-                                    new Date(),
-
-                                lastCheckedDate:
-                                    marketToday(market),
-
-                                failCount:
-                                    newFailCount,
-
-                                nextRetryAt:
-                                    nextRetryAt,
-
-                                lastStatusCheck:
-                                    new Date()
-                            }
-                        }
-                    );
-                }
+                    await registerHistoryFailure({
+                        ticker,
+                        market,
+                        failCount,
+                        hasDirectory,
+                        errorMessage: error.message
+                    });
 
                 console.error(
                     `[HistorySync] ${ticker} (${market}):`,
@@ -1390,73 +1040,36 @@ async function runHistorySync() {
         }
 
         console.log('');
-        console.log(
-            `Initial history fetches:     ${initialFetches}`
-        );
-
-        console.log(
-            `Incremental history fetches: ${incrementalFetches}`
-        );
-
-        console.log(
-            `Already current:             ${alreadyCurrent}`
-        );
-
-        console.log(
-            `Skipped:                      ${skipped}`
-        );
-
-        console.log(
-            `Failed:                       ${failed}`
-        );
-
-        console.log(
-            `API fetches this run:        ${totalFetches}`
-        );
-
-        console.log(
-            `Unique stocks found:         ${uniqueStocks.size}`
-        );
-
-        console.log(
-            '================================'
-        );
-
+        console.log(`Initial history fetches:     ${initialFetches}`);
+        console.log(`Incremental history fetches: ${incrementalFetches}`);
+        console.log(`Already current:             ${alreadyCurrent}`);
+        console.log(`Skipped:                      ${skipped}`);
+        console.log(`Failed:                       ${failed}`);
+        console.log(`API fetches this run:        ${totalFetches}`);
+        console.log(`Unique stocks found:         ${uniqueStocks.size}`);
+        console.log('================================');
         console.log('');
 
-                // Confidence only reads MongoDB now, so this costs no API calls.
+        // Confidence only reads MongoDB, so this costs no API calls
         if (totalFetches > 0) {
             await runConfidenceCheck();
         }
 
         await updateHistorySchedulerStatus({
             status: 'success',
-
             completedAt: new Date(),
-
             lastSuccessfulAt: new Date(),
-
-            stocksFound:
-                uniqueStocks.size,
-
+            stocksFound: uniqueStocks.size,
             initialFetches,
-
             incrementalFetches,
-
             alreadyCurrent,
-
             skipped,
-
             failed,
-
-            apiFetches:
-                totalFetches,
-
+            apiFetches: totalFetches,
             safetyCapReached
         });
 
     } catch (error) {
-
         console.error(
             '[HistorySync] Fatal error:',
             error.message
@@ -1469,9 +1082,7 @@ async function runHistorySync() {
         });
 
     } finally {
-
         historySyncRunning = false;
-
     }
 }
 
@@ -1526,68 +1137,58 @@ async function runStartupHistoryCatchUp() {
 
 async function runHistoryRecheck() {
     console.log('');
-    console.log(
-        '================================'
-    );
-    console.log(
-        'GAZE WEEKLY HISTORY RECHECK'
-    );
-    console.log(
-        '================================'
-    );
+    console.log('================================');
+    console.log('GAZE WEEKLY HISTORY RECHECK');
+    console.log('================================');
 
     try {
-        /*
-         * Only recheck securities that:
-         *
-         * 1. are still active securities
-         * 2. have historical data marked unavailable
-         *
-         * Live prices are NOT affected by this status.
-         */
-
-        const stocks =
+        // Stocks marked "unavailable" in the directory, plus stocks the
+        // saved sync state says have no history (covers stocks that have
+        // no directory record)
+        const directory =
             await Stock.find({
                 active: true,
-                historyStatus:
-                    'unavailable'
+                historyStatus: 'unavailable'
             })
-                .select({
-                    ticker: 1,
-                    market: 1
-                })
+                .select({ ticker: 1, market: 1 })
                 .lean();
 
+        const noDataStates =
+            await syncState.listNoData();
+
+        const targets =
+            new Map();
+
+        for (const item of [...directory, ...noDataStates]) {
+            const ticker =
+                normalizeTicker(item.ticker);
+
+            const market =
+                normalizeMarket(item.market);
+
+            if (ticker) {
+                targets.set(
+                    `${ticker}|${market}`,
+                    { ticker, market }
+                );
+            }
+        }
+
         console.log(
-            `Historical-data stocks to recheck: ${stocks.length}`
+            `Historical-data stocks to recheck: ${targets.size}`
         );
 
         let recovered = 0;
         let stillUnavailable = 0;
         let failed = 0;
+        let deferred = 0;
 
-        for (const stock of stocks) {
-
-            const ticker =
-                normalizeTicker(
-                    stock.ticker
-                );
-
-            const market =
-                normalizeMarket(
-                    stock.market
-                );
-
-            if (!ticker) {
-                continue;
-            }
-
+        for (const { ticker, market } of targets.values()) {
             console.log(
                 `→ Rechecking ${ticker} (${market}) history`
             );
 
             try {
-
                 const result =
                     await getHistoricalProviderStatus(
                         ticker,
@@ -1596,33 +1197,21 @@ async function runHistoryRecheck() {
                         null
                     );
 
-                /*
-                 * Provider successfully responded.
-                 *
-                 * Any real rows mean historical data
-                 * is available again.
-                 */
-
-                if (
-                    result.status ===
-                    'available'
-                ) {
-
+                if (result.status === 'available') {
                     await Stock.updateOne(
-                        {
-                            ticker,
-                            market
-                        },
+                        { ticker, market },
                         {
                             $set: {
-                                historyStatus:
-                                    'available',
-
-                                lastStatusCheck:
-                                    new Date()
+                                historyStatus: 'available',
+                                lastStatusCheck: new Date()
                             }
                         }
                     );
+
+                    await syncState.recordSuccess({
+                        ticker,
+                        market
+                    });
 
                     recovered++;
 
@@ -1630,26 +1219,21 @@ async function runHistoryRecheck() {
                         `✅ ${ticker} (${market}) history recovered`
                     );
 
-                } else if (
-                    result.status ===
-                    'no_data'
-                ) {
-
+                } else if (result.status === 'no_data') {
                     await Stock.updateOne(
-                        {
-                            ticker,
-                            market
-                        },
+                        { ticker, market },
                         {
                             $set: {
-                                historyStatus:
-                                    'unavailable',
-
-                                lastStatusCheck:
-                                    new Date()
+                                historyStatus: 'unavailable',
+                                lastStatusCheck: new Date()
                             }
                         }
                     );
+
+                    await syncState.recordNoData({
+                        ticker,
+                        market
+                    });
 
                     stillUnavailable++;
 
@@ -1657,8 +1241,14 @@ async function runHistoryRecheck() {
                         `⏭️ ${ticker} (${market}) still has no historical data`
                     );
 
-                } else {
+                } else if (result.status === 'cooldown') {
+                    deferred++;
 
+                    console.log(
+                        `⏸️ ${ticker} (${market}): provider cooldown or budget; recheck deferred`
+                    );
+
+                } else {
                     failed++;
 
                     console.log(
@@ -1667,16 +1257,9 @@ async function runHistoryRecheck() {
                 }
 
             } catch (error) {
-
                 failed++;
 
-                /*
-                 * IMPORTANT:
-                 *
-                 * Do not change historyStatus when
-                 * the provider itself fails.
-                 */
-
+                // Never change history status when the provider itself fails
                 console.error(
                     `[HistoryRecheck] ${ticker} (${market}):`,
                     error.message
@@ -1685,26 +1268,14 @@ async function runHistoryRecheck() {
         }
 
         console.log('');
-        console.log(
-            `Recovered:           ${recovered}`
-        );
-
-        console.log(
-            `Still unavailable:   ${stillUnavailable}`
-        );
-
-        console.log(
-            `Provider failures:   ${failed}`
-        );
-
-        console.log(
-            '================================'
-        );
-
+        console.log(`Recovered:           ${recovered}`);
+        console.log(`Still unavailable:   ${stillUnavailable}`);
+        console.log(`Deferred:            ${deferred}`);
+        console.log(`Provider failures:   ${failed}`);
+        console.log('================================');
         console.log('');
 
     } catch (error) {
-
         console.error(
             '[HistoryRecheck] Fatal error:',
             error.message
