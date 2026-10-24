@@ -4,7 +4,7 @@ const PriceHistory = require('../models/PriceHistory');
 const ProviderState = require('../models/ProviderState');
 const providerBudget = require('../services/providerBudget');
 const quoteStore = require('../services/quoteStore');
-
+const priceEvents = require('../services/priceEvents');
 
 // ============================================================
 // API CONFIG
@@ -1121,6 +1121,11 @@ async function getNGNMarketPrice(
             return null;
         }
 
+        quoteMeta.set(
+            `NGX:${symbol}`,
+            { fetchedAt: new Date(companyListCacheTime) }
+        );
+
         console.log(
             `✓ NGN Market price for ${symbol}: ${price}`
         );
@@ -1412,19 +1417,6 @@ async function fetchFinnhubPrice(
         getFinnhubToken();
 
     if (!token) {
-
-                // Finnhub's "t" is the Unix time (seconds) of the last trade
-        const tradeTime = Number(response.data?.t);
-
-        if (Number.isFinite(tradeTime) && tradeTime > 0) {
-            quoteMeta.set(
-                `US:${symbol}`,
-                { sourceTimestamp: new Date(tradeTime * 1000) }
-            );
-        } else {
-            quoteMeta.delete(`US:${symbol}`);
-        }
-
         console.error(
             '❌ FINNHUB_API_KEY is missing from .env'
         );
@@ -1457,6 +1449,23 @@ async function fetchFinnhubPrice(
                     timeout: 15000
                 }
             );
+
+        // Finnhub's "t" is the Unix time (seconds) of the last trade.
+        // This needs `response`, so it lives here, after the request.
+        const tradeTime =
+            Number(response.data?.t);
+
+        if (
+            Number.isFinite(tradeTime) &&
+            tradeTime > 0
+        ) {
+            quoteMeta.set(
+                `US:${symbol}`,
+                { sourceTimestamp: new Date(tradeTime * 1000) }
+            );
+        } else {
+            quoteMeta.delete(`US:${symbol}`);
+        }
 
         const price =
             parseNumber(
@@ -2785,13 +2794,19 @@ async function getPriceWithMeta(
         const numericPrice =
             Number(price);
 
+        const providerMeta =
+            quoteMeta.get(
+                `${normalizedMarket}:${symbol}`
+            ) || {};
+
+        // NGN Market data may come from the cached company list
         const fetchedAt =
-            new Date();
+            source === 'ngnmarket' && providerMeta.fetchedAt
+                ? new Date(providerMeta.fetchedAt)
+                : new Date();
 
         const sourceTimestamp =
-            (quoteMeta.get(
-                `${normalizedMarket}:${symbol}`
-            ) || {}).sourceTimestamp || null;
+            providerMeta.sourceTimestamp || null;
 
         cacheSet(
             priceCache,
@@ -2817,7 +2832,18 @@ async function getPriceWithMeta(
             market: normalizedMarket,
             price: numericPrice,
             source,
-            sourceTimestamp
+            sourceTimestamp,
+            fetchedAt
+        });
+                // Tell the rest of Gaze (alerts, later others) about the new price.
+        // Only real fetches get here: cache hits return earlier.
+        priceEvents.publishPrice({
+            ticker: symbol,
+            market: normalizedMarket,
+            price: numericPrice,
+            source,
+            sourceTimestamp,
+            fetchedAt
         });
 
         return {

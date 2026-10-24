@@ -6,7 +6,9 @@ require('dotenv').config(); // must stay BEFORE requiring gaze-auth (it reads en
 const { startConfidenceScheduler } = require('./services/confidenceScheduler');
 const { startMarketCalendarScheduler } = require('./services/marketCalendarScheduler');
 const { startDividendScheduler } = require('./services/dividendScheduler');
+const { startPriceScheduler } = require('./services/priceScheduler');
 const { mountAuth, requireRole } = require('./gaze-auth/src');
+const { startAlertEngine } = require('./services/alertEngine');
 const portfolioGuard = require('./gaze-auth/src/portfolio-guard');
 const portfolioValidate = require('./gaze-auth/src/portfolio-validate');
 
@@ -14,6 +16,7 @@ const dividendRoutes = require('./routes/dividends');
 const marketCalendarRoutes = require('./routes/marketCalendar');
 const schedulerRoutes = require('./routes/scheduler');
 const portfolioRoutes = require('./routes/portfolio');
+const alertRoutes = require('./routes/alerts');
 const stockRoutes = require('./routes/stocks');
 
 const app = express();
@@ -35,7 +38,9 @@ app.get('/api/test', (req, res) => {
 });
 
 // Routes  (everything that uses `app` comes AFTER `const app = express()` above)
-app.use('/api/portfolio', portfolioGuard, portfolioValidate, portfolioRoutes); // login + own portfolio + checked input
+// alertRoutes sits BEFORE portfolioRoutes: it answers /:userId/alerts and
+// /:userId/notifications, and passes every other path on to portfolioRoutes.
+app.use('/api/portfolio', portfolioGuard, portfolioValidate, alertRoutes, portfolioRoutes);
 app.use('/api/stocks', stockRoutes);                                          // public market data
 app.use('/api/market-calendar', marketCalendarRoutes);
 app.use('/api/scheduler', requireRole('admin'), schedulerRoutes);             // admin only
@@ -67,6 +72,8 @@ async function startServer() {
 
         startConfidenceScheduler();
         startMarketCalendarScheduler();
+        startAlertEngine();      // listen first, so no price event is missed
+        startPriceScheduler();   // then start producing price events
         startDividendScheduler();
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);

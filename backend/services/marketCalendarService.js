@@ -645,6 +645,10 @@ function assessQuote(market, quote, state, now = new Date()) {
             Math.round((now - fetchedAt) / 60000)
         );
 
+        // Refresh decisions use the exact age; the rounded one is for display
+    const exactMinutes =
+        Math.max(0, (now - fetchedAt) / 60000);
+
     // Market open: judge by age
     if (state.isOpen) {
         const status =
@@ -656,7 +660,7 @@ function assessQuote(market, quote, state, now = new Date()) {
 
         return {
             status,
-            shouldRefresh: ageMinutes >= REFRESH_MINUTES[m],
+            shouldRefresh: exactMinutes >= REFRESH_MINUTES[m],
             ageMinutes
         };
     }

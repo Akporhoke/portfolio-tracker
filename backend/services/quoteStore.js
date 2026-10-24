@@ -20,7 +20,8 @@ async function saveQuote({
     market,
     price,
     source,
-    sourceTimestamp = null
+    sourceTimestamp = null,
+    fetchedAt = null
 }) {
     try {
         const now = new Date();
@@ -33,7 +34,7 @@ async function saveQuote({
                     currency: currencyFor(market),
                     source: source || '',
                     sourceTimestamp,
-                    fetchedAt: now,
+                    fetchedAt: fetchedAt ? new Date(fetchedAt) : now,
                     lastAttemptAt: now,
                     failCount: 0,
                     lastError: ''

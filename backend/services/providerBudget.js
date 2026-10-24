@@ -13,15 +13,22 @@
  *   Twelve Data  8 per minute,
  *                800 per day       TWELVEDATA_PER_MINUTE / _DAILY_LIMIT
  *
- * Day and month windows are counted in UTC and stop at
- * PROVIDER_BUDGET_SAFETY (default 0.9) of the limit, leaving a margin
- * for requests Gaze did not log (dev machines, dashboards, restarts).
- * Minute windows use the limit as given.
+ * Day and month windows stop at PROVIDER_BUDGET_SAFETY (default 0.9) of
+ * the limit, leaving a margin for requests Gaze did not log (dev
+ * machines, dashboards, restarts). Minute windows use the limit as given.
+ *
+ * SCHEDULER SHARE
+ * Work started by the background scheduler runs inside runRoutine().
+ * It may only use SCHEDULER_BUDGET_SHARE (default 0.7) of each window,
+ * so the rest stays free for things a person is waiting on: adding a
+ * stock, selling, opening a chart.
  *
  * If the budget database cannot be read, requests are ALLOWED:
  * a tracking failure must never take prices down. The providers
  * enforce their own limits as a backstop.
  */
+
+const { AsyncLocalStorage } = require('async_hooks');
 
 const ProviderRequestLog =
     require('../models/ProviderRequestLog');
@@ -42,6 +49,15 @@ const SAFETY =
     Math.min(
         Math.max(
             Number(process.env.PROVIDER_BUDGET_SAFETY) || 0.9,
+            0.1
+        ),
+        1
+    );
+
+const ROUTINE_SHARE =
+    Math.min(
+        Math.max(
+            Number(process.env.SCHEDULER_BUDGET_SHARE) || 0.7,
             0.1
         ),
         1
@@ -69,6 +85,22 @@ const LIMITS = {
 const WINDOW_KINDS = ['minute', 'day', 'month'];
 
 
+// ------------------------------------------------------------
+// WHO IS ASKING (scheduler work vs. a person waiting)
+// ------------------------------------------------------------
+
+const purposeStore = new AsyncLocalStorage();
+
+// Run fn (and everything it awaits) as scheduler work
+function runRoutine(fn) {
+    return purposeStore.run('routine', fn);
+}
+
+function isRoutine() {
+    return purposeStore.getStore() === 'routine';
+}
+
+
 function windowStart(kind, now = new Date()) {
     if (kind === 'minute') {
         return new Date(now.getTime() - 60 * 1000);
@@ -94,10 +126,15 @@ function windowStart(kind, now = new Date()) {
 }
 
 
-function capFor(kind, limit) {
-    return kind === 'minute'
-        ? limit
-        : Math.floor(limit * SAFETY);
+function capFor(kind, limit, routine = false) {
+    const base =
+        kind === 'minute'
+            ? limit
+            : Math.floor(limit * SAFETY);
+
+    return routine
+        ? Math.floor(base * ROUTINE_SHARE)
+        : base;
 }
 
 
@@ -127,13 +164,15 @@ async function check(provider) {
         return { ok: true, unknownProvider: true };
     }
 
+    const routine = isRoutine();
+
     try {
         for (const kind of WINDOW_KINDS) {
             if (!limits[kind]) {
                 continue;
             }
 
-            const cap = capFor(kind, limits[kind]);
+            const cap = capFor(kind, limits[kind], routine);
 
             const used =
                 await ProviderRequestLog.countDocuments({
@@ -147,8 +186,10 @@ async function check(provider) {
                     kind,
                     used,
                     cap,
+                    routine,
                     reason:
-                        `${provider} ${kind} budget used (${used}/${cap})`
+                        `${provider} ${kind} budget used (${used}/${cap}` +
+                        `${routine ? ', scheduler share' : ''})`
                 };
             }
         }
@@ -171,14 +212,16 @@ async function check(provider) {
             ) {
                 const floor =
                     limits.month -
-                    capFor('month', limits.month);
+                    capFor('month', limits.month, routine);
 
                 if (state.reportedRemaining <= floor) {
                     return {
                         ok: false,
                         kind: 'month',
+                        routine,
                         reason:
-                            `ngnmarket reports only ${state.reportedRemaining} calls remaining`
+                            `ngnmarket reports only ${state.reportedRemaining} calls remaining` +
+                            `${routine ? ' (scheduler share)' : ''}`
                     };
                 }
             }
@@ -289,6 +332,7 @@ async function getUsage() {
             report[provider][kind] = {
                 used,
                 cap: capFor(kind, limits[kind]),
+                schedulerCap: capFor(kind, limits[kind], true),
                 limit: limits[kind]
             };
         }
@@ -303,5 +347,6 @@ module.exports = {
     spend,
     noteReported,
     getUsage,
+    runRoutine,
     LIMITS
 };
