@@ -126,7 +126,7 @@
             <span class="stat-indicator watching"></span>
             <p class="stat-label">Watching</p>
         </div>
-        <p class="stat-number" id="statWatching">5</p>
+        <p class="stat-number" id="statWatching">-</p>
     </div>
 
     <div class="divider"></div>
@@ -136,7 +136,7 @@
             <span class="stat-indicator held"></span>
             <p class="stat-label">Held</p>
         </div>
-        <p class="stat-number" id="statHeld">3</p>
+        <p class="stat-number" id="statHeld">-</p>
     </div>
 
     <div class="divider"></div>
@@ -146,7 +146,7 @@
             <span class="stat-indicator sold"></span>
             <p class="stat-label">Sold</p>
         </div>
-        <p class="stat-number" id="statSold">2</p>
+        <p class="stat-number" id="statSold">-</p>
     </div>
 
 </div>
@@ -252,10 +252,10 @@
 </div>
         </div>
 
-        <!-- Mini Portfolio Cards (NSE & US) -->
+        <!-- Mini Portfolio Cards (NGX & US) -->
         <div class="mini-cards">
             <div class="mini-card nse" id="nseCard">
-                <p class="mini-label">NSE Portfolio</p>
+                <p class="mini-label">NGX Portfolio</p>
                 <p class="mini-value" id="nseValue">₦0</p>
                 <p class="mini-change" id="nseChange">+0%</p>
                 <div class="mini-stats">
@@ -476,12 +476,9 @@
     <i class="fa-solid fa-chevron-right settings-chevron"></i>
 </button>
 
-                    <button type="button" class="settings-row settings-link" onclick="showToast('Coming soon', 'warning')">
+                                        <button type="button" class="settings-row settings-link" onclick="openAlertsModal()">
                         <i class="fa-regular fa-bell settings-row-icon"></i>
-                        <span class="settings-row-label">Notifications</span>
-                        <span class="settings-soon">Soon</span>
-                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
-                    </button>
+                        <span class="settings-row-label">Price Alerts</span>
                 </div>
 
                 <p class="settings-section-label">Preferences</p>
@@ -915,7 +912,7 @@
     <div class="modal" id="marketModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="marketModalTitle">NSE Portfolio</h2>
+                <h2 id="marketModalTitle">NGX Portfolio</h2>
                 <button class="close-modal" id="closeMarketModal" aria-label="Close market modal">✕</button>
             </div>
             <div class="modal-body">

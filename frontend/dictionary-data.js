@@ -65,6 +65,7 @@ window.GAZE_DICTIONARY = {
             whyItMatters: "Understanding the investor mindset helps you focus on long-term decisions rather than short-term noise.",
             related: ["Portfolio", "Return", "Investment"]
         },
+        
 
         {
             term: "Trader",
@@ -1276,6 +1277,453 @@ window.GAZE_DICTIONARY = {
             whyItMatters: "Stock splits change the number of shares and quoted price but do not by themselves create value.",
             related: ["Reverse Split", "Share", "Corporate Action"]
         },
+        
+                /* ============================================
+           NEW TERMS — NGX GLOSSARY BATCH
+           Paste after the "Corporate Action" entry
+           (remember the comma after that entry's closing brace)
+           ============================================ */
+
+        {
+            term: "Security",
+            category: "Market Basics",
+            level: "Beginner",
+            definition: "A tradable financial instrument that represents ownership, a debt claim or another financial right.",
+            simpleExplanation: "'Security' is the umbrella word for things like shares, bonds and funds that can be bought and sold.",
+            example: "A share in GTCO and a government bond are both securities.",
+            whyItMatters: "Most market terms you meet apply to securities, so this word is the foundation for many others.",
+            related: ["Stock", "Bond", "ETF", "Derivatives"]
+        },
+
+        {
+            term: "Securities and Exchange Commission (SEC)",
+            category: "Market Basics",
+            level: "Beginner",
+            definition: "Nigeria's main regulator of the capital market, responsible for overseeing market operators, issuers and investor protection.",
+            simpleExplanation: "The SEC is the referee of the capital market. It sets rules and checks that firms follow them.",
+            example: "A company must meet regulatory requirements before it can offer shares to the public.",
+            whyItMatters: "Knowing who regulates the market helps you check that a broker or product is legitimate.",
+            related: ["Stock Exchange", "NGX", "Broker", "Issuer"]
+        },
+
+        {
+            term: "Analyst",
+            category: "Market Basics",
+            level: "Beginner",
+            definition: "A finance professional who researches companies or markets and produces views such as buy, hold or sell recommendations.",
+            simpleExplanation: "Analysts study a company or sector in detail so investors do not have to start from scratch.",
+            example: "A banking-sector analyst may publish a report estimating next year's earnings for Nigerian banks.",
+            whyItMatters: "Analyst research can be useful input, but it is an opinion, not a guarantee.",
+            related: ["Fundamental Analysis", "Technical Analysis", "Valuation", "Broker"]
+        },
+
+        {
+            term: "Retail Investor",
+            category: "Market Basics",
+            level: "Beginner",
+            definition: "An individual who invests their own money rather than managing money for an organisation.",
+            simpleExplanation: "A retail investor is an everyday person investing for themselves.",
+            example: "Someone buying 500 shares through a stockbroker app is a retail investor.",
+            whyItMatters: "Retail and institutional investors face different rules, costs and resources.",
+            related: ["Institutional Investor", "Investor", "Broker"]
+        },
+
+        {
+            term: "Institutional Investor",
+            category: "Market Basics",
+            level: "Intermediate",
+            definition: "An organisation that invests large pools of money, such as a pension fund, insurer or investment fund.",
+            simpleExplanation: "These are the big professional players that invest on behalf of many people.",
+            example: "A pension fund administrator investing contributors' money in shares and bonds is an institutional investor.",
+            whyItMatters: "Institutions trade in large sizes and can influence prices and liquidity.",
+            related: ["Retail Investor", "Mutual Fund", "Portfolio Manager", "Custodian"]
+        },
+
+        {
+            term: "Market Intermediary",
+            category: "Market Mechanics",
+            level: "Beginner",
+            definition: "A firm that sits between buyers and sellers or between investors and issuers to help transactions happen.",
+            simpleExplanation: "Intermediaries are the middlemen of the market, such as brokers, banks and market makers.",
+            example: "A stockbroker passing your buy order to the exchange acts as an intermediary.",
+            whyItMatters: "Each intermediary adds a service and usually a cost, so it helps to know who does what.",
+            related: ["Broker", "Broker-Dealer", "Market Maker", "Custodian"]
+        },
+
+        {
+            term: "Broker-Dealer",
+            category: "Market Mechanics",
+            level: "Intermediate",
+            definition: "A firm that can both execute trades for clients (as a broker) and trade for its own account (as a dealer).",
+            simpleExplanation: "It can act for you or trade with its own money, depending on the situation.",
+            example: "A securities firm may buy shares for a client and also hold shares for its own book.",
+            whyItMatters: "The two roles can create conflicts of interest, which is why firms must be regulated and keep them separate.",
+            related: ["Broker", "Dealing Member", "Market Maker", "Market Intermediary"]
+        },
+
+        {
+            term: "Liquidity Provider",
+            category: "Market Mechanics",
+            level: "Intermediate",
+            definition: "A firm that regularly quotes buy and sell prices for a security so others can trade it more easily.",
+            simpleExplanation: "It plays a role similar to a market maker, helping buyers and sellers find each other.",
+            example: "A liquidity provider in the bond market may keep quotes available so bonds can be bought or sold.",
+            whyItMatters: "Active quoting narrows spreads and makes it easier to enter or exit positions.",
+            related: ["Market Maker", "Liquidity", "Bid-Ask Spread", "Bond"]
+        },
+
+        {
+            term: "Clearing House",
+            category: "Market Mechanics",
+            level: "Intermediate",
+            definition: "An institution that manages the obligations between buyers and sellers after a trade and helps ensure it is completed.",
+            simpleExplanation: "It stands behind trades so each side can be confident the other will deliver.",
+            example: "After you buy shares, the clearing and settlement system works out what must be delivered and paid.",
+            whyItMatters: "It reduces the risk that a trade fails because one party defaults.",
+            related: ["Clearing", "Settlement", "CSCS"]
+        },
+
+        {
+            term: "Trustee",
+            category: "Market Mechanics",
+            level: "Intermediate",
+            definition: "An independent firm appointed to protect investors' interests by overseeing that the terms of a trust deed are followed.",
+            simpleExplanation: "A trustee acts as a guardian for investors in structures like bonds and unit trusts.",
+            example: "A trustee monitors whether a bond issuer is meeting its obligations to bondholders.",
+            whyItMatters: "A trustee gives investors an independent party looking out for them.",
+            related: ["Unit Trust", "Bond", "Debenture", "REIT"]
+        },
+
+        {
+            term: "Securities Lending",
+            category: "Market Mechanics",
+            level: "Advanced",
+            definition: "Temporarily lending securities to another party in exchange for collateral and a fee.",
+            simpleExplanation: "The owner lends out shares or bonds for a period and gets them back later.",
+            example: "A trader borrows shares to short sell them and provides collateral to the lender.",
+            whyItMatters: "It supports short selling and market liquidity, but it adds counterparty risk.",
+            related: ["Short Selling", "Custodian", "Margin", "Dividend"]
+        },
+
+        {
+            term: "Whistleblowing",
+            category: "Market Mechanics",
+            level: "Beginner",
+            definition: "Reporting suspected illegal or improper conduct at an organisation, often confidentially, to a regulator or exchange.",
+            simpleExplanation: "It means raising the alarm when you see wrongdoing, such as fraud or market abuse.",
+            example: "An employee reports suspected accounting fraud at a listed company through a regulator's reporting channel.",
+            whyItMatters: "Whistleblowing helps keep markets fair and protects investors from misconduct.",
+            related: ["Securities and Exchange Commission (SEC)", "Stock Exchange", "Auditor", "Issuer"]
+        },
+
+        {
+            term: "Auditor",
+            category: "Company Fundamentals",
+            level: "Beginner",
+            definition: "A qualified professional or firm that independently examines a company's financial statements and gives an opinion on whether they are fairly presented.",
+            simpleExplanation: "An auditor checks the company's books so investors can have more confidence in the numbers.",
+            example: "A listed company's annual report includes an auditor's report on its financial statements.",
+            whyItMatters: "An unqualified audit opinion does not guarantee a good investment, but a problem with the audit is a warning sign.",
+            related: ["Annual Report", "Earnings Report", "Assets", "Liabilities"]
+        },
+
+        {
+            term: "Nominal Value",
+            category: "Company Fundamentals",
+            level: "Intermediate",
+            definition: "The fixed value assigned to a security by its issuer, also called par value or face value.",
+            simpleExplanation: "It is a label value set by the issuer, not the price the market is paying.",
+            example: "A share with a nominal value of 50 kobo can trade at ₦30 in the market.",
+            whyItMatters: "Nominal value matters for accounting and bonds (where it is the amount repaid at maturity) but says little about what a share is worth.",
+            related: ["Stock Price", "Book Value", "Bond", "Share"]
+        },
+
+        {
+            term: "Dilution",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A reduction in existing shareholders' percentage ownership when a company issues new shares.",
+            simpleExplanation: "When the pie is cut into more slices, each existing slice is a smaller share of the whole.",
+            example: "If you own 1% of a company and it issues enough new shares to double the share count, you now own about 0.5% unless you participate.",
+            whyItMatters: "Dilution can reduce per-share measures such as EPS and your voting power.",
+            related: ["Rights Issue", "Secondary Offering", "Outstanding Shares", "Earnings Per Share (EPS)"]
+        },
+
+        {
+            term: "Secondary Offering",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A sale of securities after a company's IPO, either of new shares issued by the company or of existing shares sold by current holders.",
+            simpleExplanation: "It is another round of share sales after the company is already listed.",
+            example: "A listed company issues new shares to raise money for expansion.",
+            whyItMatters: "New shares dilute existing holders, while a sale by existing holders does not increase the share count.",
+            related: ["IPO", "Dilution", "Placement", "Outstanding Shares"]
+        },
+
+        {
+            term: "Placement",
+            category: "Corporate Events",
+            level: "Advanced",
+            definition: "A sale of securities directly to selected investors rather than through an offer open to the general public.",
+            simpleExplanation: "Instead of inviting everyone, the seller offers the shares to chosen buyers.",
+            example: "A major shareholder sells part of their stake to a group of institutions through a placement.",
+            whyItMatters: "Placements can raise money or allow large holders to reduce their stake with less market disruption.",
+            related: ["IPO", "Secondary Offering", "Institutional Investor", "Issuer"]
+        },
+
+        {
+            term: "Book Building",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A process where underwriters gather investor demand at different prices to help set the price of a new offering.",
+            simpleExplanation: "Before pricing an IPO, the underwriter asks big investors how many shares they want and at what price.",
+            example: "Fund managers submit orders at various price levels, and the final offer price is set based on the demand collected.",
+            whyItMatters: "It helps price an offering closer to what the market will actually pay.",
+            related: ["IPO", "Underwriter", "Institutional Investor", "Issuer"]
+        },
+
+        {
+            term: "Underwriter",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A firm that helps an issuer sell new securities to investors and may take on the risk of any unsold securities.",
+            simpleExplanation: "The underwriter helps a company sell its new shares or bonds, and gets paid for it.",
+            example: "An investment bank underwrites a company's IPO and helps set the offer price.",
+            whyItMatters: "A reputable underwriter can add credibility, but it does not guarantee that the investment will do well.",
+            related: ["IPO", "Book Building", "Issuer", "Listing"]
+        },
+
+        {
+            term: "Receiving Agent",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A bank or broker appointed to collect application forms and subscription money for a public offer.",
+            simpleExplanation: "It is where you submit your application and payment when subscribing to a new offer.",
+            example: "You apply for an IPO by submitting your form and payment through a receiving agent.",
+            whyItMatters: "Applying through an authorised agent helps ensure your application is valid.",
+            related: ["IPO", "Subscription Period", "Rights Issue", "Issuer"]
+        },
+
+        {
+            term: "Subscription Period",
+            category: "Corporate Events",
+            level: "Beginner",
+            definition: "The window during which investors can apply to buy securities in a new offer.",
+            simpleExplanation: "It is the deadline-driven period when an offer is open for applications.",
+            example: "An IPO is open for applications for three weeks and then closes.",
+            whyItMatters: "Miss the subscription period and you generally lose the chance to take part in that offer.",
+            related: ["IPO", "Rights Issue", "Receiving Agent"]
+        },
+
+        {
+            term: "Bond",
+            category: "General Investing",
+            level: "Beginner",
+            definition: "A debt security in which an investor lends money to a government or company in return for interest and repayment at maturity.",
+            simpleExplanation: "When you buy a bond, you are lending money and the issuer promises to pay you interest and return your money later.",
+            example: "You buy a ₦1 million bond paying 10% a year for five years and receive ₦100,000 in interest each year, then get the ₦1 million back at maturity.",
+            whyItMatters: "Bonds are a core asset class and usually behave differently from shares.",
+            related: ["Coupon", "Corporate Bond", "Debenture", "Issuer"]
+        },
+
+        {
+            term: "Coupon",
+            category: "General Investing",
+            level: "Beginner",
+            definition: "The interest rate a bond pays, stated as a percentage of its face value.",
+            simpleExplanation: "The coupon is the regular interest payment a bondholder receives.",
+            example: "A ₦1 million bond with a 12% coupon pays ₦120,000 of interest per year.",
+            whyItMatters: "The coupon tells you how much income the bond pays, but not whether its price is attractive.",
+            related: ["Bond", "Corporate Bond", "Nominal Value"]
+        },
+
+        {
+            term: "Corporate Bond",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A bond issued by a company to borrow money from investors.",
+            simpleExplanation: "A company borrows from investors instead of a bank, and agrees to pay interest and repay the principal.",
+            example: "A telecom company issues a seven-year bond to fund network expansion.",
+            whyItMatters: "Corporate bonds usually pay more than government bonds because they carry more credit risk.",
+            related: ["Bond", "Debenture", "Coupon", "Issuer"]
+        },
+
+        {
+            term: "Debenture",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A medium- to long-term debt instrument issued by a company, often backed by the issuer's general creditworthiness rather than specific assets.",
+            simpleExplanation: "It is a loan to a company that gives you a claim to interest and repayment, not ownership.",
+            example: "A company issues debentures to raise long-term funds and pays holders interest each year.",
+            whyItMatters: "Debenture holders are creditors, not owners, so they do not usually vote at shareholder meetings.",
+            related: ["Bond", "Corporate Bond", "Debt", "Trustee"]
+        },
+
+        {
+            term: "Preference Shares",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A class of shares that usually pays a fixed dividend and ranks ahead of ordinary shares for dividends and in liquidation, but typically has limited or no voting rights.",
+            simpleExplanation: "They sit between bonds and ordinary shares: steadier payouts, less upside and usually no vote.",
+            example: "A company pays preference shareholders their fixed dividend before paying anything to ordinary shareholders.",
+            whyItMatters: "They can offer more predictable income than ordinary shares, but with less growth potential.",
+            related: ["Stock", "Dividend", "Equity", "Bond"]
+        },
+
+        {
+            term: "Derivatives",
+            category: "General Investing",
+            level: "Advanced",
+            definition: "Financial contracts whose value depends on an underlying asset such as a share, bond, currency, commodity or index.",
+            simpleExplanation: "Their price comes from something else. They are bets or protections based on how that other asset moves.",
+            example: "A futures contract on oil gains or loses value as the oil price moves.",
+            whyItMatters: "Derivatives can hedge risk or magnify it, since many involve leverage.",
+            related: ["Leverage", "Margin", "Risk", "Structured Products"]
+        },
+
+        {
+            term: "Structured Products",
+            category: "General Investing",
+            level: "Advanced",
+            definition: "Pre-packaged investments that combine a traditional security with derivatives to create a customised payoff.",
+            simpleExplanation: "They are built to deliver a specific risk and return pattern that ordinary securities do not offer.",
+            example: "A note may return the amount invested plus a share of an index's gains, depending on its terms.",
+            whyItMatters: "They can be complex, so you need to understand the payoff, costs and issuer risk before investing.",
+            related: ["Derivatives", "Bond", "Risk", "Issuer"]
+        },
+
+        {
+            term: "Mutual Fund",
+            category: "General Investing",
+            level: "Beginner",
+            definition: "A professionally managed fund that pools money from many investors to invest in a portfolio of securities.",
+            simpleExplanation: "You put money in alongside others, and a fund manager decides what to buy.",
+            example: "A fund manager invests investors' pooled money in shares, bonds and money-market instruments.",
+            whyItMatters: "Funds give access to diversification and professional management, but they charge fees.",
+            related: ["Net Asset Value (NAV)", "Open-Ended Fund", "Unit Trust", "ETF"]
+        },
+
+        {
+            term: "Unit Trust",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A collective investment scheme, set up under a trust deed, in which investors buy units that represent a share of a pooled portfolio.",
+            simpleExplanation: "You own units in a pool of investments, and the unit price follows the value of what the pool holds.",
+            example: "An investor buys 1,000 units of a unit trust at the current unit price.",
+            whyItMatters: "It lets small investors share in a diversified portfolio, with a trustee protecting their interests.",
+            related: ["Mutual Fund", "Net Asset Value (NAV)", "Trustee", "Open-Ended Fund"]
+        },
+
+        {
+            term: "Net Asset Value (NAV)",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "The per-unit value of a fund, calculated as the fund's assets minus its liabilities, divided by the number of units or shares outstanding.",
+            simpleExplanation: "NAV tells you what one unit of the fund is worth based on what it holds.",
+            example: "A fund with ₦1.1 billion in assets, ₦100 million in liabilities and 100 million units has a NAV of ₦10 per unit.",
+            whyItMatters: "NAV is the reference price for buying and selling many funds.",
+            related: ["Mutual Fund", "Unit Trust", "ETF", "Open-Ended Fund"]
+        },
+
+        {
+            term: "Open-Ended Fund",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A fund that continuously issues new units to investors and buys them back on request, at a price linked to its NAV.",
+            simpleExplanation: "The fund can grow or shrink as people put money in or take it out.",
+            example: "You buy units from the fund itself and later sell them back at the prevailing NAV.",
+            whyItMatters: "You deal with the fund, not other investors, and the price tracks NAV rather than market demand.",
+            related: ["Closed-End Fund", "Mutual Fund", "Net Asset Value (NAV)", "Unit Trust"]
+        },
+
+        {
+            term: "Closed-End Fund",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "A fund that raises a fixed amount of capital through an offering, then lists its shares to be traded on an exchange.",
+            simpleExplanation: "The number of shares is fixed, and you buy and sell them with other investors like a stock.",
+            example: "A listed fund's shares trade on the exchange at a market price that can differ from its NAV.",
+            whyItMatters: "The market price can trade above or below the value of the fund's holdings.",
+            related: ["Open-Ended Fund", "Mutual Fund", "ETF", "Net Asset Value (NAV)"]
+        },
+
+        {
+            term: "ETF",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "Exchange-Traded Fund, a fund that tracks an index, commodity or basket of assets and trades on an exchange like a stock.",
+            simpleExplanation: "You get a diversified basket in one purchase, and you can buy and sell it during the trading day.",
+            example: "An ETF tracking a stock index lets you gain exposure to many companies through one holding.",
+            whyItMatters: "ETFs offer low-cost diversification, though they still carry market risk.",
+            related: ["Index", "Mutual Fund", "Net Asset Value (NAV)", "Diversification"]
+        },
+
+        {
+            term: "ETN",
+            category: "General Investing",
+            level: "Advanced",
+            definition: "Exchange-Traded Note, an unsecured debt security issued by a bank or other issuer that promises a return linked to an index or benchmark.",
+            simpleExplanation: "It trades like an ETF, but it is really a debt promise from the issuer.",
+            example: "An ETN linked to a commodity index pays based on the index return, minus fees.",
+            whyItMatters: "Unlike an ETF, an ETN carries the credit risk of its issuer.",
+            related: ["ETF", "Bond", "Index", "Issuer"]
+        },
+
+        {
+            term: "REIT",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "Real Estate Investment Trust, a vehicle that invests in property or property-related loans and can be traded like a security.",
+            simpleExplanation: "A REIT lets you invest in real estate without buying a building yourself.",
+            example: "A REIT owns commercial property and distributes rental income to unit holders.",
+            whyItMatters: "REITs offer property exposure with easier buying and selling than owning property directly, but values can still fall.",
+            related: ["Dividend", "Unit Trust", "Trustee", "Diversification"]
+        },
+
+        {
+            term: "Foreign Portfolio Investment (FPI)",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "Investment by non-residents in a country's financial securities such as shares and bonds, without taking control of the businesses.",
+            simpleExplanation: "Foreign investors buy stocks or bonds in another country but do not run the companies.",
+            example: "An overseas fund buys shares of Nigerian listed companies.",
+            whyItMatters: "FPI is relatively liquid, so inflows and outflows can move prices and exchange rates quickly.",
+            related: ["Portfolio", "Liquidity", "Market Risk", "Volatility"]
+        },
+
+        {
+            term: "Asset Allocation",
+            category: "Portfolio",
+            level: "Beginner",
+            definition: "Dividing a portfolio among major asset classes such as shares, bonds and cash, based on goals, risk tolerance and time horizon.",
+            simpleExplanation: "It is deciding how much to put in each type of investment.",
+            example: "A long-term investor might hold 70% shares, 20% bonds and 10% cash.",
+            whyItMatters: "How you split your money across asset classes is a major driver of your portfolio's risk and return.",
+            related: ["Portfolio Allocation", "Diversification", "Rebalancing", "Risk"]
+        },
+
+        {
+            term: "Portfolio Manager",
+            category: "Portfolio",
+            level: "Intermediate",
+            definition: "A professional or firm that invests money on behalf of clients or a fund according to a stated mandate.",
+            simpleExplanation: "A portfolio manager makes the buy and sell decisions for other people's money.",
+            example: "A manager runs a fund and decides which shares and bonds to hold within its investment objective.",
+            whyItMatters: "Their decisions and fees both affect the returns you receive.",
+            related: ["Portfolio", "Mutual Fund", "Asset Allocation", "Institutional Investor"]
+        },
+
+        {
+            term: "Growth Stock",
+            category: "Strategies",
+            level: "Beginner",
+            definition: "A share in a company expected to grow faster than the market, which usually reinvests most of its profit instead of paying large dividends.",
+            simpleExplanation: "These companies keep the money to grow the business, so returns come mainly from a rising share price.",
+            example: "A fast-expanding company pays little or no dividend because it reinvests profits into growth.",
+            whyItMatters: "Growth stocks can offer higher upside but may be more sensitive to disappointing results.",
+            related: ["Growth Investing", "Dividend", "Payout Ratio", "Earnings Growth"]
+        },
+
 
         {
             term: "Reverse Stock Split",
@@ -1576,7 +2024,281 @@ window.GAZE_DICTIONARY = {
             example: "An investor may study revenue, earnings, debt, cash flow and competitive position.",
             whyItMatters: "It helps investors understand whether a company's business supports its market valuation.",
             related: ["Revenue", "Earnings", "Valuation"]
+        },
+        
+    {
+      term: "CSCS",
+      category: "Market Mechanics",
+      level: "beginner",
+      definition: "The Central Securities Clearing System Plc is a Nigerian financial-market infrastructure provider that supports electronic securities records and the clearing and settlement of securities transactions.",
+      simpleExplanation: "CSCS helps keep electronic records of investors' shares and supports the process that completes securities trades.",
+      example: "After buying shares through a stockbroker, an investor may see the shareholding reflected in their CSCS account.",
+      whyItMatters: "Understanding CSCS helps Nigerian investors know where their electronic securities records are maintained and how their trades are processed.",
+      related: ["Settlement", "Clearing", "Broker", "Shareholder"]
+    },
+    {
+      term: "Central Securities Depository (CSD)",
+      category: "Market Mechanics",
+      level: "beginner",
+      definition: "A financial-market institution or system that maintains securities in electronic form and supports securities transfers and related settlement processes.",
+      simpleExplanation: "A CSD helps keep track of who owns securities without relying on paper certificates.",
+      example: "A securities depository maintains electronic records of eligible shares held by investors.",
+      whyItMatters: "It helps investors understand the infrastructure behind electronic ownership and the transfer of securities.",
+      related: ["CSCS", "Dematerialisation", "Settlement"]
+    },
+    {
+      term: "Registrar",
+      category: "Corporate Events",
+      level: "beginner",
+      definition: "An organisation appointed to maintain a company's register of shareholders and administer specified shareholder-related activities.",
+      simpleExplanation: "A registrar helps a company keep track of its shareholders and handle certain matters such as dividend administration.",
+      example: "An investor may contact a company's registrar to resolve an issue with dividend records.",
+      whyItMatters: "Knowing the registrar's role can help investors identify the appropriate contact when shareholder records or corporate-action payments need attention.",
+      related: ["Shareholder", "Dividend", "Corporate Action"]
+    },
+    {
+      term: "Custodian",
+      category: "Market Mechanics",
+      level: "beginner",
+      definition: "A financial institution that safeguards financial assets on behalf of clients and may provide related recordkeeping and administrative services.",
+      simpleExplanation: "A custodian helps protect and administer investments held for a client.",
+      example: "An investment fund may use a custodian to safeguard its securities and maintain records.",
+      whyItMatters: "Custodians are part of the infrastructure that supports the safekeeping and administration of investments.",
+      related: ["Portfolio", "CSCS", "Institutional Investor"]
+    },
+    {
+      term: "Dealing Member",
+      category: "Market Mechanics",
+      level: "intermediate",
+      definition: "A member authorised under the applicable exchange rules to conduct securities-dealing activities on the exchange.",
+      simpleExplanation: "A dealing member is a firm permitted to carry out specified trading activities on the exchange.",
+      example: "An investor places an order through a stockbroker that is authorised to deal in securities on the exchange.",
+      whyItMatters: "Investors should understand the role and authorisation of the firms through which they access the market.",
+      related: ["Broker", "Stock Exchange", "Order", "Execution"]
+    },
+    {
+      term: "Clearing",
+      category: "Market Mechanics",
+      level: "intermediate",
+      definition: "The process of determining and managing the obligations of parties arising from securities transactions before settlement.",
+      simpleExplanation: "Clearing works out what the buyer and seller owe or must deliver after a trade.",
+      example: "After a share trade is matched, clearing processes help establish the obligations that must be completed.",
+      whyItMatters: "Clearing is an important step in processing trades and reducing operational uncertainty before settlement.",
+      related: ["Settlement", "CSCS", "Execution"]
+    },
+    {
+      term: "Dematerialisation",
+      category: "Market Mechanics",
+      level: "intermediate",
+      definition: "The conversion of physical securities certificates into electronic book-entry records.",
+      simpleExplanation: "Dematerialisation means replacing paper share certificates with electronic records of ownership.",
+      example: "A shareholder's eligible paper share certificate is converted into an electronic holding through the applicable process.",
+      whyItMatters: "Electronic securities records make ownership administration and transfers more practical than relying on physical certificates.",
+      related: ["CSCS", "Central Securities Depository (CSD)", "Shareholder"]
+    },
+    {
+      term: "Listing",
+      category: "Corporate Events",
+      level: "beginner",
+      definition: "The admission of a security to a recognised exchange's official list or to trading under the exchange's applicable rules.",
+      simpleExplanation: "Listing is the process that allows eligible company shares or other securities to be traded on an exchange.",
+      example: "A company completes the required process for its shares to be listed on the NGX.",
+      whyItMatters: "Listing status helps investors understand whether a security is admitted to the exchange and subject to its applicable requirements.",
+      related: ["NGX", "IPO", "Issuer", "Delisting"]
+    },
+    {
+      term: "Issuer",
+      category: "Corporate Events",
+      level: "beginner",
+      definition: "A company, government, or other eligible entity that creates and issues securities to raise capital or for another permitted purpose.",
+      simpleExplanation: "An issuer is the organisation behind a share, bond, or other security.",
+      example: "When a company issues shares to investors, that company is the issuer.",
+      whyItMatters: "Understanding the issuer helps investors identify whose financial position, disclosures, and obligations they are evaluating.",
+      related: ["Stock", "Bond", "IPO", "Annual Report"]
+    },
+    {
+      term: "Rights Issue",
+      category: "Corporate Events",
+      level: "intermediate",
+      definition: "An offer by a company to eligible existing shareholders to subscribe for additional shares, usually in proportion to their existing holdings and subject to specified terms.",
+      simpleExplanation: "A rights issue gives eligible shareholders an opportunity to buy more shares in the company, often at a stated subscription price.",
+      example: "A company announces a rights issue allowing eligible shareholders to apply for additional shares according to the offer terms.",
+      whyItMatters: "Investors need to check eligibility, subscription price, deadlines, payment requirements, and how participation may affect their ownership percentage.",
+      related: ["Shareholder", "Issuer", "Outstanding Shares", "Dilution", "Corporate Action"]
+    },
+    {
+      term: "Bonus Issue",
+      category: "Corporate Events",
+      level: "beginner",
+      definition: "An issue of additional shares to existing shareholders in proportion to their holdings, without requiring them to pay a subscription price for those bonus shares.",
+      simpleExplanation: "A bonus issue gives existing shareholders additional shares according to the announced ratio; it does not automatically increase the value of their investment.",
+      example: "Under a 1-for-5 bonus issue, an eligible shareholder holding 500 shares would receive 100 additional shares, subject to the offer's terms.",
+      whyItMatters: "Investors should understand how a bonus issue changes their share count and how the market price may adjust. More shares do not automatically mean greater wealth.",
+      related: ["Shareholder", "Stock Split", "Outstanding Shares", "Corporate Action"]
+    },
+    {
+      term: "Outstanding Shares",
+      category: "Company Fundamentals",
+      level: "intermediate",
+      definition: "The total number of a company's issued shares currently held by shareholders, excluding shares classified as treasury shares where applicable.",
+      simpleExplanation: "Outstanding shares are the shares that currently count as being held by investors and other shareholders.",
+      example: "If a company has 1 billion outstanding shares and reports net income of ₦100 billion, its basic earnings per share would be ₦100, assuming those figures and share count are appropriate for the calculation.",
+      whyItMatters: "Outstanding shares are used in calculations such as earnings per share and market capitalisation. Changes in the share count can affect per-share metrics.",
+      related: ["Market Capitalization", "Earnings Per Share (EPS)", "Share Buyback", "Dilution"]
+    },
+    {
+      term: "Book Value",
+      category: "Valuation",
+      level: "intermediate",
+      definition: "The accounting value of an asset or, in an equity context, the company's net assets attributable to shareholders as reported under applicable accounting rules. Book value per share is calculated using the relevant equity amount divided by the applicable share count.",
+      simpleExplanation: "A company's equity book value is broadly what remains on its balance sheet after liabilities are deducted from assets. It is not necessarily what the company could sell for.",
+      example: "If a company reports ₦200 billion in relevant shareholders' equity and has 2 billion applicable shares, its book value per share is ₦100.",
+      whyItMatters: "Book value is used in valuation measures such as the price-to-book ratio, but accounting values do not necessarily reflect current market values.",
+      related: ["Assets", "Liabilities", "Shareholders' Equity", "P/B Ratio"]
+    },
+    {
+      term: "Shareholders' Equity",
+      category: "Company Fundamentals",
+      level: "intermediate",
+      definition: "The residual interest in an entity's assets after deducting its liabilities, as presented under applicable accounting standards.",
+      simpleExplanation: "Shareholders' equity is the accounting amount left after the company's liabilities are subtracted from its assets.",
+      example: "If a company reports total assets of ₦500 billion and total liabilities of ₦350 billion, its shareholders' equity is ₦150 billion, assuming the figures are comparable and complete.",
+      whyItMatters: "Equity helps investors assess a company's financial position and is an input to measures such as return on equity and price-to-book ratio.",
+      related: ["Assets", "Liabilities", "Book Value", "Return on Equity (ROE)", "P/B Ratio"]
+    },
+    {
+      term: "Corporate Action",
+      category: "Corporate Events",
+      level: "beginner",
+      definition: "An event initiated or announced by a company that can affect its securities, capital structure, or shareholders' rights and entitlements.",
+      simpleExplanation: "A corporate action is a company event that may change what shareholders own, receive, or need to do.",
+      example: "A dividend declaration, rights issue, bonus issue, or stock split may be a corporate action.",
+      whyItMatters: "Tracking corporate actions helps investors understand important deadlines, eligibility rules, and changes that may affect their holdings.",
+      related: ["Dividend", "Rights Issue", "Bonus Issue", "Stock Split", "Share Buyback"]
+    },,
+
+        {
+            term: "Maturity Date",
+            category: "General Investing",
+            level: "Beginner",
+            definition: "The date on which a debt instrument ends and its principal is scheduled to be repaid, subject to its terms.",
+            simpleExplanation: "A bond's maturity date is when the issuer is due to pay back the money it borrowed.",
+            example: "A bond maturing in 2030 is scheduled to repay its principal in 2030.",
+            whyItMatters: "Maturity tells you when your money may be returned and how long you are exposed to interest-rate and credit risk.",
+            related: ["Bond", "Coupon Rate", "Credit Risk"]
+        },
+
+        {
+            term: "Fixed Income",
+            category: "General Investing",
+            level: "Beginner",
+            definition: "An investment category made up mainly of debt securities that pay scheduled or contractually defined amounts, though the amounts and timing vary by instrument.",
+            simpleExplanation: "Fixed-income investments usually mean lending money in exchange for interest and repayment under agreed terms.",
+            example: "Government bonds and corporate bonds are fixed-income investments.",
+            whyItMatters: "Fixed income can diversify a portfolio, but it still carries risks such as default, inflation and changing interest rates.",
+            related: ["Bond", "Coupon Rate", "Maturity Date", "Portfolio", "Diversification"]
+        },
+
+        {
+            term: "Accrued Interest",
+            category: "General Investing",
+            level: "Intermediate",
+            definition: "Interest that has built up on a financial instrument over a period but has not yet been paid or received.",
+            simpleExplanation: "It is interest that keeps adding up over time even before the payment date arrives.",
+            example: "A bond may have accumulated interest since its last coupon date, which matters when it is sold to another investor.",
+            whyItMatters: "It helps you understand bond transactions and the difference between the quoted price and the total amount payable.",
+            related: ["Bond", "Coupon Rate", "Maturity Date", "Fixed Income"]
+        },
+
+        {
+            term: "Credit Risk",
+            category: "Risk",
+            level: "Beginner",
+            definition: "The risk that a borrower or issuer fails to meet its payment obligations in full or on time.",
+            simpleExplanation: "Credit risk is the chance that whoever you lent money to cannot pay you back as agreed.",
+            example: "A bondholder faces credit risk if the company struggles to make its interest or principal payments.",
+            whyItMatters: "Credit risk can lead to delayed payments, losses or default, so it matters when evaluating any debt investment.",
+            related: ["Bond", "Debenture", "Maturity Date", "Default", "Risk"]
+        },
+
+        {
+            term: "Default",
+            category: "Risk",
+            level: "Intermediate",
+            definition: "A failure to meet a financial obligation under an agreement, such as missing a required debt payment.",
+            simpleExplanation: "Default happens when a borrower or issuer does not do what its agreement requires, usually by missing a payment.",
+            example: "A bond issuer misses a scheduled interest payment and does not fix it within the allowed period.",
+            whyItMatters: "Default can cause investor losses, but the outcome depends on the contract, any grace period, available security and the recovery process.",
+            related: ["Credit Risk", "Bond", "Debenture", "Fixed Income"]
+        },
+
+        {
+            term: "Interim Dividend",
+            category: "Dividends",
+            level: "Beginner",
+            definition: "A dividend paid to shareholders during the financial year, before the full-year results are completed, subject to the company's approval and declaration requirements.",
+            simpleExplanation: "It is a dividend a company announces part-way through the year instead of waiting for the year-end payout.",
+            example: "A company reports its half-year results and announces an interim cash dividend of ₦1 per share.",
+            whyItMatters: "Interim dividends show a company's payout pattern, but one payment does not guarantee future dividends.",
+            related: ["Dividend", "Final Dividend", "Dividend Per Share", "Dividend Declaration Date"]
+        },
+
+        {
+            term: "Final Dividend",
+            category: "Dividends",
+            level: "Beginner",
+            definition: "A dividend proposed or declared after a company's financial year ends, subject to the required approval process.",
+            simpleExplanation: "A final dividend comes with the year-end results and may need shareholder approval before it is paid.",
+            example: "After publishing its annual results, a company proposes a final dividend of ₦2 per share, subject to approval.",
+            whyItMatters: "Investors should tell a proposed dividend apart from an approved one and check the announced payment terms.",
+            related: ["Dividend", "Interim Dividend", "Dividend Per Share", "Annual Report"]
+        },
+
+        {
+            term: "Special Dividend",
+            category: "Dividends",
+            level: "Intermediate",
+            definition: "A one-off dividend outside a company's usual recurring payout pattern, often linked to an unusual event or surplus cash.",
+            simpleExplanation: "It is an extra payout, not something investors should automatically expect every year.",
+            example: "A company sells a major asset and announces a special dividend from the proceeds, subject to approvals.",
+            whyItMatters: "A special dividend can temporarily make dividend yield look higher, so do not assume the same payout will repeat.",
+            related: ["Dividend", "Dividend Yield", "Payout Ratio", "Cash Flow"]
+        },
+
+        {
+            term: "Dividend Declaration Date",
+            category: "Dividends",
+            level: "Beginner",
+            definition: "The date a company formally announces a dividend, as shown in its official notice.",
+            simpleExplanation: "This is the day the company announces the dividend and gives details such as the amount and the key dates.",
+            example: "A company announces a dividend on 10 March and separately states its qualification and payment dates.",
+            whyItMatters: "It helps you separate the announcement from the dates that decide who is eligible and when payment happens.",
+            related: ["Dividend", "Ex-Dividend Date", "Record Date", "Payment Date"]
+        },
+
+        {
+            term: "Disclosure",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "The release of material or legally required information by a company in line with the applicable laws, regulations and exchange rules.",
+            simpleExplanation: "A disclosure is important information a company makes public so investors can understand what is happening.",
+            example: "A listed company publishes a market announcement about a major transaction or its financial results.",
+            whyItMatters: "Disclosures can move how investors see a company's prospects and risks, so rely on official announcements rather than rumours.",
+            related: ["Issuer", "Annual Report", "Earnings Report", "Corporate Action"]
+        },
+
+        {
+            term: "Prospectus",
+            category: "Corporate Events",
+            level: "Intermediate",
+            definition: "A formal offering document that describes a securities offer and gives material information about the issuer, the securities, the risks and the terms.",
+            simpleExplanation: "A prospectus tells you what is being offered, who is offering it and what the risks are.",
+            example: "Before applying for a public share offer, an investor reads the prospectus for the offer price, use of proceeds, risks and application terms.",
+            whyItMatters: "Reading the prospectus helps you decide based on facts rather than promotional claims or headlines.",
+            related: ["Issuer", "IPO", "Listing", "Risk"]
         }
+
+
 
     ]
 };
