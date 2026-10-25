@@ -5,6 +5,7 @@ const ProviderState = require('../models/ProviderState');
 const providerBudget = require('../services/providerBudget');
 const quoteStore = require('../services/quoteStore');
 const priceEvents = require('../services/priceEvents');
+const breaker = require('../services/circuitBreaker');
 
 // ============================================================
 // API CONFIG
@@ -49,6 +50,46 @@ const investoInFlight = new Map();
 const investoHistoryInFlight = new Map();
 
 // ============================================================
+// CIRCUIT BREAKER WRAPPER
+// ============================================================
+//
+// Every provider request goes through this. It asks the breaker for
+// permission, sends the request, then reports the result so the breaker
+// knows when a provider is down and when it has recovered.
+//
+// requestFn must contain ONLY the axios call.
+
+async function guardedRequest(provider, endpoint, requestFn) {
+    const key = breaker.keyFor(provider, endpoint);
+
+    // Also claims the single test request once the cooldown is over
+    const permit = breaker.beforeRequest(key);
+
+    if (!permit.allowed) {
+        const error = new Error(`circuit open for ${key}`);
+        error.circuitOpen = true;
+        throw error;
+    }
+
+    try {
+        const response = await requestFn();
+        breaker.recordSuccess(key);
+        return response;
+
+    } catch (error) {
+        if (breaker.isProviderFailure(error)) {
+            // timeout, network, 5xx, 429, 401, 403: the provider's fault
+            breaker.recordFailure(key, error);
+        } else {
+            // 404 / unknown symbol: the provider answered, so it is up
+            breaker.recordSuccess(key);
+        }
+
+        throw error;
+    }
+}
+
+// ============================================================
 // TWELVE DATA REQUEST QUEUE
 // ============================================================
 
@@ -85,6 +126,12 @@ async function processTwelveDataQueue() {
         const job = twelveDataQueue.shift();
 
         try {
+            // Circuit open: fail this job at once, before the 8 second
+            // wait, so a blocked queue clears quickly
+            if (breaker.blockingKey('twelvedata', 'time_series')) {
+                throw new Error('twelvedata circuit open');
+            }
+
             const now = Date.now();
 
             const elapsed =
@@ -133,11 +180,6 @@ let companyListCache = null;
 let companyListCacheTime = 0;
 let companyListRequest = null;
 
-
-
-// ============================================================
-// NGN MARKET QUOTA / COOLDOWN
-// ============================================================
 // ============================================================
 // PROVIDER PERSISTENT COOLDOWN
 // ============================================================
@@ -900,16 +942,21 @@ async function getNGNMarketCompanies() {
         return companyListRequest;
     }
 
-        // Last attempt failed or came back empty: do not retry yet
+    // Last attempt failed or came back empty: do not retry yet
     if (Date.now() < companyListFailUntil) {
         return companyListCache || [];
     }
-    
+
+    // Circuit open: NGN Market is failing, so do not spend quota on it.
+    // Serve the last list we have.
+    if (breaker.blockingKey('ngnmarket', 'companies')) {
+        return companyListCache || [];
+    }
 
     companyListRequest =
         (async () => {
             try {
-                                const budget =
+                const budget =
                     await providerBudget.spend(
                         'ngnmarket',
                         'companies'
@@ -925,40 +972,42 @@ async function getNGNMarketCompanies() {
                 );
 
                 const response =
-                    await axios.get(
-                        `${NGNMARKET_BASE_URL}/companies`,
-                        {
-                            params: {
-                                limit: 200,
-                                page: 1
-                            },
-                            headers: {
-                                Authorization:
-                                    `Bearer ${token}`
-                            },
-                            timeout: 15000
-                        }
+                    await guardedRequest('ngnmarket', 'companies', () =>
+                        axios.get(
+                            `${NGNMARKET_BASE_URL}/companies`,
+                            {
+                                params: {
+                                    limit: 200,
+                                    page: 1
+                                },
+                                headers: {
+                                    Authorization:
+                                        `Bearer ${token}`
+                                },
+                                timeout: 15000
+                            }
+                        )
                     );
 
                 const body =
-    response.data;
+                    response.data;
 
-if (isNGNMarketQuotaExceeded(body)) {
-    await activateNGNMarketQuotaCooldown();
+                if (isNGNMarketQuotaExceeded(body)) {
+                    await activateNGNMarketQuotaCooldown();
 
-    return [];
-}
+                    return [];
+                }
 
-if (
-    body?.success === false
-) {
-    console.error(
-        '[getNGNMarketCompanies] API error:',
-        body.error || body
-    );
+                if (
+                    body?.success === false
+                ) {
+                    console.error(
+                        '[getNGNMarketCompanies] API error:',
+                        body.error || body
+                    );
 
-    return [];
-}
+                    return [];
+                }
 
                 let companies = [];
 
@@ -1000,8 +1049,8 @@ if (
                 );
 
                 await clearProviderCooldown(
-    'ngnmarket'
-);
+                    'ngnmarket'
+                );
 
                 if (body?.meta) {
                     console.log(
@@ -1013,7 +1062,7 @@ if (
                             'unknown'
                         } remaining`
                     );
-                                        await providerBudget.noteReported(
+                    await providerBudget.noteReported(
                         'ngnmarket',
                         body.meta.calls_used,
                         body.meta.calls_remaining
@@ -1022,31 +1071,31 @@ if (
 
                 return companies;
             } catch (error) {
-    const responseData =
-        error.response?.data;
+                const responseData =
+                    error.response?.data;
 
-    if (
-        isNGNMarketQuotaExceeded(
-            responseData
-        )
-    ) {
-await activateNGNMarketQuotaCooldown();
-        return [];
-    }
+                if (
+                    isNGNMarketQuotaExceeded(
+                        responseData
+                    )
+                ) {
+                    await activateNGNMarketQuotaCooldown();
+                    return [];
+                }
 
-    console.error(
-        '[getNGNMarketCompanies] Error:',
-        responseData ||
-        error.message
-    );
+                console.error(
+                    '[getNGNMarketCompanies] Error:',
+                    responseData ||
+                    error.message
+                );
 
-    return [];
-}finally {
+                return [];
+            } finally {
                 companyListRequest = null;
             }
         })();
 
-            companyListRequest
+    companyListRequest
         .then(list => {
             companyListFailUntil =
                 Array.isArray(list) && list.length > 0
@@ -1191,7 +1240,13 @@ async function getInvestoCurrentPrice(
     const requestPromise =
         (async () => {
             try {
-                    const budget =
+                // Circuit open: do not spend budget on a request
+                // that will not be sent
+                if (breaker.blockingKey('investo', 'price')) {
+                    return null;
+                }
+
+                const budget =
                     await providerBudget.spend(
                         'investo',
                         'price'
@@ -1205,19 +1260,21 @@ async function getInvestoCurrentPrice(
                 );
 
                 const response =
-                    await axios.get(
-                        `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                        {
-                            params: {
-                                interval: 'latest',
-                                provenance: 1
-                            },
-                            headers: {
-                                Authorization:
-                                    `Bearer ${token}`
-                            },
-                            timeout: 15000
-                        }
+                    await guardedRequest('investo', 'price', () =>
+                        axios.get(
+                            `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                            {
+                                params: {
+                                    interval: 'latest',
+                                    provenance: 1
+                                },
+                                headers: {
+                                    Authorization:
+                                        `Bearer ${token}`
+                                },
+                                timeout: 15000
+                            }
+                        )
                     );
 
                 const body =
@@ -1427,6 +1484,11 @@ async function fetchFinnhubPrice(
     const symbol =
         normalizeTicker(ticker);
 
+    // Circuit open: do not spend budget on a request that will not be sent
+    if (breaker.blockingKey('finnhub', 'quote')) {
+        return null;
+    }
+
     const budget =
         await providerBudget.spend(
             'finnhub',
@@ -1439,15 +1501,17 @@ async function fetchFinnhubPrice(
 
     try {
         const response =
-            await axios.get(
-                `${FINNHUB_BASE_URL}/quote`,
-                {
-                    params: {
-                        symbol,
-                        token
-                    },
-                    timeout: 15000
-                }
+            await guardedRequest('finnhub', 'quote', () =>
+                axios.get(
+                    `${FINNHUB_BASE_URL}/quote`,
+                    {
+                        params: {
+                            symbol,
+                            token
+                        },
+                        timeout: 15000
+                    }
+                )
             );
 
         // Finnhub's "t" is the Unix time (seconds) of the last trade.
@@ -1580,7 +1644,12 @@ async function getInvestoHistory(
         return cached;
     }
 
-        const budget =
+    // Circuit open: do not spend budget on a request that will not be sent
+    if (breaker.blockingKey('investo', 'history')) {
+        return [];
+    }
+
+    const budget =
         await providerBudget.spend(
             'investo',
             'history'
@@ -1592,21 +1661,23 @@ async function getInvestoHistory(
 
     try {
         const response =
-            await axios.get(
-                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                {
-                    params: {
-                        from,
-                        to: end
-                    },
+            await guardedRequest('investo', 'history', () =>
+                axios.get(
+                    `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                    {
+                        params: {
+                            from,
+                            to: end
+                        },
 
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    },
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        },
 
-                    timeout: 20000
-                }
+                        timeout: 20000
+                    }
+                )
             );
 
         const data =
@@ -1751,7 +1822,7 @@ async function getTwelveDataHistory(
 
     // Fetch the number of trading days requested.
     const historyDays =
-    safeDays;
+        safeDays;
 
     const calendarWindow =
         Math.max(
@@ -1765,35 +1836,35 @@ async function getTwelveDataHistory(
             calendarWindow
         );
 
-        // Cached per history length so a short fetch never
+    // Cached per history length so a short fetch never
     // serves a longer request.
     const cacheKey =
         `twelvedata-history:${symbol}:${safeDays}:${end}`;
 
     if (!forceRefresh) {
-    const cached =
-        cacheGet(
-            historyCache,
-            cacheKey
-        );
+        const cached =
+            cacheGet(
+                historyCache,
+                cacheKey
+            );
 
-    if (cached) {
-        const result =
-            cached.slice(-safeDays);
+        if (cached) {
+            const result =
+                cached.slice(-safeDays);
 
-        console.log(
-            `✓ Cached Twelve Data history for ${symbol}: ${result.length} real trading days`
-        );
+            console.log(
+                `✓ Cached Twelve Data history for ${symbol}: ${result.length} real trading days`
+            );
 
-        return result;
+            return result;
+        }
     }
-}
 
     // --------------------------------------------------------
     // Request deduplication
     // --------------------------------------------------------
 
-        const inFlightKey =
+    const inFlightKey =
         `twelvedata-history:${symbol}:${safeDays}:${end}`;
 
     const existingRequest =
@@ -1824,28 +1895,30 @@ async function getTwelveDataHistory(
                 const response =
                     await enqueueTwelveDataRequest(
                         () =>
-                            axios.get(
-                                `${TWELVE_DATA_BASE_URL}/time_series`,
-                                {
-                                    params: {
-                                        symbol,
-                                        interval:
-                                            '1day',
-                                        start_date:
-                                            from,
-                                        end_date:
-                                            end,
-                                        apikey:
-                                            token,
-                                        order:
-                                            'asc',
-                                        timezone:
-                                            'America/New_York',
-                                        outputsize:
-                                            5000
-                                    },
-                                    timeout: 20000
-                                }
+                            guardedRequest('twelvedata', 'time_series', () =>
+                                axios.get(
+                                    `${TWELVE_DATA_BASE_URL}/time_series`,
+                                    {
+                                        params: {
+                                            symbol,
+                                            interval:
+                                                '1day',
+                                            start_date:
+                                                from,
+                                            end_date:
+                                                end,
+                                            apikey:
+                                                token,
+                                            order:
+                                                'asc',
+                                            timezone:
+                                                'America/New_York',
+                                            outputsize:
+                                                5000
+                                        },
+                                        timeout: 20000
+                                    }
+                                )
                             )
                     );
 
@@ -1868,61 +1941,61 @@ async function getTwelveDataHistory(
                 }
 
                 const allRows =
-    data.values
-        .map(row => ({
-            date:
-                row.datetime,
-            open:
-                parseNumber(
-                    row.open
-                ),
-            high:
-                parseNumber(
-                    row.high
-                ),
-            low:
-                parseNumber(
-                    row.low
-                ),
-            close:
-                parseNumber(
-                    row.close
-                ),
-            volume:
-                parseNumber(
-                    row.volume
-                )
-        }))
-        .filter(
-            row =>
-                row.date &&
-                isValidPrice(
-                    row.close
-                )
-        )
-        .sort(
-            (a, b) =>
-                a.date.localeCompare(
-                    b.date
-                )
-        );
+                    data.values
+                        .map(row => ({
+                            date:
+                                row.datetime,
+                            open:
+                                parseNumber(
+                                    row.open
+                                ),
+                            high:
+                                parseNumber(
+                                    row.high
+                                ),
+                            low:
+                                parseNumber(
+                                    row.low
+                                ),
+                            close:
+                                parseNumber(
+                                    row.close
+                                ),
+                            volume:
+                                parseNumber(
+                                    row.volume
+                                )
+                        }))
+                        .filter(
+                            row =>
+                                row.date &&
+                                isValidPrice(
+                                    row.close
+                                )
+                        )
+                        .sort(
+                            (a, b) =>
+                                a.date.localeCompare(
+                                    b.date
+                                )
+                        );
 
-        console.log(
-    `📅 Twelve Data ${symbol} dates:`,
-    allRows.map(row => row.date)
-);
+                console.log(
+                    `📅 Twelve Data ${symbol} dates:`,
+                    allRows.map(row => row.date)
+                );
 
-await savePriceHistory(
-    symbol,
-    'US',
-    allRows,
-    'twelvedata'
-);
+                await savePriceHistory(
+                    symbol,
+                    'US',
+                    allRows,
+                    'twelvedata'
+                );
 
-const rows =
-    allRows.slice(
-        -historyDays
-    );
+                const rows =
+                    allRows.slice(
+                        -historyDays
+                    );
 
                 cacheSet(
                     historyCache,
@@ -2211,14 +2284,11 @@ async function getSnapshotHistory(
 // no_data       = provider responded successfully but had
 //                 no historical rows
 // provider_error = provider request failed
+// cooldown      = no request was made (quota or circuit open)
 //
 // IMPORTANT:
 // getPriceHistory() remains unchanged and can still use
 // PriceSnapshot for "Observed by Gaze" charts.
-// ============================================================
-
-// ============================================================
-// HISTORICAL PROVIDER STATUS
 // ============================================================
 
 async function getHistoricalProviderStatus(
@@ -2255,61 +2325,68 @@ async function getHistoricalProviderStatus(
     }
 
     // ========================================================
-    // US — FINNHUB
+    // US — TWELVE DATA
     // ========================================================
 
-    // ========================================================
-// US — FINNHUB
-// ========================================================
+    if (normalizedMarket === 'US') {
+        // Circuit open: report "cooldown", NOT "no_data". Without this,
+        // getPriceHistory would return an empty list and the scheduler
+        // would wrongly believe the stock has no history.
+        if (breaker.blockingKey('twelvedata', 'time_series')) {
+            return {
+                status: 'cooldown',
+                rows: [],
+                requestMade: false
+            };
+        }
 
-if (normalizedMarket === 'US') {
-    const budgetCheck =
-        await providerBudget.check('twelvedata');
+        const budgetCheck =
+            await providerBudget.check('twelvedata');
 
-    if (!budgetCheck.ok) {
-        return {
-            status: 'cooldown',
-            rows: [],
-            requestMade: false
-        };
-    }
+        if (!budgetCheck.ok) {
+            return {
+                status: 'cooldown',
+                rows: [],
+                requestMade: false
+            };
+        }
 
-    try {
-        /*
-         * getPriceHistory() already routes US history
-         * to Finnhub and does not use the NGX snapshot
-         * fallback.
-         */
-        const rows =
-            await getPriceHistory(
-                symbol,
-                safeDays,
-                'US',
-                end,
-                true
+        try {
+            /*
+             * getPriceHistory() routes US history to Twelve Data
+             * and does not use the NGX snapshot fallback.
+             */
+            const rows =
+                await getPriceHistory(
+                    symbol,
+                    safeDays,
+                    'US',
+                    end,
+                    true
+                );
+
+            return {
+                status:
+                    rows.length > 0
+                        ? 'available'
+                        : 'no_data',
+
+                rows
+            };
+
+        } catch (error) {
+            console.error(
+                `[HistoricalProviderStatus] ${symbol} (${normalizedMarket}):`,
+                error.message
             );
 
-        return {
-            status:
-                rows.length > 0
-                    ? 'available'
-                    : 'no_data',
-
-            rows
-        };
-
-    } catch (error) {
-        console.error(
-            `[HistoricalProviderStatus] ${symbol} (${normalizedMarket}):`,
-            error.message
-        );
-
-        return {
-            status: 'provider_error',
-            rows: []
-        };
+            return {
+                status: 'provider_error',
+                rows: []
+            };
+        }
     }
-}
+
     // ========================================================
     // NGX — INVESTO
     // ========================================================
@@ -2329,18 +2406,27 @@ if (normalizedMarket === 'US') {
     }
 
     if (
-    await isInvestoCoolingDown()
-) {
-    console.log(
-        `⏸️ Investo cooldown active. Skipping provider status for ${symbol}`
-    );
+        await isInvestoCoolingDown()
+    ) {
+        console.log(
+            `⏸️ Investo cooldown active. Skipping provider status for ${symbol}`
+        );
 
-    return {
-        status: 'cooldown',
-        rows: [],
-        requestMade: false
-    };
-}
+        return {
+            status: 'cooldown',
+            rows: [],
+            requestMade: false
+        };
+    }
+
+    // Circuit open: do not spend budget on a request that will not be sent
+    if (breaker.blockingKey('investo', 'history-status')) {
+        return {
+            status: 'cooldown',
+            rows: [],
+            requestMade: false
+        };
+    }
 
     const budget =
         await providerBudget.spend(
@@ -2375,21 +2461,23 @@ if (normalizedMarket === 'US') {
 
     try {
         const response =
-            await axios.get(
-                `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
-                {
-                    params: {
-                        from,
-                        to: end
-                    },
+            await guardedRequest('investo', 'history-status', () =>
+                axios.get(
+                    `${INVESTO_BASE_URL}/prices/${encodeURIComponent(symbol)}`,
+                    {
+                        params: {
+                            from,
+                            to: end
+                        },
 
-                    headers: {
-                        Authorization:
-                            `Bearer ${token}`
-                    },
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`
+                        },
 
-                    timeout: 20000
-                }
+                        timeout: 20000
+                    }
+                )
             );
 
         const data =
@@ -2418,15 +2506,15 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-    status:
-        errorCode ===
-        'unknown_symbol'
-            ? 'no_data'
-            : 'provider_error',
+                status:
+                    errorCode ===
+                    'unknown_symbol'
+                        ? 'no_data'
+                        : 'provider_error',
 
-    rows: [],
-    requestMade: true
-};
+                rows: [],
+                requestMade: true
+            };
         }
 
         const rawRows =
@@ -2462,10 +2550,10 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-    status: 'available',
-    rows,
-    requestMade: true
-};
+                status: 'available',
+                rows,
+                requestMade: true
+            };
         }
 
         console.log(
@@ -2473,10 +2561,10 @@ if (normalizedMarket === 'US') {
         );
 
         return {
-    status: 'no_data',
-    rows: [],
-    requestMade: true
-};
+            status: 'no_data',
+            rows: [],
+            requestMade: true
+        };
 
     } catch (error) {
         const responseStatus =
@@ -2499,10 +2587,10 @@ if (normalizedMarket === 'US') {
             );
 
             return {
-    status: 'no_data',
-    rows: [],
-    requestMade: true
-};
+                status: 'no_data',
+                rows: [],
+                requestMade: true
+            };
         }
 
         /*
@@ -2525,10 +2613,10 @@ if (normalizedMarket === 'US') {
         );
 
         return {
-    status: 'provider_error',
-    rows: [],
-    requestMade: true
-};
+            status: 'provider_error',
+            rows: [],
+            requestMade: true
+        };
     }
 }
 
@@ -2835,7 +2923,8 @@ async function getPriceWithMeta(
             sourceTimestamp,
             fetchedAt
         });
-                // Tell the rest of Gaze (alerts, later others) about the new price.
+
+        // Tell the rest of Gaze (alerts, later others) about the new price.
         // Only real fetches get here: cache hits return earlier.
         priceEvents.publishPrice({
             ticker: symbol,

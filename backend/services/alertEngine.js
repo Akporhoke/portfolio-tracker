@@ -15,8 +15,10 @@
  *   - the previous price is saved in the database, so a restart loses
  *     nothing
  *
- * It does NOT make calls to any provider. It only reacts to prices Gaze
- * already fetched.
+ * It does NOT make calls to any price provider. It only reacts to prices
+ * Gaze already fetched. When a notification is created it is also sent to
+ * the user's phone/browser (push) and to their Telegram, wherever they
+ * turned those on.
  */
 
 const Alert =
@@ -27,6 +29,12 @@ const Notification =
 
 const priceEvents =
     require('./priceEvents');
+
+const telegram =
+    require('./telegramService');
+
+const push =
+    require('./pushService');
 
 
 // Ignore prices that are already old when they arrive (for example a
@@ -94,8 +102,8 @@ function formatNumber(value) {
 }
 
 
-// Returns true if a new notification was created, false if it already
-// existed (the same alert for the same observation)
+// Returns the new notification, or null if it already existed (the same
+// alert for the same observation)
 async function createNotification(alert, price, fetchedAt) {
     const sign =
         alert.market === 'US'
@@ -108,7 +116,7 @@ async function createNotification(alert, price, fetchedAt) {
             : 'fell below';
 
     try {
-        await Notification.create({
+        return await Notification.create({
             userId: alert.userId,
             type: 'price_alert',
 
@@ -132,16 +140,40 @@ async function createNotification(alert, price, fetchedAt) {
                 `${alert._id}|${fetchedAt.getTime()}`
         });
 
-        return true;
-
     } catch (error) {
         // Duplicate key: this alert already fired for this observation
         if (error && error.code === 11000) {
-            return false;
+            return null;
         }
 
         throw error;
     }
+}
+
+
+// Sends one new notification out to every channel the user turned on.
+// Neither call is awaited and neither can throw: a slow or failing
+// channel must never hold up the engine or stop the other channel.
+function deliver(notification) {
+    void push.sendToUser(
+        notification.userId,
+        {
+            title: notification.title,
+            body: notification.message,
+
+            // A different tag for every notification, so two alerts
+            // never replace each other on the lock screen
+            tag: notification.dedupeKey,
+
+            // Opens the app on the Notifications tab
+            url: '/?alerts=1'
+        }
+    );
+
+    void telegram.sendToUser(
+        notification.userId,
+        `${notification.title}\n${notification.message}`
+    );
 }
 
 
@@ -222,7 +254,7 @@ async function handlePriceEvent(event) {
         // Notification first: if the server stops right after, the worst
         // case is a duplicate later, never a lost alert. The unique key
         // stops duplicates for the same observation.
-        let created = false;
+        let created = null;
 
         if (fire) {
             created =
@@ -231,6 +263,11 @@ async function handlePriceEvent(event) {
                     price,
                     fetchedAt
                 );
+
+            // One new notification = one push + one Telegram message
+            if (created) {
+                deliver(created);
+            }
         }
 
         const set = {

@@ -9,6 +9,8 @@ const { startDividendScheduler } = require('./services/dividendScheduler');
 const { startPriceScheduler } = require('./services/priceScheduler');
 const { mountAuth, requireRole } = require('./gaze-auth/src');
 const { startAlertEngine } = require('./services/alertEngine');
+const { startTelegram } = require('./services/telegramService');
+const { startPush } = require('./services/pushService');
 const portfolioGuard = require('./gaze-auth/src/portfolio-guard');
 const portfolioValidate = require('./gaze-auth/src/portfolio-validate');
 
@@ -17,6 +19,8 @@ const marketCalendarRoutes = require('./routes/marketCalendar');
 const schedulerRoutes = require('./routes/scheduler');
 const portfolioRoutes = require('./routes/portfolio');
 const alertRoutes = require('./routes/alerts');
+const telegramRoutes = require('./routes/telegram');
+const pushRoutes = require('./routes/push');
 const stockRoutes = require('./routes/stocks');
 
 const app = express();
@@ -38,9 +42,18 @@ app.get('/api/test', (req, res) => {
 });
 
 // Routes  (everything that uses `app` comes AFTER `const app = express()` above)
-// alertRoutes sits BEFORE portfolioRoutes: it answers /:userId/alerts and
-// /:userId/notifications, and passes every other path on to portfolioRoutes.
-app.use('/api/portfolio', portfolioGuard, portfolioValidate, alertRoutes, portfolioRoutes);
+// alertRoutes, telegramRoutes and pushRoutes sit BEFORE portfolioRoutes:
+// they answer /:userId/alerts, /notifications, /telegram and /push, and
+// pass every other path on to portfolioRoutes.
+app.use(
+    '/api/portfolio',
+    portfolioGuard,
+    portfolioValidate,
+    alertRoutes,
+    telegramRoutes,
+    pushRoutes,
+    portfolioRoutes
+);
 app.use('/api/stocks', stockRoutes);                                          // public market data
 app.use('/api/market-calendar', marketCalendarRoutes);
 app.use('/api/scheduler', requireRole('admin'), schedulerRoutes);             // admin only
@@ -75,6 +88,14 @@ async function startServer() {
         startAlertEngine();      // listen first, so no price event is missed
         startPriceScheduler();   // then start producing price events
         startDividendScheduler();
+
+        // Push and Telegram never stop the server: if one fails to start,
+        // only that channel is off
+        startPush();
+
+        startTelegram().catch(error => {
+            console.error('[Telegram] failed to start:', error.message);
+        });
     } catch (err) {
         console.error('❌ MongoDB connection failed:', err.message);
         process.exit(1);

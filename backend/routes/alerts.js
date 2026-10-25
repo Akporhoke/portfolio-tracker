@@ -183,6 +183,123 @@ async function baselineFor(ticker, market) {
 
 
 // ------------------------------------------------------------
+// PRICE CHECK: is the price already past the threshold?
+//
+// An alert only fires when the price CROSSES the threshold. If the
+// price is already beyond it, the alert waits for the price to come
+// back and cross again. The form should say so, so nobody is surprised.
+// ------------------------------------------------------------
+
+function formatMoney(value, market) {
+    const sign =
+        market === 'US'
+            ? '$'
+            : '₦';
+
+    return sign + Number(value).toLocaleString(
+        'en-US',
+        { maximumFractionDigits: 2 }
+    );
+}
+
+
+async function checkAgainstPrice(ticker, market, direction, threshold) {
+    let price = null;
+
+    try {
+        const stored =
+            await quoteStore.getStoredQuote(ticker, market);
+
+        const number =
+            Number(stored && stored.price);
+
+        if (number > 0) {
+            price = number;
+        }
+    } catch (error) {
+        console.error(
+            '[Alerts] price check failed:',
+            error.message
+        );
+    }
+
+    if (price === null) {
+        return {
+            status: 'no_price',
+            currentPrice: null,
+            message:
+                `No price on record for ${ticker} yet. ` +
+                'The alert will start watching from the next price update.'
+        };
+    }
+
+    // Exactly ON the threshold counts as beyond: the engine needs the
+    // previous price to be strictly on the other side
+    const beyond =
+        direction === 'above'
+            ? price >= threshold
+            : price <= threshold;
+
+    if (!beyond) {
+        return {
+            status: 'ok',
+            currentPrice: price,
+            message: null
+        };
+    }
+
+    const now = formatMoney(price, market);
+    const line = formatMoney(threshold, market);
+
+    return {
+        status: 'already_beyond',
+        currentPrice: price,
+        message:
+            direction === 'above'
+                ? `${ticker} is already at ${now}, above ${line}. ` +
+                  `This alert will only fire after the price drops below ${line} and rises above it again.`
+                : `${ticker} is already at ${now}, below ${line}. ` +
+                  `This alert will only fire after the price rises above ${line} and falls below it again.`
+    };
+}
+
+
+// Called by the form while the user types, before saving
+//   GET .../alerts/preview?ticker=SEPLAT&market=NGX&direction=above&threshold=5000
+router.get('/:userId/alerts/preview', async (req, res) => {
+    try {
+        const ticker = cleanTicker(req.query.ticker);
+        const market = parseMarket(req.query.market);
+        const direction = parseDirection(req.query.direction);
+        const threshold = parseThreshold(req.query.threshold);
+
+        if (!ticker || !market || !direction || threshold === null) {
+            return fail(
+                res,
+                400,
+                'BAD_INPUT',
+                'ticker, market, direction and threshold are required'
+            );
+        }
+
+        res.json(
+            await checkAgainstPrice(
+                ticker,
+                market,
+                direction,
+                threshold
+            )
+        );
+
+    } catch (error) {
+        console.error('[Alerts] preview failed:', error.message);
+
+        fail(res, 500, 'SERVER_ERROR', 'Could not check the price');
+    }
+});
+
+
+// ------------------------------------------------------------
 // ALERTS: LIST
 // ------------------------------------------------------------
 
@@ -297,8 +414,23 @@ router.post('/:userId/alerts', async (req, res) => {
         // tell it to look again so the new alert counts right away
         invalidateActiveCache();
 
+        // Tell the form whether the price is already past the threshold
+        const check =
+            await checkAgainstPrice(
+                ticker,
+                market,
+                direction,
+                threshold
+            );
+
         res.status(201).json({
-            alert: withId(alert)
+            alert: withId(alert),
+            currentPrice: check.currentPrice,
+            alreadyBeyond: check.status === 'already_beyond',
+            warning:
+                check.status === 'already_beyond'
+                    ? check.message
+                    : null
         });
 
     } catch (error) {
