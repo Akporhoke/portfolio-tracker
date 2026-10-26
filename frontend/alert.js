@@ -369,6 +369,10 @@
 
         badgeEl.textContent = count > 9 ? '9+' : String(count);
         badgeEl.classList.toggle('show', count > 0);
+
+        // Inline style wins over any other stylesheet rule, so a "0"
+        // can never stay visible
+        badgeEl.style.display = count > 0 ? 'block' : 'none';
     }
 
     function buildBell() {
