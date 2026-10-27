@@ -21,6 +21,75 @@ window.GAZE_DICTIONARY = {
             whyItMatters: "Stocks are the basic building blocks of stock-market investing.",
             related: ["Share", "Equity", "Shareholder", "Company"]
         },
+        
+{
+    term: "NGX Trading Hours",
+    category: "Market Basics",
+    definition: "The official trading schedule of the Nigerian Exchange (NGX), which determines when the Nigerian stock market opens, accepts orders, conducts continuous trading, and closes on trading days.",
+    explanation: "The NGX follows West Africa Time (WAT, UTC+1). Its trading day includes pre-open, continuous trading, and pre-close phases. The market is generally closed on weekends and Nigerian public holidays.",
+    keyPoints: [
+        "Pre-Open: 9:00 AM WAT",
+        "Pre-Open IO (Imbalance Order): 9:25 AM WAT",
+        "Continuous Trading: 9:30 AM – 3:50 PM WAT",
+        "Pre-Close: 3:50 PM WAT",
+        "Pre-Close IO: 3:55 PM WAT",
+        "Market Close: 4:00 PM WAT"
+    ],
+    example: "If you want to monitor a stock during continuous trading, the schedule shown here indicates that the session runs from 9:30 AM to 3:50 PM WAT on a normal trading day.",
+    relatedTerms: [
+        "Stock Exchange",
+        "Trading Session",
+        "Market Order",
+        "Limit Order",
+        "Pre-Market",
+        "Market Close"
+    ]
+},
+
+       
+    {
+        term: "Pre-Open",
+        category: "Market Basics",
+        definition: "The period before continuous trading begins when the exchange prepares the market and allows eligible orders to be entered.",
+        explanation: "Orders may be collected and used to help establish an opening price, depending on the exchange's rules. Continuous trading has not started yet.",
+        example: "At 9:00 AM WAT, the pre-open phase begins according to the schedule shown."
+    },
+    {
+        term: "Pre-Open IO (Imbalance Order)",
+        category: "Market Basics",
+        definition: "A stage in the pre-open process associated with imbalance orders, which relate to differences between buy and sell orders.",
+        explanation: "An order imbalance occurs when buying interest and selling interest are not equal. The exchange's specific rules determine which orders can be entered or adjusted during this stage.",
+        example: "If more shares are offered for sale than buyers want to purchase, the market has a sell-side order imbalance."
+    },
+    {
+        term: "Continuous Trading",
+        category: "Market Basics",
+        definition: "The main trading session when eligible buy and sell orders can be matched as they enter the market.",
+        explanation: "During this phase, matching orders can result in trades at available market prices. Prices may change as buying and selling activity changes.",
+        example: "If a buyer's bid matches a seller's asking price, a trade may occur."
+    },
+    {
+        term: "Pre-Close",
+        category: "Market Basics",
+        definition: "The phase near the end of the trading session when the exchange transitions from continuous trading toward the closing process.",
+        explanation: "The exchange applies its rules for handling orders and determining the closing price. The exact activities permitted during this phase depend on the exchange's procedures.",
+        example: "At 3:50 PM WAT, the schedule shown indicates the start of the pre-close phase."
+    },
+    {
+        term: "Pre-Close IO (Imbalance Order)",
+        category: "Market Basics",
+        definition: "A stage associated with order imbalances during the pre-close process, as the exchange moves toward determining the closing price.",
+        explanation: "An imbalance reflects a difference between buy and sell interest. The exchange's rules determine how orders are handled during this stage.",
+        example: "If there is stronger buying interest than selling interest near the close, the order book may show a buy-side imbalance."
+    },
+    {
+        term: "Market Close",
+        category: "Market Basics",
+        definition: "The point at which the exchange's scheduled trading session ends for the day.",
+        explanation: "After the market closes, normal trading for that session ends. The closing price is the official end-of-session price determined under the exchange's rules; it is not necessarily the same as the last price displayed during continuous trading.",
+        example: "At 4:00 PM WAT, the schedule shown indicates that the market closes for the day."
+    },
+
 
         {
             term: "Share",
@@ -2175,7 +2244,7 @@ window.GAZE_DICTIONARY = {
       example: "A dividend declaration, rights issue, bonus issue, or stock split may be a corporate action.",
       whyItMatters: "Tracking corporate actions helps investors understand important deadlines, eligibility rules, and changes that may affect their holdings.",
       related: ["Dividend", "Rights Issue", "Bonus Issue", "Stock Split", "Share Buyback"]
-    },,
+    },
 
         {
             term: "Maturity Date",
