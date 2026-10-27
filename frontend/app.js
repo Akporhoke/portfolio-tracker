@@ -5872,6 +5872,17 @@ function renderWatchlist() {
                                      ${priceFreshnessHtml(stock)}
 
                                 </div>
+                                
+                                <div class="stock-actions">
+    <button
+        class="btn-icon btn-alert"
+        onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
+        title="Set price alert"
+        aria-label="Set price alert for ${safeTicker}"
+    >
+        🔔
+    </button>
+</div>
 
 
                                 <div class="watchlist-expand-icon">
@@ -7757,6 +7768,14 @@ function renderPortfolio() {
                                 >
                                     ✏️
                                 </button>
+                                <button
+    class="btn-icon btn-alert"
+    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
+    title="Set price alert"
+    aria-label="Set price alert for ${safeTicker}"
+>
+    🔔
+</button>
 
                             </div>
 
@@ -7766,7 +7785,7 @@ function renderPortfolio() {
                 }
             )
             .join('');
-}
+} 
 
 
 /* ============================================
@@ -8085,6 +8104,14 @@ function renderMarketStockList(
                                 >
                                     ✏️
                                 </button>
+                                <button
+    class="btn-icon btn-alert"
+    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${market}')"
+    title="Set price alert"
+    aria-label="Set price alert for ${safeTicker}"
+>
+    🔔
+</button>
 
 
                                 <button
