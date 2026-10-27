@@ -21,6 +21,7 @@ const portfolioRoutes = require('./routes/portfolio');
 const alertRoutes = require('./routes/alerts');
 const telegramRoutes = require('./routes/telegram');
 const pushRoutes = require('./routes/push');
+const adminStatusRoutes = require('./routes/adminStatus');
 const stockRoutes = require('./routes/stocks');
 
 const app = express();
@@ -42,9 +43,9 @@ app.get('/api/test', (req, res) => {
 });
 
 // Routes  (everything that uses `app` comes AFTER `const app = express()` above)
-// alertRoutes, telegramRoutes and pushRoutes sit BEFORE portfolioRoutes:
-// they answer /:userId/alerts, /notifications, /telegram and /push, and
-// pass every other path on to portfolioRoutes.
+// alertRoutes, telegramRoutes, pushRoutes and adminStatusRoutes sit BEFORE
+// portfolioRoutes: they answer /:userId/alerts, /notifications, /telegram,
+// /push and /admin/status, and pass every other path on to portfolioRoutes.
 app.use(
     '/api/portfolio',
     portfolioGuard,
@@ -52,6 +53,7 @@ app.use(
     alertRoutes,
     telegramRoutes,
     pushRoutes,
+    adminStatusRoutes,
     portfolioRoutes
 );
 app.use('/api/stocks', stockRoutes);                                          // public market data
@@ -97,7 +99,7 @@ async function startServer() {
             console.error('[Telegram] failed to start:', error.message);
         });
     } catch (err) {
-        console.error('❌ MongoDB connection failed:', err.message);
+        console.error('❌ Server failed to start:', err.message);
         process.exit(1);
     }
 }

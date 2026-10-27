@@ -23,7 +23,7 @@ self.addEventListener('activate', event => {
 // A push arrived from the server
 self.addEventListener('push', event => {
     let data = {};
-
+    
     try {
         data = event.data ? event.data.json() : {};
     } catch (error) {
@@ -32,20 +32,20 @@ self.addEventListener('push', event => {
             body: event.data ? event.data.text() : ''
         };
     }
-
+    
     const title = data.title || 'Gaze';
-
+    
     const options = {
         body: data.body || '',
-
+        
         // Same tag = replaces the older notification. The server gives
         // each alert its own tag so none are lost.
         tag: data.tag || undefined,
-
+        
         // Where to go when it is tapped
         data: { url: data.url || '/' }
     };
-
+    
     // waitUntil keeps the worker alive until the notification is shown.
     // Browsers require every push to show a notification.
     event.waitUntil(
@@ -57,30 +57,30 @@ self.addEventListener('push', event => {
 // The notification was tapped
 self.addEventListener('notificationclick', event => {
     event.notification.close();
-
+    
     const wanted =
         (event.notification.data && event.notification.data.url) || '/';
-
+    
     // Only ever open a page on our own site
     const target =
         new URL(wanted, self.location.origin).href;
-
+    
     event.waitUntil(
         self.clients
-            .matchAll({ type: 'window', includeUncontrolled: true })
-            .then(windows => {
-                // Gaze is already open: bring it forward and tell it
-                // to show the notifications
-                for (const client of windows) {
-                    if ('focus' in client) {
-                        client.postMessage({ type: 'open-alerts' });
-
-                        return client.focus();
-                    }
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then(windows => {
+            // Gaze is already open: bring it forward and tell it
+            // to show the notifications
+            for (const client of windows) {
+                if ('focus' in client) {
+                    client.postMessage({ type: 'open-alerts' });
+                    
+                    return client.focus();
                 }
-
-                // Not open: open it (the app reads ?alerts=1)
-                return self.clients.openWindow(target);
-            })
+            }
+            
+            // Not open: open it (the app reads ?alerts=1)
+            return self.clients.openWindow(target);
+        })
     );
 });

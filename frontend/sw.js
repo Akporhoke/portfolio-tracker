@@ -83,4 +83,4 @@ self.addEventListener('notificationclick', event => {
                 return self.clients.openWindow(target);
             })
     );
-});
+});&& 

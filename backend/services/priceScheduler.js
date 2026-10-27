@@ -26,6 +26,10 @@
  * start) refreshes everything that went out of date, most important
  * first, and later cycles finish whatever the budget did not allow.
  *
+ * When a provider is paused by its circuit breaker, its stocks are SKIPPED
+ * (not failed): a failure would push each stock into a longer and longer
+ * retry delay, even though the stock did nothing wrong.
+ *
  * Set PRICE_SCHEDULER_ENABLED=false to switch it off (for example on a
  * laptop that shares the production database and API keys).
  */
@@ -51,6 +55,9 @@ const calendarService =
 
 const providerBudget =
     require('./providerBudget');
+
+const circuitBreaker =
+    require('./circuitBreaker');
 
 
 const ENABLED =
@@ -344,6 +351,7 @@ async function runPriceRefreshCycle(reason = 'tick') {
         });
 
         let finnhubBlocked = false;
+        let ngxBlocked = false;
 
         // Everything inside runs as scheduler work: it may use only the
         // scheduler's share of each provider's quota
@@ -352,8 +360,29 @@ async function runPriceRefreshCycle(reason = 'tick') {
                 while (queue.length > 0) {
                     const item = queue.shift();
 
+                    // NGX prices: when BOTH NGX sources are paused by their
+                    // circuit breakers, leave the rest for a later cycle.
+                    // Skipped is not failed: a failure would put each stock
+                    // into a longer retry delay for no fault of its own.
+                    if (item.market === 'NGX') {
+                        if (ngxBlocked) {
+                            summary.skipped++;
+                            continue;
+                        }
+
+                        if (
+                            circuitBreaker.isBlocking('ngnmarket:companies') &&
+                            circuitBreaker.isBlocking('investo:price')
+                        ) {
+                            ngxBlocked = true;
+                            summary.skipped++;
+                            continue;
+                        }
+                    }
+
                     // US prices come from Finnhub, limited per minute.
-                    // When it is used up, leave the rest for the next cycle.
+                    // When it is used up (or its circuit is open), leave
+                    // the rest for the next cycle.
                     if (item.market === 'US') {
                         if (finnhubBlocked) {
                             summary.skipped++;
