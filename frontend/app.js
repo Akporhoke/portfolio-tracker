@@ -4576,6 +4576,9 @@ function updateTopPerformer(portfolio) {
         document.getElementById(
             'topPerformerSubtitle'
         );
+        
+    const topPerformerCard =
+    document.querySelector('.portfolio-right');
 
 
     /*
@@ -4676,43 +4679,25 @@ function updateTopPerformer(portfolio) {
      * If more than one stock remains,
      * there is genuinely no standout.
      */
-    if (finalLeaders.length > 1) {
 
-        if (tickerEl) {
-            tickerEl.textContent =
-                'No standout';
-        }
+/*
+ * Hide Top Performer when holdings are tied.
+ */
+if (finalLeaders.length > 1) {
 
-        if (changeEl) {
-            changeEl.textContent =
-                '—';
-
-            changeEl.style.color =
-                'rgba(255, 255, 255, 0.7)';
-        }
-
-        if (subtitleEl) {
-            subtitleEl.textContent =
-                'All holdings are tied';
-        }
-
-        if (investedEl) {
-            investedEl.textContent =
-                '—';
-        }
-
-        if (gainEl) {
-            gainEl.textContent =
-                '—';
-        }
-
-        if (lossEl) {
-            lossEl.textContent =
-                '—';
-        }
-
-        return;
+    if (topPerformerCard) {
+        topPerformerCard.style.display = 'none';
     }
+
+    return;
+}
+
+/*
+ * Show Top Performer when there is a clear winner.
+ */
+if (topPerformerCard) {
+    topPerformerCard.style.display = '';
+}
 
 
     /*
