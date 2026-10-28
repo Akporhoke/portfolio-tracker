@@ -542,5 +542,6 @@ function stopPriceScheduler() {
 module.exports = {
     startPriceScheduler,
     stopPriceScheduler,
-    runPriceRefreshCycle
+    runPriceRefreshCycle,
+    collectTrackedSymbols
 };
