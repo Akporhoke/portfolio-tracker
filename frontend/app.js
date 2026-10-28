@@ -5873,27 +5873,25 @@ function renderWatchlist() {
 
                                 </div>
                                 
-                                <div class="stock-actions">
+
+<div class="stock-card-controls">
+
     <button
         class="btn-icon btn-alert"
         onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
         title="Set price alert"
         aria-label="Set price alert for ${safeTicker}"
     >
-        🔔
+        <i class="fa-regular fa-bell" aria-hidden="true"></i>
     </button>
+
+    <div class="watchlist-expand-icon">
+        <span id="watchlist-arrow-${i}">
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </span>
+    </div>
+
 </div>
-
-
-                                <div class="watchlist-expand-icon">
-
-                                    <span
-                                        id="watchlist-arrow-${i}"
-                                    >
-                                        ⌄
-                                    </span>
-
-                                </div>
 
                             </div>
 
@@ -6044,12 +6042,16 @@ function renderWatchlist() {
                                         </button>
 
 
-                                        <button
-                                            class="btn-delete watchlist-analysis-btn"
-                                            onclick="event.stopPropagation(); deleteFromWatchlist('${safeTicker}')"
-                                        >
-                                            🗑 Remove
-                                        </button>
+<button
+    class="btn-delete watchlist-analysis-btn"
+    onclick="event.stopPropagation(); deleteFromWatchlist('${safeTicker}')"
+    title="Remove from watchlist"
+    aria-label="Remove ${safeTicker} from watchlist"
+>
+    <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+    <span>Remove</span>
+</button>
+
 
                                     </div>
 
@@ -6243,60 +6245,58 @@ function renderConfidenceMetric(
    WATCHLIST EXPAND / COLLAPSE
    ============================================ */
 
+
 async function toggleWatchlistAnalysis(
     ticker,
     market,
     index
 ) {
-
     const analysis =
         document.getElementById(
             `watchlist-analysis-${index}`
         );
-
 
     const arrow =
         document.getElementById(
             `watchlist-arrow-${index}`
         );
 
-
     if (!analysis) {
         return;
     }
 
+    // Find the parent watchlist card
+    const card = analysis.closest(
+        '.watchlist-card'
+    );
 
     const isOpen =
         analysis.classList.contains(
             'active'
         );
 
-
     if (isOpen) {
+        analysis.classList.remove('active');
 
-        analysis.classList.remove(
-            'active'
-        );
-
-
-        if (arrow) {
-            arrow.textContent =
-                '⌄';
+        if (card) {
+            card.classList.remove('expanded');
         }
 
+        if (arrow) {
+            arrow.textContent = '⌄';
+        }
 
         return;
     }
 
+    analysis.classList.add('active');
 
-    analysis.classList.add(
-        'active'
-    );
-
+    if (card) {
+        card.classList.add('expanded');
+    }
 
     if (arrow) {
-        arrow.textContent =
-            '⌃';
+        arrow.textContent = '⌃';
     }
 
     loadConfidenceHistory(ticker, market, index);
@@ -7757,25 +7757,29 @@ function renderPortfolio() {
 
                             <div class="stock-actions">
 
-                                <button
-                                    class="btn-icon btn-edit"
-                                    onclick="openEditStockModal(
-                                        '${stock.ticker}',
-                                        '${stock.market}'
-                                    )"
-                                    title="Edit"
-                                    aria-label="Edit ${safeTicker} position"
-                                >
-                                    ✏️
-                                </button>
-                                <button
+                 
+<button
+    class="btn-icon btn-edit"
+    onclick="openEditStockModal(
+        '${stock.ticker}',
+        '${stock.market}'
+    )"
+    title="Edit stock"
+    aria-label="Edit ${safeTicker} position"
+>
+    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+</button>
+
+          
+<button
     class="btn-icon btn-alert"
     onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
     title="Set price alert"
     aria-label="Set price alert for ${safeTicker}"
 >
-    🔔
+    <i class="fa-regular fa-bell" aria-hidden="true"></i>
 </button>
+
 
                             </div>
 
@@ -8093,25 +8097,28 @@ function renderMarketStockList(
 
                             <div class="stock-actions">
 
-                                <button
-                                    class="btn-icon btn-edit"
-                                    onclick="event.stopPropagation(); openEditStockModal(
-                                        '${stock.ticker}',
-                                        '${market}'
-                                    )"
-                                    title="Edit"
-                                    aria-label="Edit ${safeTicker}"
-                                >
-                                    ✏️
-                                </button>
-                                <button
+                           
+<button
+    class="btn-icon btn-edit"
+    onclick="openEditStockModal(
+        '${stock.ticker}',
+        '${stock.market}'
+    )"
+    title="Edit stock"
+    aria-label="Edit ${safeTicker} position"
+>
+    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+</button>
+
+<button
     class="btn-icon btn-alert"
-    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${market}')"
+    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
     title="Set price alert"
     aria-label="Set price alert for ${safeTicker}"
 >
-    🔔
+    <i class="fa-regular fa-bell" aria-hidden="true"></i>
 </button>
+    
 
 
                                 <button
