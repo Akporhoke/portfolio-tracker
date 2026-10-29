@@ -80,24 +80,53 @@ const API_COLORS = [
 /* ============================================
    INITIALIZATION
    ============================================ */
+   
+   const USER_DATA_KEYS = [
+    'portfolioTrackerState',
+    'portfolioTrackerLocalActivity',
+    'portfolioTrackerActivityClearedAt'
+];
+
+function clearUserData() {
+    USER_DATA_KEYS.forEach(key => localStorage.removeItem(key));
+
+    state.portfolio = { stocks: [] };
+    state.watchlist = { stocks: [] };
+    state.sold = { stocks: [] };
+    state.activity = [];
+    state.localActivity = [];
+    state.activityClearedAt = null;
+    state.userName = '';
+    state.settings = { goalAmount: 1000000 };
+    state.pricesFromServer = false;
+
+    updateUI();
+}
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Portfolio Tracker loaded');
-
     initializeTime();
     setupEventListeners();
     setupTabNavigation();
-    loadFromLocalStorage();
-    loadLocalActivity();
     setupClearActivityButton();
-
     renderSkeletons();
-
-    fetchAllData();
-
     setupNetworkListeners();
-    
     syncCurrencyToggleUI();
+
+    const start = () => {
+        if (window.GazeAuth?.getUser()) {
+            loadFromLocalStorage();
+            loadLocalActivity();
+        } else {
+            clearUserData();
+        }
+        fetchAllData();
+    };
+
+    if (window.GazeAuth) {
+        window.GazeAuth.ready.then(start, start);
+    } else {
+        start();
+    }
 
     setInterval(
         () => fetchAllData({ background: true }),
@@ -1464,8 +1493,9 @@ async function fetchAllData(options = {}) {
 
 
         if (portfolioRes.status === 401) {
-            return; // not logged in: the login box handles it
-        }
+    clearUserData();
+    return;
+}
 
         if (!portfolioRes.ok) {
 
@@ -8597,7 +8627,9 @@ function saveToLocalStorage() {
             state.exchangeRate,
 
         lastUpdated:
-            state.lastUpdated
+            state.lastUpdated,
+            
+            owner: window.GazeAuth?.getUser()?.email || null,
     };
 
 
@@ -8628,6 +8660,12 @@ function loadFromLocalStorage() {
 
         const data =
             JSON.parse(saved);
+            const currentOwner = window.GazeAuth?.getUser()?.email || null;
+
+if (!currentOwner || data.owner !== currentOwner) {
+    USER_DATA_KEYS.forEach(key => localStorage.removeItem(key));
+    return;
+}
 
 
         state.portfolio =

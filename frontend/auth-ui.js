@@ -115,13 +115,16 @@
       outBtn.type = 'button';
       outBtn.appendChild(icon('fa-solid fa-right-from-bracket settings-row-icon'));
       outBtn.appendChild(el('span', 'settings-row-label', 'Log out'));
-      outBtn.addEventListener('click', async function () {
-        outBtn.disabled = true;
-        await window.GazeAuth.logout();
-        clearUserCache();
-        toast('Logged out');
-        reloadSoon();
-      });
+outBtn.addEventListener('click', async function() {
+  outBtn.disabled = true;
+  try {
+    await window.GazeAuth.logout();
+  } finally {
+    clearUserCache();
+  }
+  toast('Logged out');
+  reloadSoon();
+});
       group.appendChild(outBtn);
     }
     root.appendChild(group);
@@ -677,12 +680,17 @@
     var secRow = $('securityRowBtn');
     if (secRow) secRow.addEventListener('click', openSecurity);
 
-    window.GazeAuth.onChange(function (user) {
-      renderCard(user);
-      refreshHeader();
-      syncNameInput(user);
-      if (!user) { closeModal('securityModal'); closeModal('nicknameModal'); }
-    });
+var hadUser = false;
+
+window.GazeAuth.onChange(function (user) {
+    if (hadUser && !user) clearUserCache();
+    hadUser = !!user;
+
+    renderCard(user);
+    refreshHeader();
+    syncNameInput(user);
+    if (!user) { closeModal('securityModal'); closeModal('nicknameModal'); }
+});
 
     // A portfolio request was blocked because nobody is logged in: ask them to log in (once per page load)
     window.addEventListener('gaze:login-required', function () {
@@ -700,8 +708,10 @@
       syncNameInput(u);
     };
     show();
-    window.GazeAuth.ready.then(function () { show(); maybePromptNickname(); maybeRemindVerify(); });
-
+window.GazeAuth.ready.then(function () {
+    if (!window.GazeAuth.getUser()) clearUserCache();
+    show(); maybePromptNickname(); maybeRemindVerify();
+});
     // came back from confirming the email in another tab: pick up the new status
     window.addEventListener('focus', function () {
       var u = window.GazeAuth.getUser();
@@ -722,3 +732,4 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+  
