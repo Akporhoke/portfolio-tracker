@@ -88,19 +88,29 @@
 
     <!-- Main Container -->
     <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="greeting">
-                <p class="hello" id="greetingText">Good Morning,</p>
-                <h1 class="name" id="userName">Guest</h1>
-            </div>
-            <div class="header-actions">
-                <button class="tab-btn header-icon-btn" data-tab="settings" aria-label="Settings">
-                    <i class="fa-solid fa-gear"></i>
-                </button>
-                <div class="avatar" id="avatar">G</div>
-            </div>
-                </div>
+
+<!-- Header -->
+<div class="header">
+    <div class="greeting">
+        <p class="hello" id="greetingText">Good Morning,</p>
+
+        <div class="header-identity">
+            <div class="avatar header-avatar" id="avatar">G</div>
+            <h1 class="name" id="userName">Guest</h1>
+        </div>
+    </div>
+
+    <div class="header-actions">
+        <button
+            class="tab-btn header-icon-btn"
+            data-tab="settings"
+            aria-label="Settings"
+        >
+            <i class="fa-solid fa-gear"></i>
+        </button>
+    </div>
+</div>
+
 
         <!-- Floating Tools Sphere -->
         <div id="floatingToolsSphere" class="floating-tools-sphere" aria-label="Floating tools">
@@ -479,10 +489,15 @@
     <i class="fa-solid fa-chevron-right settings-chevron"></i>
 </button>
 
-                                        <button type="button" class="settings-row settings-link" onclick="openAlertsModal()">
-                        <i class="fa-regular fa-bell settings-row-icon"></i>
-                        <span class="settings-row-label">Price Alerts</span>
-                </div>
+                                        <button
+    type="button"
+    class="settings-row settings-link"
+    onclick="openAlertsModal()"
+>
+    <i class="fa-regular fa-bell settings-row-icon"></i>
+    <span class="settings-row-label">Price Alerts</span>
+</button>
+</div>
 
                 <p class="settings-section-label">Preferences</p>
                 <div class="settings-group">
@@ -998,7 +1013,7 @@
     </div>
 
 
-    <!-- ===== AUTH MODALS (paste just before <!-- Sync Indicator -->    
+    <!-- ===== AUTH MODALS ===== -->
 
     <!-- Login / Sign up -->
     <div class="modal" id="authModal">

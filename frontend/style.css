@@ -3787,3 +3787,49 @@ button:last-child:active {
         width: 32px;
     }
 }
+
+/* =========================================
+   GAZE HEADER — COMPACT PROFILE IDENTITY
+   ========================================= */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.greeting {
+    min-width: 0;
+}
+
+.header-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-identity .header-avatar {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.header-identity .name {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}

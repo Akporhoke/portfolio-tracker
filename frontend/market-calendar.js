@@ -73,12 +73,57 @@
         return out;
     }
 
-    async function apiProvider(y, m) {
-    const base = (typeof API_BASE !== 'undefined') ? API_BASE : '/api';
-    const res = await fetch(`${base}/market-calendar?month=${y}-${pad(m + 1)}`);
-    if (!res.ok) throw new Error('Calendar request failed');
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Calendar error');
+
+async function apiProvider(y, m) {
+    const base =
+        typeof API_BASE !== 'undefined'
+            ? API_BASE
+            : '/api';
+
+    const month = `${y}-${pad(m + 1)}`;
+    const url = `${base}/market-calendar?month=${month}`;
+
+    let res;
+
+    try {
+        res = await fetch(url);
+    } catch (err) {
+        throw new Error(
+            `Calendar network request failed (${url}): ${err.message}`
+        );
+    }
+
+    if (!res.ok) {
+        const responseText = await res.text().catch(() => '');
+
+        throw new Error(
+            `Calendar HTTP ${res.status} ${res.statusText}. ` +
+            `Response: ${responseText.slice(0, 300)}`
+        );
+    }
+
+    let data;
+
+    try {
+        data = await res.json();
+    } catch (err) {
+        throw new Error(
+            `Calendar returned invalid JSON: ${err.message}`
+        );
+    }
+
+    if (!data.success) {
+        throw new Error(
+            data.error || 'Calendar API returned success=false'
+        );
+    }
+
+    if (!data.days || typeof data.days !== 'object') {
+        throw new Error(
+            'Calendar API response is missing its days object'
+        );
+    }
+
     return data.days;
 }
 
@@ -115,10 +160,13 @@ let provider = apiProvider;
 
         if (sess.status === 'fulfilled') {
             state.sessions = sess.value;
-        } else {
-            console.error('Market calendar load failed:', sess.reason);
-            state.sessions = null;
+               } else {
             state.error = true;
+
+            console.error(
+                'Market calendar load failed:',
+                sess.reason?.stack || sess.reason?.message || sess.reason
+            );
         }
 
         if (div.status === 'fulfilled') {
@@ -332,3 +380,4 @@ let provider = apiProvider;
         init();
     }
 })();
+&& 

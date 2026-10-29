@@ -1,10 +1,10 @@
-/* ============================================
+ /* ============================================
    STATE MANAGEMENT
    ============================================ */
 
 const state = {
     userId: 'user-1',
-    userName: 'Orhoke',
+    userName: 'Guest',
 
     portfolio: {
         stocks: []
@@ -4128,29 +4128,52 @@ function updateUI(options = {}) {
 }
 
 
-function displayName() {
-    const account = window.GazeAuth && window.GazeAuth.getUser();
-    const accountName = account
-        ? (account.name || String(account.email || '').split('@')[0])
-        : '';
-    return String(state.userName || accountName || 'Guest').trim() || 'Guest';
-}
 
 function displayName() {
-    const account = window.GazeAuth && window.GazeAuth.getUser();
-    if (!account) return 'Guest';
-    const email = String(account.email || '');
-    return String(account.nickname || account.name || email.split('@')[0] || 'Guest').trim() || 'Guest';
+    const account = window.GazeAuth?.getUser();
+
+    const accountName = account
+        ? (
+            account.nickname ||
+            account.name ||
+            String(account.email || '').split('@')[0]
+        )
+        : '';
+
+    return String(
+        state.userName || accountName || 'Guest'
+    ).trim() || 'Guest';
 }
 
 function updateHeader() {
     const name = displayName();
+    const initial = name.charAt(0).toUpperCase();
+
+    // Main header
     const userName = document.getElementById('userName');
     const avatar = document.getElementById('avatar');
 
-    if (userName) userName.textContent = name;
-    if (avatar) avatar.textContent = name.charAt(0).toUpperCase();
+    if (userName) {
+        userName.textContent = name;
+    }
+
+    if (avatar) {
+        avatar.textContent = initial;
+    }
+
+    // Settings profile
+    const settingsAvatar = document.getElementById('settingsAvatar');
+    const settingsProfileName = document.getElementById('settingsProfileName');
+
+    if (settingsAvatar) {
+        settingsAvatar.textContent = initial;
+    }
+
+    if (settingsProfileName) {
+        settingsProfileName.textContent = name;
+    }
 }
+
 
 
 function updateQuickStats() {
@@ -5873,25 +5896,29 @@ function renderWatchlist() {
 
                                 </div>
                                 
+                                <div class="stock-actions">
 
-<div class="stock-card-controls">
-
-    <button
-        class="btn-icon btn-alert"
-        onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
-        title="Set price alert"
-        aria-label="Set price alert for ${safeTicker}"
-    >
-        <i class="fa-regular fa-bell" aria-hidden="true"></i>
-    </button>
-
-    <div class="watchlist-expand-icon">
-        <span id="watchlist-arrow-${i}">
-            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-        </span>
-    </div>
+<button
+    class="btn-icon btn-alert"
+    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
+    title="Set price alert"
+    aria-label="Set price alert for ${safeTicker}"
+>
+    <i class="fa-regular fa-bell" aria-hidden="true"></i>
+</button>
 
 </div>
+
+
+                                <div class="watchlist-expand-icon">
+
+                                    
+<span id="watchlist-arrow-${i}">
+    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+</span>
+
+
+                                </div>
 
                             </div>
 
@@ -6245,58 +6272,60 @@ function renderConfidenceMetric(
    WATCHLIST EXPAND / COLLAPSE
    ============================================ */
 
-
 async function toggleWatchlistAnalysis(
     ticker,
     market,
     index
 ) {
+
     const analysis =
         document.getElementById(
             `watchlist-analysis-${index}`
         );
+
 
     const arrow =
         document.getElementById(
             `watchlist-arrow-${index}`
         );
 
+
     if (!analysis) {
         return;
     }
 
-    // Find the parent watchlist card
-    const card = analysis.closest(
-        '.watchlist-card'
-    );
 
     const isOpen =
         analysis.classList.contains(
             'active'
         );
 
-    if (isOpen) {
-        analysis.classList.remove('active');
 
-        if (card) {
-            card.classList.remove('expanded');
-        }
+    if (isOpen) {
+
+        analysis.classList.remove(
+            'active'
+        );
+
 
         if (arrow) {
-            arrow.textContent = '⌄';
+            arrow.textContent =
+                '⌄';
         }
+
 
         return;
     }
 
-    analysis.classList.add('active');
 
-    if (card) {
-        card.classList.add('expanded');
-    }
+    analysis.classList.add(
+        'active'
+    );
+
 
     if (arrow) {
-        arrow.textContent = '⌃';
+        arrow.textContent =
+            '⌃';
     }
 
     loadConfidenceHistory(ticker, market, index);
