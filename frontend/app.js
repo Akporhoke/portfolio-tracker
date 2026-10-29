@@ -4132,18 +4132,20 @@ function updateUI(options = {}) {
 function displayName() {
     const account = window.GazeAuth?.getUser();
 
-    const accountName = account
-        ? (
-            account.nickname ||
-            account.name ||
-            String(account.email || '').split('@')[0]
-        )
-        : '';
+    const clean = v => {
+        const s = String(v || '').trim();
+        return s && s.toLowerCase() !== 'guest' ? s : '';
+    };
 
-    return String(
-        state.userName || accountName || 'Guest'
-    ).trim() || 'Guest';
+    return (
+        clean(account?.nickname) ||
+        clean(state.userName) ||
+        clean(account?.name) ||
+        clean(String(account?.email || '').split('@')[0]) ||
+        'Guest'
+    );
 }
+
 
 function updateHeader() {
     const name = displayName();
@@ -9404,4 +9406,4 @@ function updateQuickStats() {
         document.getElementById('statSold'),
         state.sold.stocks?.length || 0
     );
-}
+} 
