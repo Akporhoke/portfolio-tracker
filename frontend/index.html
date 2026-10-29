@@ -431,7 +431,7 @@
                     <!-- Portfolio items will be generated here -->
                 </div>
                 <div class="empty-state" id="portfolioEmpty">
-                    <p style="font-size: 32px;">📈</p>
+                    <p style="font-size: 32px;"><p style="font-size: 32px;"><i class="fa-solid fa-chart-line"></i></p></p>
                     <p style="font-weight: 600;">No stocks owned yet</p>
                     <p style="color: #999; font-size: 12px;">Invest in stocks to start building your portfolio</p>
                 </div>
@@ -446,7 +446,7 @@
                     <!-- Sold items will be generated here -->
                 </div>
                 <div class="empty-state" id="soldEmpty">
-                    <p style="font-size: 32px;">✓</p>
+                    <p style="font-size: 32px;"><p style="font-size: 32px;"><i class="fa-solid fa-circle-check"></i></p></p>
                     <p style="font-weight: 600;">No stocks sold yet</p>
                     <p style="color: #999; font-size: 12px;">Your exit history will appear here</p>
                 </div>
@@ -645,7 +645,7 @@
         <!-- TAB: STOCK EXPLORER -->
         <div class="tab-content" id="explorerTab">
             <div class="tool-container">
-                <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+                <button type="button" class="tool-back" onclick="switchTab('settings')"><i class="fa-solid fa-chevron-left"></i> Back</button>
                 <h2 class="settings-title">Stock Explorer</h2>
 
                 <input type="search" id="exSearch" class="ex-search" placeholder="Search name or ticker" aria-label="Search stocks" autocomplete="off">
@@ -686,7 +686,7 @@
         <!-- TAB: CALCULATOR -->
         <div class="tab-content" id="calculatorTab">
             <div class="tool-container">
-                <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+                <button type="button" class="tool-back" onclick="switchTab('settings')"><i class="fa-solid fa-chevron-left"></i> Back</button>
                 <h2 class="settings-title">Profit / Loss Calculator</h2>
 
                 <div class="settings-group">
@@ -756,7 +756,7 @@
         <!-- TAB: MARKET CALENDAR -->
         <div class="tab-content" id="calendarTab">
          <div class="tool-container">
-        <button type="button" class="tool-back" onclick="switchTab('settings')">‹ Back</button>
+        <button type="button" class="tool-back" onclick="switchTab('settings')"><i class="fa-solid fa-chevron-left"></i> Back</button>
         <h2 class="settings-title">Market Calendar</h2>
         <div class="market-calendar" id="marketCalendarRoot"></div>
          </div>
@@ -768,9 +768,7 @@
         </div>
     </div>
 </div>
-            </div>
-        </div>
-    </div>
+
 
     <!-- MODALS -->
 
@@ -779,7 +777,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Add Stock</h2>
-                <button class="close-modal" id="closeAddModal" aria-label="Close add stock modal">✕</button>
+                <button class="close-modal" id="closeAddModal" aria-label="Close add stock modal""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
 
             <!-- MODAL TABS -->
@@ -931,7 +929,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="marketModalTitle">NGX Portfolio</h2>
-                <button class="close-modal" id="closeMarketModal" aria-label="Close market modal">✕</button>
+                <button class="close-modal" id="closeMarketModal" aria-label="Close market modal""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <div class="market-stock-list" id="marketStockList">
@@ -950,7 +948,7 @@
         <div class="modal-content modal-detail">
             <div class="modal-header">
                 <h2 id="detailStockName">—</h2>
-                <button class="close-modal" onclick="closeStockDetailModal()" aria-label="Close stock detail modal">✕</button>
+                <button class="close-modal" onclick="closeStockDetailModal()" aria-label="Close stock detail modal""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <div class="stock-detail-container">
@@ -963,7 +961,7 @@
                         <p class="value" id="detailPrice">₦0</p>
                     </div>
                     <div class="detail-stats" id="detailStats"></div>
-                    <button class="btn-danger btn-full" onclick="confirmSellFromDetail()">Sell Stock</button>
+                    <button class="btn-danger btn-full" onclick="confirmSellFromDetail(selectedStockForDetail.ticker, selectedStockForDetail.market)">Sell Stock</button>
                 </div>
             </div>
         </div>
@@ -974,7 +972,7 @@
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2>About Gaze</h2>
-                <button class="close-modal" onclick="document.getElementById('aboutModal').classList.remove('active')" aria-label="Close about">✕</button>
+                <button class="close-modal" onclick="document.getElementById('aboutModal').classList.remove('active')" aria-label="Close about""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <p style="font-size:14px; line-height:1.5;">Gaze helps you watch, analyse and track stocks on the Nigerian (NGX) and US markets.</p>
@@ -989,7 +987,7 @@
         <div class="modal-content modal-detail">
             <div class="modal-header">
                 <h2 id="exModalTicker">—</h2>
-                <button class="close-modal" id="exModalClose" aria-label="Close stock details">✕</button>
+                <button class="close-modal" id="exModalClose" aria-label="Close stock details""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <div class="stock-detail-container">
@@ -1020,7 +1018,7 @@
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2 id="authTitle">Log in</h2>
-                <button type="button" class="close-modal" id="authClose" aria-label="Close">✕</button>
+                <button type="button" class="close-modal" id="authClose" aria-label="Close""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <div class="auth-tabs" role="tablist">
@@ -1065,7 +1063,7 @@
         <div class="modal-content modal-small">
             <div class="modal-header">
                 <h2>Password &amp; Security</h2>
-                <button type="button" class="close-modal" id="securityClose" aria-label="Close">✕</button>
+                <button type="button" class="close-modal" id="securityClose" aria-label="Close""><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>button>
             </div>
             <div class="modal-body">
                 <form id="pwForm" novalidate>
@@ -1092,7 +1090,7 @@
 
     <!-- Sync Indicator -->
     <div class="sync-indicator" id="syncIndicator">
-        <span>⟳</span> Syncing...
+        <span><i class="fa-solid fa-rotate" aria-hidden="true"></i></span> Syncing...
     </div>
 
     <!-- Toast Notifications -->

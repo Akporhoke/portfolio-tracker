@@ -1801,7 +1801,7 @@ async function addStock(type) {
             document.getElementById(
                 'watchTickerError'
             ).textContent =
-                '✕ Please enter a ticker';
+                'Please enter a ticker';
 
             return;
         }
@@ -1817,7 +1817,7 @@ async function addStock(type) {
             document.getElementById(
                 'watchMarketError'
             ).textContent =
-                '✕ Please select a market';
+                'Please select a market';
 
             return;
         }
@@ -2746,7 +2746,7 @@ function validateForm(
 
         if (tickerError) {
             tickerError.textContent =
-                '✕ Please enter a ticker';
+                'Please enter a ticker';
         }
 
         isValid = false;
@@ -2760,7 +2760,7 @@ function validateForm(
 
         if (quantityError) {
             quantityError.textContent =
-                '✕ Quantity must be positive';
+                'Quantity must be positive';
         }
 
         isValid = false;
@@ -2774,7 +2774,7 @@ function validateForm(
 
         if (priceError) {
             priceError.textContent =
-                '✕ Price must be positive';
+                'Price must be positive';
         }
 
         isValid = false;
@@ -2785,7 +2785,7 @@ function validateForm(
 
         if (sectorError) {
             sectorError.textContent =
-                '✕ Please select a sector';
+                'Please select a sector';
         }
 
         isValid = false;
@@ -2810,7 +2810,7 @@ function validateForm(
 
         if (marketErrorEl) {
             marketErrorEl.textContent =
-                '✕ Please select a market';
+                'Please select a market';
         }
 
         isValid = false;
@@ -2844,7 +2844,7 @@ function validateQuantity(e) {
 
         if (error) {
             error.textContent =
-                '✕ Must be positive';
+                'Must be positive';
         }
 
 
@@ -2891,7 +2891,7 @@ function validatePrice(e) {
 
         if (error) {
             error.textContent =
-                '✕ Must be positive';
+                'Must be positive';
         }
 
 
@@ -5506,16 +5506,11 @@ if (
 
 
                     const icons = {
-                        invested:
-                            '✓',
-                        sold:
-                            '↑',
-                        rejected:
-                            '✕',
-                        watching:
-                            '<i class="fa-solid fa-gear"></i>'
-                    };
-
+    invested: '<i class="fa-solid fa-check"></i>',
+    sold: '<i class="fa-solid fa-arrow-trend-up"></i>',
+    rejected: '<i class="fa-solid fa-xmark"></i>',
+    watching: '<i class="fa-solid fa-eye"></i>'
+};
 
                     return `
 
@@ -8068,7 +8063,7 @@ function renderMarketStockList(
                                     title="Sell"
                                     aria-label="Sell ${safeTicker}"
                                 >
-                                    📊
+<i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i>
                                 </button>
 
                             </div>
@@ -8281,6 +8276,8 @@ function showToast(
     duration = TOAST_DURATION
 ) {
 
+    message = String(message).replace(/^[✓✕]\s*/, '');
+
     const container =
         document.getElementById(
             'toastContainer'
@@ -8302,18 +8299,11 @@ function showToast(
         `toast ${type}`;
 
 
-    const icons = {
-
-        success:
-            '✓',
-
-        error:
-            '✕',
-
-        warning:
-            '⚠️'
-    };
-
+const icons = {
+    success: '<i class="fa-solid fa-circle-check"></i>',
+    error: '<i class="fa-solid fa-circle-xmark"></i>',
+    warning: '<i class="fa-solid fa-triangle-exclamation"></i>'
+};
 
     toast.innerHTML = `
 
