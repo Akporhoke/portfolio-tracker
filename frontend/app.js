@@ -4907,76 +4907,27 @@ updateTopPerformer(portfolio);
             );
 
 
-    const finance =
-        sectors['Finance'] || 0;
+    const SECTOR_GROUP = {
+    'Financial Services': 'finance', 'Finance': 'finance',
+    'Technology': 'tech', 'Tech': 'tech',
+    'Consumer Cyclical': 'consumer', 'Consumer Defensive': 'consumer', 'Consumer': 'consumer'
+};
 
+const groups = { finance: 0, tech: 0, consumer: 0, other: 0 };
 
-    const tech =
-        sectors['Tech'] || 0;
+Object.entries(sectors).forEach(([name, value]) => {
+    groups[SECTOR_GROUP[name] || 'other'] += value;
+});
 
+Object.entries(groups).forEach(([key, value]) => {
+    const pct = total > 0 ? (value / total) * 100 : 0;
+    const label = document.getElementById(`${key}Percent`);
+    const bar = document.getElementById(`sector${key[0].toUpperCase()}${key.slice(1)}`);
 
-    const consumer =
-        sectors['Consumer'] || 0;
+    if (label) label.textContent = Math.round(pct);
+    if (bar) bar.style.flex = `${pct} 0 0`;
+});
 
-
-    const financePercent =
-        document.getElementById(
-            'financePercent'
-        );
-
-
-    const techPercent =
-        document.getElementById(
-            'techPercent'
-        );
-
-
-    const consumerPercent =
-        document.getElementById(
-            'consumerPercent'
-        );
-
-
-    if (financePercent) {
-
-        financePercent.textContent =
-            total > 0
-                ? Math.round(
-                    (
-                        finance /
-                        total
-                    ) * 100
-                )
-                : 0;
-    }
-
-
-    if (techPercent) {
-
-        techPercent.textContent =
-            total > 0
-                ? Math.round(
-                    (
-                        tech /
-                        total
-                    ) * 100
-                )
-                : 0;
-    }
-
-
-    if (consumerPercent) {
-
-        consumerPercent.textContent =
-            total > 0
-                ? Math.round(
-                    (
-                        consumer /
-                        total
-                    ) * 100
-                )
-                : 0;
-    }
 
 
   const goalAmountNGN =
@@ -5898,30 +5849,22 @@ function renderWatchlist() {
 
                                 </div>
                                 
-                                <div class="stock-actions">
+<div class="stock-card-controls">
+    <button
+        class="btn-icon btn-alert"
+        onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
+        title="Set price alert"
+        aria-label="Set price alert for ${safeTicker}"
+    >
+        <i class="fa-regular fa-bell" aria-hidden="true"></i>
+    </button>
 
-<button
-    class="btn-icon btn-alert"
-    onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
-    title="Set price alert"
-    aria-label="Set price alert for ${safeTicker}"
->
-    <i class="fa-regular fa-bell" aria-hidden="true"></i>
-</button>
-
+    <div class="watchlist-expand-icon">
+        <span id="watchlist-arrow-${i}">
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </span>
+    </div>
 </div>
-
-
-                                <div class="watchlist-expand-icon">
-
-                                    
-<span id="watchlist-arrow-${i}">
-    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-</span>
-
-
-                                </div>
-
                             </div>
 
 
@@ -6280,63 +6223,27 @@ async function toggleWatchlistAnalysis(
     index
 ) {
 
-    const analysis =
-        document.getElementById(
-            `watchlist-analysis-${index}`
-        );
+    const analysis = document.getElementById(`watchlist-analysis-${index}`);
 
+if (!analysis) {
+    return;
+}
 
-    const arrow =
-        document.getElementById(
-            `watchlist-arrow-${index}`
-        );
+const card = analysis.closest('.watchlist-card');
+const isOpen = analysis.classList.contains('active');
 
+if (isOpen) {
+    analysis.classList.remove('active');
+    card?.classList.remove('expanded');
+    return;
+}
 
-    if (!analysis) {
-        return;
-    }
+analysis.classList.add('active');
+card?.classList.add('expanded');
 
+loadConfidenceHistory(ticker, market, index);
 
-    const isOpen =
-        analysis.classList.contains(
-            'active'
-        );
-
-
-    if (isOpen) {
-
-        analysis.classList.remove(
-            'active'
-        );
-
-
-        if (arrow) {
-            arrow.textContent =
-                '⌄';
-        }
-
-
-        return;
-    }
-
-
-    analysis.classList.add(
-        'active'
-    );
-
-
-    if (arrow) {
-        arrow.textContent =
-            '⌃';
-    }
-
-    loadConfidenceHistory(ticker, market, index);
-
-    await loadWatchlistChart(
-        ticker,
-        market,
-        index
-    );
+await loadWatchlistChart(ticker, market, index);
 }
 
 
