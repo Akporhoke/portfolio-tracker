@@ -380,4 +380,3 @@ let provider = apiProvider;
         init();
     }
 })();
-&& 
