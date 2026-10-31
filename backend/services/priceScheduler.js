@@ -44,7 +44,8 @@ const SchedulerStatus =
     require('../models/SchedulerStatus');
 
 const {
-    getPrice
+    getPrice,
+    providersBlocked
 } = require('../utils/getPrice');
 
 const quoteStore =
@@ -55,9 +56,6 @@ const calendarService =
 
 const providerBudget =
     require('./providerBudget');
-
-const circuitBreaker =
-    require('./circuitBreaker');
 
 
 const ENABLED =
@@ -356,28 +354,25 @@ async function runPriceRefreshCycle(reason = 'tick') {
         // Everything inside runs as scheduler work: it may use only the
         // scheduler's share of each provider's quota
         await providerBudget.runRoutine(async () => {
+            // Asked once for the whole cycle, not once per stock, so it
+            // costs a few database reads instead of hundreds. It runs
+            // inside runRoutine so it uses the scheduler's budget share.
+            if (queue.some(item => item.market === 'NGX')) {
+                ngxBlocked = await providersBlocked('NGX');
+            }
+
             const worker = async () => {
                 while (queue.length > 0) {
                     const item = queue.shift();
 
-                    // NGX prices: when BOTH NGX sources are paused by their
-                    // circuit breakers, leave the rest for a later cycle.
+                    // NGX prices: when BOTH NGX sources are blocked (paused
+                    // by a circuit breaker, over budget, or in a quota
+                    // cooldown), leave the rest for a later cycle.
                     // Skipped is not failed: a failure would put each stock
                     // into a longer retry delay for no fault of its own.
-                    if (item.market === 'NGX') {
-                        if (ngxBlocked) {
-                            summary.skipped++;
-                            continue;
-                        }
-
-                        if (
-                            circuitBreaker.isBlocking('ngnmarket:companies') &&
-                            circuitBreaker.isBlocking('investo:price')
-                        ) {
-                            ngxBlocked = true;
-                            summary.skipped++;
-                            continue;
-                        }
+                    if (item.market === 'NGX' && ngxBlocked) {
+                        summary.skipped++;
+                        continue;
                     }
 
                     // US prices come from Finnhub, limited per minute.

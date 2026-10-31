@@ -385,6 +385,53 @@ async function activateInvestoCooldown() {
     );
 }
 // ============================================================
+// ARE THE PROVIDERS FOR A MARKET BLOCKED RIGHT NOW?
+// ============================================================
+//
+// Blocked = paused by the circuit breaker, over budget, or in a quota
+// cooldown. It tells "could not be asked" (not the stock's fault) apart
+// from "was asked and failed".
+//
+// NGX has two sources (NGN Market first, Investo as the backup), so NGX
+// counts as blocked only when BOTH are. US has one (Finnhub).
+//
+// Used by getPriceWithMeta (so a blocked request is not recorded as a
+// failure) and by the price scheduler (so it skips instead of failing).
+
+async function providersBlocked(market) {
+    try {
+        if (normalizeMarket(market) === 'US') {
+            const finnhub =
+                await providerBudget.check('finnhub', 'quote');
+
+            return !finnhub.ok;
+        }
+
+        const ngnMarketBlocked =
+            (await isNGNMarketCoolingDown()) ||
+            !(await providerBudget.check('ngnmarket', 'companies')).ok;
+
+        if (!ngnMarketBlocked) {
+            return false;
+        }
+
+        return (
+            (await isInvestoCoolingDown()) ||
+            !(await providerBudget.check('investo', 'price')).ok
+        );
+
+    } catch (error) {
+        console.error(
+            '[providersBlocked]',
+            error.message
+        );
+
+        // If we cannot tell, treat it as a normal failure
+        return false;
+    }
+}
+
+// ============================================================
 // API KEYS
 // ============================================================
 
@@ -910,6 +957,16 @@ async function recordSnapshot(
 // NGN MARKET — COMPANY LIST
 // ============================================================
 async function getNGNMarketCompanies() {
+    // Memory first: a fresh list needs no database read and no request.
+    // (Before, every stock paid a cooldown lookup in the database even
+    // when the list was already in memory.)
+    if (
+        companyListCache &&
+        Date.now() - companyListCacheTime < COMPANY_LIST_CACHE_TTL
+    ) {
+        return companyListCache;
+    }
+
     if (await isNGNMarketCoolingDown()) {
         console.log(
             '⏸️ NGN Market quota cooldown active. Skipping NGN Market.'
@@ -927,15 +984,6 @@ async function getNGNMarketCompanies() {
         );
 
         return [];
-    }
-
-    if (
-        companyListCache &&
-        Date.now() -
-            companyListCacheTime <
-            COMPANY_LIST_CACHE_TTL
-    ) {
-        return companyListCache;
     }
 
     if (companyListRequest) {
@@ -2952,15 +3000,30 @@ async function getPriceWithMeta(
         Date.now() + PRICE_FAIL_TTL
     );
 
-    void quoteStore.noteFailure({
-        ticker: symbol,
-        market: normalizedMarket,
-        error: 'no price returned by providers'
-    });
+    // A request that was never sent (provider paused, or over budget) is
+    // not this stock's fault. Recording it as a failure would lengthen
+    // the stock's retry delay (up to an hour) even after the provider is
+    // back, so only a real failure is recorded.
+    const blocked =
+        await providersBlocked(normalizedMarket);
 
-    console.warn(
-        `⚠️ No real ${normalizedMarket} price available for ${symbol}`
-    );
+    if (blocked) {
+        console.log(
+            `⏸️ ${normalizedMarket} price for ${symbol} skipped: ` +
+            'provider paused or over budget'
+        );
+
+    } else {
+        void quoteStore.noteFailure({
+            ticker: symbol,
+            market: normalizedMarket,
+            error: 'no price returned by providers'
+        });
+
+        console.warn(
+            `⚠️ No real ${normalizedMarket} price available for ${symbol}`
+        );
+    }
 
     return none;
 }
@@ -3043,5 +3106,6 @@ module.exports = {
     ensureStoredHistory,
     getInvestoHistory,
     getHistoricalProviderStatus,
-    getQuote
+    getQuote,
+    providersBlocked
 };

@@ -9,11 +9,24 @@ const {
     getPriceHistory
 } = require('../utils/getPrice');
 
+const quoteStore =
+    require('../services/quoteStore');
+
+const calendarService =
+    require('../services/marketCalendarService');
+
+const {
+    collectTrackedSymbols
+} = require('../services/priceScheduler');
+
 // ============================================================
 // VALID MARKETS
 // ============================================================
 
 const VALID_MARKETS = ['NGX', 'US'];
+
+// Letters, digits and dots, up to 12 characters (for example GTCO, BRK.B)
+const TICKER_PATTERN = /^[A-Z0-9.]{1,12}$/;
 
 
 // ============================================================
@@ -39,6 +52,143 @@ function escapeRegex(value) {
         '\\$&'
     );
 }
+
+
+// ============================================================
+// WHO MAY CAUSE A PROVIDER REQUEST
+//
+// /price and /history need no login (the app calls them like a
+// public page), so anyone can call them, including with made-up
+// tickers. Every provider request spends a free-plan allowance that the
+// price scheduler and the alerts depend on. So:
+//
+//   tracked    held, watched, or has an alert  -> allowed
+//   directory  a real stock nobody follows     -> allowed, but only
+//              a few per minute across everyone
+//   unknown    not a real stock                -> refused, no provider
+//              request at all
+// ============================================================
+
+// The set of followed stocks is rebuilt at most this often
+const TRACKED_CACHE_MS = 15 * 1000;
+
+const DIRECTORY_CACHE_MS = 5 * 60 * 1000;
+const DIRECTORY_CACHE_MAX = 2000;
+
+// Untracked (directory-only) provider requests, all callers together
+const UNTRACKED_PER_MINUTE =
+    Number(process.env.PUBLIC_LOOKUPS_PER_MINUTE) || 20;
+
+let trackedCache = {
+    at: 0,
+    keys: new Set()
+};
+
+const directoryCache = new Map();
+
+let untrackedWindowStart = 0;
+let untrackedCount = 0;
+
+
+async function isTracked(ticker, market) {
+    if (Date.now() - trackedCache.at > TRACKED_CACHE_MS) {
+        try {
+            const items = await collectTrackedSymbols();
+
+            trackedCache = {
+                at: Date.now(),
+                keys: new Set(
+                    items.map(item => `${item.ticker}|${item.market}`)
+                )
+            };
+
+        } catch (error) {
+            console.error(
+                '[Stocks] could not load followed stocks:',
+                error.message
+            );
+
+            // Keep the old list, and do not retry on every request
+            trackedCache.at = Date.now();
+        }
+    }
+
+    return trackedCache.keys.has(`${ticker}|${market}`);
+}
+
+
+async function inDirectory(ticker, market) {
+    const key = `${ticker}|${market}`;
+
+    const hit = directoryCache.get(key);
+
+    if (hit && Date.now() - hit.at < DIRECTORY_CACHE_MS) {
+        return hit.value;
+    }
+
+    let value = false;
+
+    try {
+        value = Boolean(
+            await Stock.exists({
+                ticker,
+                market,
+                active: true
+            })
+        );
+    } catch (error) {
+        console.error(
+            '[Stocks] directory lookup failed:',
+            error.message
+        );
+
+        // Do not remember a failed lookup
+        return false;
+    }
+
+    // Made-up tickers must not be able to grow this without limit
+    if (directoryCache.size >= DIRECTORY_CACHE_MAX) {
+        directoryCache.clear();
+    }
+
+    directoryCache.set(key, { value, at: Date.now() });
+
+    return value;
+}
+
+
+function allowUntrackedLookup() {
+    const now = Date.now();
+
+    if (now - untrackedWindowStart >= 60 * 1000) {
+        untrackedWindowStart = now;
+        untrackedCount = 0;
+    }
+
+    if (untrackedCount >= UNTRACKED_PER_MINUTE) {
+        return false;
+    }
+
+    untrackedCount++;
+
+    return true;
+}
+
+
+// A stored quote, in the same shape getQuote returns
+function quoteFromStore(stored, ticker, market, stale = false) {
+    return {
+        ticker,
+        market,
+        price: Number(stored.price),
+        source: stored.source || null,
+        sourceTimestamp: stored.sourceTimestamp || null,
+        fetchedAt: stored.fetchedAt || null,
+        cached: true,
+        ...(stale ? { stale: true } : {})
+    };
+}
+
 
 // ============================================================
 // LIST / FILTER STOCK DIRECTORY (EXPLORER)
@@ -365,11 +515,19 @@ router.get('/search', async (req, res) => {
 
 
 // ============================================================
-// GET CURRENT PRICE + CHANGE
+// GET CURRENT PRICE
 //
 // Example:
 // GET /stocks/price/GTCO?market=NGX
 // GET /stocks/price/AAPL?market=US
+//
+// Order of work:
+//   1. A stored price that is still fresh (by the market calendar
+//      rules the scheduler uses) is returned. No provider is asked.
+//   2. Otherwise a provider may be asked, but only for a followed
+//      stock, or (a few per minute) for a real stock in the directory.
+//   3. If a provider may not be asked, the stored price is returned
+//      marked "stale", or the request is refused.
 // ============================================================
 
 router.get('/price/:ticker', async (req, res) => {
@@ -388,7 +546,7 @@ router.get('/price/:ticker', async (req, res) => {
 
 
         // --------------------------------------------------------
-        // Validate market
+        // Validate input
         // --------------------------------------------------------
 
         if (
@@ -401,9 +559,115 @@ router.get('/price/:ticker', async (req, res) => {
             });
         }
 
+        if (!TICKER_PATTERN.test(ticker)) {
+
+            return res.status(400).json({
+                error: 'Invalid ticker'
+            });
+        }
+
 
         // --------------------------------------------------------
-        // Get quote
+        // 1. Fresh stored price: answer from the database
+        // --------------------------------------------------------
+
+        const stored =
+            await quoteStore.getStoredQuote(
+                ticker,
+                market
+            );
+
+        const hasStored =
+            Boolean(
+                stored &&
+                Number(stored.price) > 0
+            );
+
+        if (hasStored) {
+
+            const state =
+                await calendarService.getMarketState(
+                    market
+                );
+
+            const assessed =
+                calendarService.assessQuote(
+                    market,
+                    stored,
+                    state
+                );
+
+            if (!assessed.shouldRefresh) {
+
+                return res.json(
+                    quoteFromStore(
+                        stored,
+                        ticker,
+                        market
+                    )
+                );
+            }
+        }
+
+
+        // --------------------------------------------------------
+        // 2. May a provider be asked?
+        // --------------------------------------------------------
+
+        let allowed =
+            await isTracked(
+                ticker,
+                market
+            );
+
+        if (!allowed) {
+
+            const listed =
+                await inDirectory(
+                    ticker,
+                    market
+                );
+
+            if (!listed && !hasStored) {
+
+                return res.status(404).json({
+                    error: 'Unknown stock'
+                });
+            }
+
+            allowed =
+                listed &&
+                allowUntrackedLookup();
+        }
+
+
+        // --------------------------------------------------------
+        // 3. Not allowed: stored price (marked stale) or refuse
+        // --------------------------------------------------------
+
+        if (!allowed) {
+
+            if (hasStored) {
+
+                return res.json(
+                    quoteFromStore(
+                        stored,
+                        ticker,
+                        market,
+                        true
+                    )
+                );
+            }
+
+            return res.status(429).json({
+                error:
+                    'Too many price requests right now. Try again in a minute.'
+            });
+        }
+
+
+        // --------------------------------------------------------
+        // Ask the provider (through the budget and circuit breaker)
         // --------------------------------------------------------
 
         const quote =
@@ -437,6 +701,10 @@ router.get('/price/:ticker', async (req, res) => {
 // Example:
 // GET /stocks/history/GTCO?market=NGX&days=7
 // GET /stocks/history/AAPL?market=US&days=7
+//
+// Stored history is used first (inside getPriceHistory). A provider
+// is only asked for a followed stock, or (a few per minute) for a
+// real stock in the directory.
 // ============================================================
 
 router.get('/history/:ticker', async (req, res) => {
@@ -469,7 +737,7 @@ router.get('/history/:ticker', async (req, res) => {
 
 
         // --------------------------------------------------------
-        // Validate market
+        // Validate input
         // --------------------------------------------------------
 
         if (
@@ -482,12 +750,55 @@ router.get('/history/:ticker', async (req, res) => {
             });
         }
 
+        if (!TICKER_PATTERN.test(ticker)) {
+
+            return res.status(400).json({
+                error: 'Invalid ticker'
+            });
+        }
+
+
+        // --------------------------------------------------------
+        // May this stock cause provider requests?
+        // --------------------------------------------------------
+
+        const tracked =
+            await isTracked(
+                ticker,
+                market
+            );
+
+        if (!tracked) {
+
+            const listed =
+                await inDirectory(
+                    ticker,
+                    market
+                );
+
+            if (!listed) {
+
+                return res.status(404).json({
+                    error: 'Unknown stock'
+                });
+            }
+
+            if (!allowUntrackedLookup()) {
+
+                return res.status(429).json({
+                    error:
+                        'Too many requests right now. Try again in a minute.'
+                });
+            }
+        }
+
 
         // --------------------------------------------------------
         // Get REAL historical data
         //
         // NGX → Investo
-        // US  → Finnhub
+        // US  → Twelve Data
+        // (stored history is used first)
         // --------------------------------------------------------
 
         const history =
