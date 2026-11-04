@@ -104,6 +104,16 @@
         </div>
     </div>
 
+    <button
+    type="button"
+    class="tab-btn header-icon-btn"
+    data-tab="news"
+    aria-label="Market News"
+    title="Market News"
+>
+    <i class="fa-regular fa-newspaper"></i>
+</button>
+
     <div class="header-actions">
         <button
             class="tab-btn header-icon-btn"
@@ -135,8 +145,11 @@
             ></div>
         </div>
 
-        <!-- Quick Stats -->
-<div class="quick-stats">
+<!-- Portfolio Overview -->
+<div id="gazePortfolioOverview">
+
+    <!-- Quick Stats -->
+    <div class="quick-stats">
 
     <div class="stat">
         <div class="stat-top">
@@ -291,7 +304,10 @@
             </div>
         </div>
 
-        <!-- Tabs Navigation -->
+    </div>
+   <!-- End Portfolio Overview -->
+
+       <!-- Tabs Navigation -->
         <div class="tabs">
             <button class="tab-btn active" data-tab="home">
                 <span><i class="fa-solid fa-house-user"></i></span>
@@ -778,21 +794,86 @@
         </div>
 
         <!-- NEWS: TAB: MARKET NEWS -->
-        <div class="tab-content" id="newsTab">
-            <div class="tool-container">
-                <button type="button" class="tool-back" onclick="switchTab('settings')"><i class="fa-solid fa-chevron-left"></i> Back</button>
-                <h2 class="settings-title">Market News</h2>
+<!-- TAB: MARKET NEWS -->
+<div class="tab-content" id="newsTab">
 
-                <p id="news-status" class="form-hint" role="status" aria-live="polite"></p>
+    <div class="news-page">
 
-                <div id="news-list"></div>
+        <!-- News Header -->
+        <div class="news-header">
 
-                <button type="button" id="news-more" class="btn-secondary" hidden>Load more</button>
-                <button type="button" id="news-refresh" class="btn-secondary">Refresh</button>
-
-                <p class="form-hint">Headlines link to the original publishers. News is a source of information, not financial advice.</p>
+            <div class="news-heading">
+                <span class="news-eyebrow">GAZE INTELLIGENCE</span>
+                <h2>Market News</h2>
+                <p>Stay informed. Understand what moves the market.</p>
             </div>
+
+            <button
+                type="button"
+                id="news-refresh"
+                class="news-refresh-btn"
+                aria-label="Refresh news"
+                title="Refresh news"
+            >
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+
         </div>
+
+        <!-- Market News Status -->
+        <div class="news-market-strip">
+            <span class="news-live-indicator"></span>
+            <span>MARKET INTELLIGENCE</span>
+            <span class="news-market-divider"></span>
+            <span id="news-status" role="status" aria-live="polite">
+                Loading headlines...
+            </span>
+        </div>
+
+        <!-- Featured Story -->
+        <section
+            id="news-featured"
+            class="news-featured"
+            aria-label="Featured market story"
+            hidden
+        ></section>
+
+        <!-- News Feed -->
+        <section class="news-feed-section">
+
+            <div class="news-feed-heading">
+                <div>
+                    <span class="news-eyebrow">LATEST UPDATES</span>
+                    <h3>Top Stories</h3>
+                </div>
+            </div>
+
+            <div id="news-list" class="news-grid"></div>
+
+            <div class="news-controls">
+
+                <button
+                    type="button"
+                    id="news-more"
+                    class="news-more-btn"
+                    hidden
+                >
+                    Load more stories
+                </button>
+
+            </div>
+
+        </section>
+
+        <!-- Disclaimer -->
+        <p class="news-disclaimer">
+            News is provided for informational purposes only and is not
+            financial advice. Headlines link to their original publishers.
+        </p>
+
+    </div>
+
+</div>
 
         <!-- TAB: STUDY (Learn) -->
         <div class="tab-content" id="studyTab">

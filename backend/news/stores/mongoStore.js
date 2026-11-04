@@ -1,94 +1,313 @@
 'use strict';
 
-// MongoDB implementation of the store contract (see memoryStore.js).
-// It receives the app's existing mongoose instance, so it opens no second
-// connection and this module has no hard dependency on mongoose itself.
+// MongoDB implementation of the News store contract.
 //
-// Footprint: roughly 0.5 KB per story, at most about 150 stories per feed
-// refresh window, auto-deleted after expiresAt. Expect well under 1 MB total.
+// Uses the application's existing Mongoose instance.
+// Does not create another database connection.
+//
+// Supports:
+// - Article storage and retrieval
+// - Duplicate prevention
+// - Ticker-based filtering
+// - Cursor pagination
+// - Automatic expiry through MongoDB TTL
+// - Article images, descriptions and categories
 
 function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
-  const schema = new mongoose.Schema(
-    {
-      _id: { type: String }, // 24-hex hash of the title, so duplicates cannot exist
-      title: String,
-      url: String,
-      source: String,
-      publishedAt: Date,
-      expiresAt: Date,
-      tickers: [String],
-    },
-    { versionKey: false, collection, autoIndex: false }
-  );
+if (!mongoose || !mongoose.Schema || !mongoose.models) {
+throw new TypeError('A valid Mongoose instance is required.');
+}
 
-  schema.index({ publishedAt: -1, _id: -1 });                // latest news
-  schema.index({ tickers: 1, publishedAt: -1, _id: -1 });    // news for chosen stocks
-  // TTL on a per-document expiry time (expireAfterSeconds: 0). Changing the
-  // retention setting later never needs an index change, so no migration.
-  schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+const schema = new mongoose.Schema(
+{
+_id: {
+type: String,
+required: true,
+},
 
-  const Model = mongoose.models.GazeNewsItem || mongoose.model('GazeNewsItem', schema);
 
-  return {
-    async init() {
-      await Model.createIndexes();
-    },
+  title: {
+    type: String,
+    required: true,
+  },
 
-    async upsertMany(items) {
-      if (!items.length) return 0;
-      // $setOnInsert: an existing story is never rewritten, so repeated
-      // refreshes cost almost no writes and cannot change stored data.
-      const ops = items.map((it) => ({
-        updateOne: {
-          filter: { _id: String(it.id) },
-          update: {
-            $setOnInsert: {
-              title: it.title,
-              url: it.url,
-              source: it.source,
-              publishedAt: new Date(it.publishedAt),
-              expiresAt: new Date(it.expiresAt),
-              tickers: it.tickers,
-            },
+  url: {
+    type: String,
+    required: true,
+  },
+
+  source: {
+    type: String,
+    default: 'Unknown',
+  },
+
+  publishedAt: {
+    type: Date,
+    required: true,
+  },
+
+  expiresAt: {
+    type: Date,
+    required: true,
+  },
+
+  tickers: {
+    type: [String],
+    default: [],
+  },
+
+  // Optional publisher-provided article image.
+  image: {
+    type: String,
+    default: null,
+  },
+
+  // Sanitised plain-text article summary.
+  description: {
+    type: String,
+    default: '',
+  },
+
+  // Gaze-assigned category.
+  category: {
+    type: String,
+    enum: [
+      'NGX',
+      'Companies',
+      'Economy',
+      'Dividends',
+      'Global',
+    ],
+    default: 'Global',
+  },
+},
+{
+  versionKey: false,
+  collection,
+  autoIndex: false,
+}
+ 
+
+);
+
+// Latest articles and stable pagination.
+schema.index({
+publishedAt: -1,
+_id: -1,
+});
+
+// Efficient filtering for users following particular stocks.
+schema.index({
+tickers: 1,
+publishedAt: -1,
+_id: -1,
+});
+
+// Automatically delete articles after their expiry time.
+schema.index(
+{ expiresAt: 1 },
+{ expireAfterSeconds: 0 }
+);
+
+const Model =
+mongoose.models.GazeNewsItem ||
+mongoose.model('GazeNewsItem', schema);
+
+function normaliseLimit(value) {
+const limit = Number(value);
+
+ 
+if (!Number.isFinite(limit)) return 30;
+
+return Math.min(Math.max(Math.floor(limit), 1), 50);
+ 
+
+}
+
+function normaliseTickers(tickers) {
+if (!Array.isArray(tickers)) return [];
+
+ 
+return tickers
+  .map((ticker) => String(ticker).toUpperCase())
+  .filter((ticker) => /^[A-Z0-9]{1,15}$/.test(ticker))
+  .slice(0, 20);
+ 
+
+}
+
+function toEpoch(value) {
+const date = value instanceof Date ? value : new Date(value);
+const timestamp = date.getTime();
+
+
+return Number.isFinite(timestamp) ? timestamp : null;
+
+}
+
+return {
+async init() {
+await Model.createIndexes();
+},
+
+
+async upsertMany(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return 0;
+  }
+
+  const operations = [];
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+
+    const id = String(item.id || '');
+    const publishedAt = toEpoch(item.publishedAt);
+    const expiresAt = toEpoch(item.expiresAt);
+
+    if (
+      !/^[a-f0-9]{24}$/i.test(id) ||
+      !publishedAt ||
+      !expiresAt ||
+      typeof item.title !== 'string' ||
+      typeof item.url !== 'string'
+    ) {
+      continue;
+    }
+
+    operations.push({
+      updateOne: {
+        filter: { _id: id },
+
+        update: {
+          $setOnInsert: {
+            title: item.title,
+            url: item.url,
+            source: item.source || 'Unknown',
+
+            publishedAt: new Date(publishedAt),
+            expiresAt: new Date(expiresAt),
+
+            tickers: normaliseTickers(item.tickers),
+
+            image:
+              typeof item.image === 'string'
+                ? item.image
+                : null,
+
+            description:
+              typeof item.description === 'string'
+                ? item.description
+                : '',
+
+            category: [
+              'NGX',
+              'Companies',
+              'Economy',
+              'Dividends',
+              'Global',
+            ].includes(item.category)
+              ? item.category
+              : 'Global',
           },
-          upsert: true,
         },
-      }));
-      const res = await Model.bulkWrite(ops, { ordered: false });
-      return res.upsertedCount || 0;
-    },
 
-    async list({ tickers = [], limit = 30, before = null } = {}) {
-      const filter = {};
-      // Values are coerced to strings and numbers here as a second line of
-      // defence against NoSQL operator injection (the route validates first).
-      if (tickers.length) filter.tickers = { $in: tickers.map(String) };
-      if (before) {
-        const d = new Date(Number(before.publishedAt));
-        const id = String(before.id);
-        filter.$or = [{ publishedAt: { $lt: d } }, { publishedAt: d, _id: { $lt: id } }];
-      }
-      const rows = await Model.find(filter)
-        .sort({ publishedAt: -1, _id: -1 })
-        .limit(Math.min(Math.max(Number(limit) || 30, 1), 50))
-        .select('title url source publishedAt tickers')
-        .maxTimeMS(3000) // a slow query fails fast instead of piling up
-        .lean();
+        upsert: true,
+      },
+    });
+  }
 
-      return rows.map((r) => ({
-        id: r._id,
-        title: r.title,
-        url: r.url,
-        source: r.source,
-        publishedAt: r.publishedAt.getTime(),
-        tickers: r.tickers || [],
-      }));
-    },
+  if (operations.length === 0) return 0;
 
-    async close() {
-      // The mongoose connection belongs to the app, not to this module.
-    },
-  };
+  const result = await Model.bulkWrite(operations, {
+    ordered: false,
+  });
+
+  return result.upsertedCount || 0;
+},
+
+async list({
+  tickers = [],
+  limit = 30,
+  before = null,
+} = {}) {
+  const filter = {};
+
+  const safeTickers = normaliseTickers(tickers);
+
+  if (safeTickers.length) {
+    filter.tickers = {
+      $in: safeTickers,
+    };
+  }
+
+  // Cursor pagination:
+  // newer records are excluded using the last article's
+  // timestamp and ID from the previous page.
+  if (before && typeof before === 'object') {
+    const timestamp = Number(before.publishedAt);
+    const id = String(before.id || '');
+
+    if (
+      Number.isFinite(timestamp) &&
+      /^[a-f0-9]{24}$/i.test(id)
+    ) {
+      const date = new Date(timestamp);
+
+      filter.$or = [
+        {
+          publishedAt: {
+            $lt: date,
+          },
+        },
+        {
+          publishedAt: date,
+          _id: {
+            $lt: id,
+          },
+        },
+      ];
+    }
+  }
+
+  const rows = await Model.find(filter)
+    .sort({
+      publishedAt: -1,
+      _id: -1,
+    })
+    .limit(normaliseLimit(limit))
+    .select(
+      'title url source publishedAt tickers image description category'
+    )
+    .maxTimeMS(3000)
+    .lean();
+
+  return rows.map((row) => ({
+    id: row._id,
+    title: row.title,
+    url: row.url,
+    source: row.source || 'Unknown',
+
+    publishedAt: row.publishedAt
+      ? row.publishedAt.getTime()
+      : 0,
+
+    tickers: row.tickers || [],
+
+    image: row.image || null,
+
+    description: row.description || '',
+
+    category: row.category || 'Global',
+  }));
+},
+
+async close() {
+  // The application's Mongoose connection belongs to
+  // the application, not this store.
+},
+
+};
 }
 
 module.exports = { createMongoStore };

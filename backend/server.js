@@ -7,7 +7,7 @@ const { startConfidenceScheduler } = require('./services/confidenceScheduler');
 const { startMarketCalendarScheduler } = require('./services/marketCalendarScheduler');
 const { startDividendScheduler } = require('./services/dividendScheduler');
 const { startPriceScheduler } = require('./services/priceScheduler');
-const { mountAuth, requireRole } = require('./gaze-auth/src');
+const { mountAuth, requireRole, usersConn } = require('./gaze-auth/src');
 const { startAlertEngine } = require('./services/alertEngine');
 const { startTelegram } = require('./services/telegramService');
 const { startPush } = require('./services/pushService');
@@ -25,8 +25,16 @@ const telegramRoutes = require('./routes/telegram');
 const pushRoutes = require('./routes/push');
 const adminStatusRoutes = require('./routes/adminStatus');
 const stockRoutes = require('./routes/stocks');
+const { createNews } = require('./news');
+
 
 const app = express();
+
+// Market News
+const {
+    service: newsService,
+    router: newsRouter
+} = createNews({ mongoose });
 
 // Health check for uptime monitors (UptimeRobot / Render). Mounted BEFORE auth
 // so it skips rate limits and CORS, and it doesn't touch the database.
@@ -97,6 +105,7 @@ app.use('/api/market-calendar', marketCalendarRoutes);
 app.use('/api/scheduler', requireRole('admin'), schedulerRoutes);             // admin only
 app.use('/api/dividends', dividendRoutes);
 app.use('/api/fx', require('./routes/fx'));
+app.use('/api/news', newsRouter);
 
 // Server Port
 const PORT = process.env.PORT || 5000;
@@ -116,6 +125,21 @@ async function startServer() {
         });
 
         console.log('✓ MongoDB connected');
+
+        console.log('Connecting to users database...');
+
+await usersConn.asPromise();
+
+console.log('✓ Users database connected');
+
+
+            // Start Market News
+         try {
+    await newsService.start();
+    console.log('[news] service started');
+            } catch (error) {
+            console.error('[news] failed to start:', error.message);
+         }
 
         app.listen(PORT, () => {
             console.log(`✓ Server running on port ${PORT}`);

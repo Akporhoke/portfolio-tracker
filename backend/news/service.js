@@ -4,8 +4,8 @@ const Parser = require('rss-parser');
 const { fetchFeedText } = require('./fetcher');
 const { normalizeItem } = require('./sanitize');
 
-const MIN_ATTEMPT_GAP_MS = 60 * 1000;   // never refresh more than once a minute
-const MAX_BACKOFF_MS = 60 * 60 * 1000;  // a failing source is retried at least hourly
+const MIN_ATTEMPT_GAP_MS = 60 * 1000;
+const MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 class NewsService {
   constructor({
@@ -13,7 +13,7 @@ class NewsService {
     config,
     matchTickers,
     logger = console,
-    fetchText = fetchFeedText, // injectable so tests never touch the network
+    fetchText = fetchFeedText,
     now = Date.now,
   }) {
     this.store = store;
@@ -22,29 +22,54 @@ class NewsService {
     this.log = logger;
     this.fetchText = fetchText;
     this.now = now;
-    this.parser = new Parser();
 
-    // Health is kept in memory on purpose: it costs no database space and is
-    // rebuilt within one refresh after a restart.
+    // Capture standard RSS fields and common media extensions.
+    this.parser = new Parser({
+      timeout: config.fetchTimeoutMs,
+
+      customFields: {
+        item: [
+          ['media:content', 'mediaContent', { keepArray: true }],
+          ['media:thumbnail', 'mediaThumbnail', { keepArray: true }],
+          ['content:encoded', 'contentEncoded'],
+        ],
+      },
+    });
+
+    // Source health is kept in memory.
     this.health = new Map(
-      config.sources.map((s) => [
-        s.id,
-        { failures: 0, nextAttemptAt: 0, lastSuccessAt: null, lastError: null, lastCount: 0 },
+      config.sources.map((source) => [
+        source.id,
+        {
+          failures: 0,
+          nextAttemptAt: 0,
+          lastSuccessAt: null,
+          lastError: null,
+          lastCount: 0,
+        },
       ])
     );
+
     this.lastSuccessAt = null;
     this.lastAttemptAt = 0;
     this.running = null;
     this.timer = null;
   }
 
-  // Prepare the store and start the schedule. The first refresh runs in the
-  // background so a slow feed can never delay or block server startup.
   async start() {
     await this.store.init();
+
+    // Do not delay server startup while feeds are downloading.
     this.refresh().catch(() => {});
-    this.timer = setInterval(() => this.refresh().catch(() => {}), this.config.refreshIntervalMs);
-    this.timer.unref(); // the timer alone must not keep the process alive
+
+    this.timer = setInterval(
+      () => this.refresh().catch(() => {}),
+      this.config.refreshIntervalMs
+    );
+
+    if (this.timer.unref) {
+      this.timer.unref();
+    }
   }
 
   async stop() {
@@ -52,86 +77,141 @@ class NewsService {
       clearInterval(this.timer);
       this.timer = null;
     }
-    if (this.running) await this.running.catch(() => {});
+
+    if (this.running) {
+      await this.running.catch(() => {});
+    }
+
     await this.store.close();
   }
 
-  // Only one refresh runs at a time; concurrent callers share the same promise.
+  // Prevent concurrent refreshes.
   refresh() {
-    if (this.running) return this.running;
+    if (this.running) {
+      return this.running;
+    }
+
     this.running = this._refresh()
-      .catch((err) => this.log.error('[news] refresh crashed:', err.message))
+      .catch((error) => {
+        this.log.error('[news] refresh crashed:', error.message);
+      })
       .finally(() => {
         this.running = null;
       });
+
     return this.running;
   }
 
   async _refresh() {
     const now = this.now();
+
     this.lastAttemptAt = now;
 
-    // Sources in backoff are skipped, so one dead feed cannot slow the others.
-    const due = this.config.sources.filter((s) => this.health.get(s.id).nextAttemptAt <= now);
-    const results = await Promise.allSettled(due.map((s) => this._pull(s, now)));
+    // Skip sources currently in backoff.
+    const due = this.config.sources.filter((source) => {
+      const health = this.health.get(source.id);
+      return health && health.nextAttemptAt <= now;
+    });
+
+    if (!due.length) {
+      return;
+    }
+
+    const results = await Promise.allSettled(
+      due.map((source) => this._pull(source, now))
+    );
 
     const batch = [];
     let anySuccess = false;
 
-    results.forEach((result, i) => {
-      const source = due[i];
-      const h = this.health.get(source.id);
+    results.forEach((result, index) => {
+      const source = due[index];
+      const health = this.health.get(source.id);
+
       if (result.status === 'fulfilled') {
         anySuccess = true;
-        h.failures = 0;
-        h.nextAttemptAt = 0;
-        h.lastSuccessAt = now;
-        h.lastError = null;
-        h.lastCount = result.value.length;
+
+        health.failures = 0;
+        health.nextAttemptAt = 0;
+        health.lastSuccessAt = now;
+        health.lastError = null;
+        health.lastCount = result.value.length;
+
         batch.push(...result.value);
       } else {
-        h.failures += 1;
-        h.lastError = String((result.reason && result.reason.message) || result.reason).slice(0, 200);
-        // Exponential backoff: 2, 4, 8 ... minutes, capped at one hour.
-        h.nextAttemptAt = now + Math.min(2 ** h.failures * 60 * 1000, MAX_BACKOFF_MS);
-        this.log.warn(`[news] source ${source.id} failed: ${h.lastError}`);
+        health.failures += 1;
+
+        health.lastError = String(
+          (result.reason && result.reason.message) || result.reason
+        ).slice(0, 200);
+
+        // Exponential backoff: 2, 4, 8 ... 60 minutes.
+        health.nextAttemptAt =
+          now +
+          Math.min(
+            2 ** health.failures * 60 * 1000,
+            MAX_BACKOFF_MS
+          );
+
+        this.log.warn(
+          `[news] source ${source.id} failed: ${health.lastError}`
+        );
       }
     });
 
     try {
-      if (batch.length) await this.store.upsertMany(batch);
-      if (anySuccess) this.lastSuccessAt = now;
-    } catch (err) {
-      this.log.error('[news] store write failed:', err.message);
+      if (batch.length) {
+        await this.store.upsertMany(batch);
+      }
+
+      if (anySuccess) {
+        this.lastSuccessAt = now;
+      }
+    } catch (error) {
+      this.log.error('[news] store write failed:', error.message);
     }
   }
 
   async _pull(source, now) {
-    const cfg = this.config;
+    const config = this.config;
+
     const xml = await this.fetchText(source, {
-      timeoutMs: cfg.fetchTimeoutMs,
-      maxBytes: cfg.maxFeedBytes,
-      userAgent: cfg.userAgent,
+      timeoutMs: config.fetchTimeoutMs,
+      maxBytes: config.maxFeedBytes,
+      userAgent: config.userAgent,
     });
+
     const feed = await this.parser.parseString(xml);
+
     const out = [];
-    for (const raw of (feed.items || []).slice(0, cfg.maxItemsPerSource)) {
+
+    const feedItems = Array.isArray(feed.items) ? feed.items : [];
+
+    for (const raw of feedItems.slice(0, config.maxItemsPerSource)) {
       const item = normalizeItem(raw, source, {
         now,
-        retentionMs: cfg.retentionMs,
+        retentionMs: config.retentionMs,
         matchTickers: this.matchTickers,
       });
-      if (item) out.push(item);
+
+      if (item) {
+        out.push(item);
+      }
     }
+
     return out;
   }
 
-  // Stale-while-revalidate: if data is old (for example the host slept and the
-  // timer did not run), start a refresh in the background but answer from the
-  // store immediately. Requests never wait on the network.
+  // Stale-while-revalidate.
+  // Return stored news immediately while refreshing outdated data.
   maybeRefresh() {
     const now = this.now();
-    const age = this.lastSuccessAt === null ? Infinity : now - this.lastSuccessAt;
+
+    const age =
+      this.lastSuccessAt === null
+        ? Infinity
+        : now - this.lastSuccessAt;
+
     if (
       !this.running &&
       age >= this.config.refreshIntervalMs &&
@@ -144,19 +224,35 @@ class NewsService {
   isStale() {
     return (
       this.lastSuccessAt === null ||
-      this.now() - this.lastSuccessAt > this.config.refreshIntervalMs * 3
+      this.now() - this.lastSuccessAt >
+        this.config.refreshIntervalMs * 3
     );
   }
 
-  async getNews({ tickers = [], limit = 30, before = null } = {}) {
+  async getNews({
+    tickers = [],
+    limit = 30,
+    before = null,
+  } = {}) {
     this.maybeRefresh();
-    const items = await this.store.list({ tickers, limit, before });
+
+    const items = await this.store.list({
+      tickers,
+      limit,
+      before,
+    });
+
     const last = items[items.length - 1];
+
     return {
       items,
       updatedAt: this.lastSuccessAt,
       stale: this.isStale(),
-      nextCursor: items.length === limit && last ? `${last.publishedAt}-${last.id}` : null,
+
+      nextCursor:
+        items.length === limit && last
+          ? `${last.publishedAt}-${last.id}`
+          : null,
     };
   }
 
@@ -164,7 +260,11 @@ class NewsService {
     return {
       lastSuccessAt: this.lastSuccessAt,
       stale: this.isStale(),
-      sources: this.config.sources.map((s) => ({ id: s.id, ...this.health.get(s.id) })),
+
+      sources: this.config.sources.map((source) => ({
+        id: source.id,
+        ...this.health.get(source.id),
+      })),
     };
   }
 }

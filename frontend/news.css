@@ -1,49 +1,248 @@
-/* frontend/news.css - inherits your theme colours; no hard-coded palette */
+/* =========================================
+   GAZE MARKET NEWS
+========================================= */
 
-#news-list {
-  margin-top: 8px;
+.news-page {
+    width: 100%;
+    padding: 8px 0 30px;
+    animation: newsFadeIn .3s ease;
 }
+
+@keyframes newsFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Header */
+
+.news-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 22px;
+}
+
+.news-heading {
+    min-width: 0;
+}
+
+.news-eyebrow {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.7px;
+    color: #16836f;
+    margin-bottom: 7px;
+}
+
+.news-heading h2 {
+    font-size: 27px;
+    font-weight: 800;
+    margin: 0;
+    letter-spacing: -.7px;
+}
+
+.news-heading p {
+    font-size: 13px;
+    opacity: .65;
+    margin: 7px 0 0;
+    line-height: 1.5;
+}
+
+.news-refresh-btn {
+    width: 43px;
+    height: 43px;
+    flex-shrink: 0;
+    border-radius: 13px;
+    border: 1px solid rgba(128, 128, 128, .2);
+    background: var(--card-bg, #fff);
+    color: inherit;
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.news-refresh-btn:active {
+    transform: scale(.94);
+}
+
+/* Market status */
+
+.news-market-strip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 42px;
+    padding: 0 13px;
+    border-radius: 10px;
+    background: rgba(22, 101, 52, .07);
+    margin-bottom: 25px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    overflow: hidden;
+}
+
+.news-live-indicator {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: #16836f;
+}
+
+.news-market-divider {
+    width: 1px;
+    height: 15px;
+    background: rgba(128, 128, 128, .3);
+}
+
+#news-status {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    opacity: .7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Featured story */
+
+.news-featured {
+    margin-bottom: 30px;
+}
+
+.news-featured[hidden] {
+    display: none !important;
+}
+
+/* Feed heading */
+
+.news-feed-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.news-feed-heading h3 {
+    font-size: 19px;
+    font-weight: 800;
+    margin: 0;
+}
+
+/* News grid */
+
+.news-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 13px;
+}
+
+/* Existing article structure */
 
 .news-item {
-  display: block;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.25);
-  color: inherit;
-  text-decoration: none;
+    display: block;
+    padding: 16px;
+    border: 1px solid rgba(128, 128, 128, .16);
+    border-radius: 15px;
+    background: var(--card-bg, #fff);
+    color: inherit;
+    text-decoration: none;
+    transition: transform .2s ease, border-color .2s ease;
 }
 
-.news-item:focus-visible,
-#news-more:focus-visible,
-#news-refresh:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+.news-item:active {
+    transform: scale(.985);
 }
 
 .news-title {
-  display: block;
-  font-size: 15px;
-  line-height: 1.35;
-  overflow-wrap: anywhere; /* long unbroken strings cannot break the layout */
+    display: block;
+    font-size: 15px;
+    font-weight: 750;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 
 .news-meta {
-  display: block;
-  margin-top: 4px;
-  font-size: 12px;
-  opacity: 0.7;
+    display: block;
+    margin-top: 10px;
+    font-size: 11px;
+    opacity: .65;
+    line-height: 1.5;
 }
+
+/* Empty and loading states */
 
 .news-empty,
 #news-status {
-  font-size: 13px;
-  opacity: 0.75;
+    font-size: 12px;
 }
 
-#news-more {
-  display: block;
-  margin: 12px auto 0;
+.news-empty {
+    padding: 35px 15px;
+    text-align: center;
+    opacity: .7;
+    line-height: 1.6;
 }
 
-#news-more[hidden] {
-  display: none;
+/* Controls */
+
+.news-controls {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.news-more-btn {
+    padding: 12px 22px;
+    border: 1px solid rgba(128, 128, 128, .25);
+    border-radius: 12px;
+    background: transparent;
+    color: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.news-more-btn[hidden] {
+    display: none;
+}
+
+/* Disclaimer */
+
+.news-disclaimer {
+    margin-top: 27px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(128, 128, 128, .15);
+    font-size: 11px;
+    line-height: 1.6;
+    opacity: .6;
+}
+
+/* Hide portfolio overview while News is active */
+
+.container:has(#newsTab.active) #gazePortfolioOverview {
+    display: none !important;
+}
+
+/* Responsive */
+
+@media (min-width: 650px) {
+
+    .news-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .news-heading h2 {
+        font-size: 32px;
+    }
+
 }
