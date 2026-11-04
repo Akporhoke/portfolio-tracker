@@ -55,9 +55,26 @@ function marketGuardOnAdd(req, res, next) {
         req.method === 'POST' &&
         /^\/[^/]+\/(stocks|add-watchlist)\/?$/.test(req.path);
 
-    return isAdd
-        ? guardMarket(req, res, next)
-        : next();
+    if (!isAdd) {
+        return next();
+    }
+
+    const market =
+        String((req.body || {}).market || '')
+            .trim()
+            .toUpperCase();
+
+    // The portfolio routes used to assume "US" when no market arrived.
+    // That is how a Nigerian bank can end up saved as a US stock, so the
+    // market must now be stated.
+    if (market !== 'NGX' && market !== 'US') {
+        return res.status(400).json({
+            error: 'Please choose a market (NGX or US)',
+            code: 'MARKET_REQUIRED'
+        });
+    }
+
+    return guardMarket(req, res, next);
 }
 
 // Routes  (everything that uses `app` comes AFTER `const app = express()` above)

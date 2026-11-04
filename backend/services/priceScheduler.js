@@ -212,30 +212,6 @@ function priorityRank(item) {
 }
 
 
-// A stock that keeps failing is retried less and less often
-// (2, 4, 8 ... up to 60 minutes)
-function inBackoff(quote, now) {
-    if (
-        !quote ||
-        !(quote.failCount > 0) ||
-        !quote.lastAttemptAt
-    ) {
-        return false;
-    }
-
-    const minutes =
-        Math.min(
-            2 * Math.pow(2, quote.failCount - 1),
-            60
-        );
-
-    return (
-        now - new Date(quote.lastAttemptAt).getTime() <
-        minutes * 60 * 1000
-    );
-}
-
-
 // ------------------------------------------------------------
 // ONE CYCLE
 // ------------------------------------------------------------
@@ -293,7 +269,10 @@ async function runPriceRefreshCycle(reason = 'tick') {
                 continue;
             }
 
-            if (inBackoff(quote, now)) {
+            // A stock that keeps failing is retried less and less often
+            // (2, 4, 8 ... up to 60 minutes). One rule, shared with the
+            // portfolio route.
+            if (quoteStore.isInBackoff(quote, now)) {
                 backedOff++;
                 continue;
             }

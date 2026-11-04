@@ -131,9 +131,37 @@ async function getStoredQuotes(items) {
 }
 
 
+// A stock that keeps failing is retried less and less often: after 1
+// failure wait 2 minutes, then 4, 8, 16 ... never more than 60 minutes.
+// The price scheduler AND the portfolio route use this one rule, so a
+// failing stock is not retried on every page load.
+function isInBackoff(quote, now = Date.now()) {
+    if (
+        !quote ||
+        !(quote.failCount > 0) ||
+        !quote.lastAttemptAt
+    ) {
+        return false;
+    }
+
+    const minutes =
+        Math.min(
+            2 * Math.pow(2, quote.failCount - 1),
+            60
+        );
+
+    return (
+        now - new Date(quote.lastAttemptAt).getTime() <
+        minutes * 60 * 1000
+    );
+}
+
+
 module.exports = {
     saveQuote,
     noteFailure,
     getStoredQuote,
-    getStoredQuotes
+    getStoredQuotes,
+    isInBackoff
 };
+ 

@@ -1,0 +1,16 @@
+<!-- Paste where the News tab content should appear in index.html -->
+<section id="news-section" aria-labelledby="news-heading">
+  <h2 id="news-heading">Market news</h2>
+  <label>
+    <input type="checkbox" id="news-mine"> My stocks only
+  </label>
+  <button type="button" id="news-refresh">Refresh</button>
+  <p id="news-status" role="status" aria-live="polite"></p>
+  <div id="news-list"></div>
+  <button type="button" id="news-more" hidden>Load more</button>
+</section>
+
+<!-- Load once, after your main app scripts. Put the stylesheet in <head>. -->
+<!-- <link rel="stylesheet" href="news.css"> -->
+<!-- <script>window.GAZE_API_BASE = "https://your-backend.example.com";</script> -->
+<!-- <script src="news.js"></script> -->

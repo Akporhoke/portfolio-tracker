@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
 
@@ -58,6 +60,8 @@
      <link rel="stylesheet" href="auth-ui.css">
      <link rel="stylesheet" href="fx-rates.css">
      <link rel="stylesheet" href="converter.css">
+     <!-- NEWS -->
+     <link rel="stylesheet" href="news.css">
 
 
     <!-- Google Fonts -->
@@ -575,6 +579,17 @@
                         <i class="fa-solid fa-chevron-right settings-chevron"></i>
                     </button>
 
+                    <!-- NEWS -->
+                    <button
+                        type="button"
+                        class="settings-row settings-link"
+                        onclick="switchTab('news')"
+                    >
+                        <i class="fa-regular fa-newspaper settings-row-icon"></i>
+                        <span class="settings-row-label">Market News</span>
+                        <i class="fa-solid fa-chevron-right settings-chevron"></i>
+                    </button>
+
                     
 
                     <!-- Floating Tools toggle -->
@@ -760,6 +775,23 @@
         <h2 class="settings-title">Market Calendar</h2>
         <div class="market-calendar" id="marketCalendarRoot"></div>
          </div>
+        </div>
+
+        <!-- NEWS: TAB: MARKET NEWS -->
+        <div class="tab-content" id="newsTab">
+            <div class="tool-container">
+                <button type="button" class="tool-back" onclick="switchTab('settings')"><i class="fa-solid fa-chevron-left"></i> Back</button>
+                <h2 class="settings-title">Market News</h2>
+
+                <p id="news-status" class="form-hint" role="status" aria-live="polite"></p>
+
+                <div id="news-list"></div>
+
+                <button type="button" id="news-more" class="btn-secondary" hidden>Load more</button>
+                <button type="button" id="news-refresh" class="btn-secondary">Refresh</button>
+
+                <p class="form-hint">Headlines link to the original publishers. News is a source of information, not financial advice.</p>
+            </div>
         </div>
 
         <!-- TAB: STUDY (Learn) -->
@@ -1115,6 +1147,8 @@
     <script src="learn-reader.js"></script>
 <script src="dictionary-data.js"></script>
 <script src="dictionary.js"></script>
+    <!-- NEWS: loads headlines when the Market News tab is opened -->
+    <script src="news.js"></script>
 
     <script src="https://kit.fontawesome.com/ebc2dac530.js" crossorigin="anonymous"></script>
 </body>
