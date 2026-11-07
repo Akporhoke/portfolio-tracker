@@ -48,7 +48,7 @@
         OANDO: 'oandoplc.com',
         CONOIL: 'conoilplc.com',
         TOTAL: 'totalenergies.ng',
-        GEREGU: 'gereguplc.com',
+        GEREGU: 'geregupowerplc.com',
         TRANSCORP: 'transcorpnigeria.com',
         NESTLE: 'nestle-cwa.com',
         NB: 'nbplc.com',
@@ -93,6 +93,22 @@ NNFM: 'nnfmplc.com',
 HONEYFLOUR: 'honeywellfood.com',
 HONYFLOUR: 'honeywellfood.com',
 ETERNA: 'eternaplc.com',
+// Add inside DOMAINS
+
+// NGX
+AUSTINLAZ: 'austinlaz.com.ng',
+INTBREW: 'internationalbreweriesplc.com',
+
+THOMASWY: 'thomaswyattng.com',
+ABCTRANS: 'abctransport.com',
+EKOCORP: 'ekohospitals.com',
+CORNERST: 'cornerstone.com.ng',
+
+// US
+SPCX: 'spacex.com',
+
+// Google ticker alias, if GOOGN is intentional in your data
+GOOGN: 'google.com',
 
 // US
 ARGT: 'globalxetfs.com',
