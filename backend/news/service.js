@@ -467,7 +467,7 @@ class NewsService {
 
       nextCursor:
         items.length === limit && last
-          ? `${last.publishedAt}-${last.id}`
+          ? `${last.rankAt}-${last.id}`
           : null,
     };
   }

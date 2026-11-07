@@ -18,6 +18,7 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
       source: { type: String, default: 'Unknown' },
       publishedAt: { type: Date, required: true },
       expiresAt: { type: Date, required: true },
+      rankAt: { type: Date, default: null }, // publish time + relevance boost
       tickers: { type: [String], default: [] },
       image: { type: String, default: null },
       description: { type: String, default: '' },
@@ -26,11 +27,11 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
     { versionKey: false, collection, autoIndex: false }
   );
 
-  // Latest articles and stable pagination.
-  schema.index({ publishedAt: -1, _id: -1 });
+  // Ranked feed and stable pagination.
+  schema.index({ rankAt: -1, _id: -1 });
 
   // Efficient filtering for users following particular stocks.
-  schema.index({ tickers: 1, publishedAt: -1, _id: -1 });
+  schema.index({ tickers: 1, rankAt: -1, _id: -1 });
 
   // Automatically delete articles after their expiry time.
   schema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -66,6 +67,17 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
   return {
     async init() {
       await Model.createIndexes();
+
+      // One-time upgrade: articles saved before ranking existed get
+      // rankAt = publishedAt so they still sort correctly.
+      try {
+        await Model.updateMany(
+          { rankAt: null },
+          [{ $set: { rankAt: '$publishedAt' } }]
+        );
+      } catch (error) {
+        console.warn('[news] rankAt backfill skipped:', error.message);
+      }
     },
 
     async upsertMany(items) {
@@ -99,6 +111,8 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
         const description =
           typeof item.description === 'string' ? item.description : '';
 
+        const rankAtMs = toEpoch(item.rankAt) || publishedAt;
+
         // Fields that are fixed once the article exists.
         const update = {
           $setOnInsert: {
@@ -114,7 +128,7 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
           // Always set category; image and description only when we
           // actually have a value, so an empty result never erases
           // good data that is already stored.
-          $set: { category },
+          $set: { category, rankAt: new Date(rankAtMs) },
         };
 
         if (typeof item.image === 'string' && item.image) {
@@ -155,7 +169,8 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
         filter.tickers = { $in: safeTickers };
       }
 
-      // Cursor pagination using the last article's timestamp and ID.
+      // Cursor pagination. NOTE: "publishedAt" in the cursor is really the
+      // article's rankAt (the route passes it through under this name).
       if (before && typeof before === 'object') {
         const timestamp = Number(before.publishedAt);
         const id = String(before.id || '');
@@ -164,16 +179,16 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
           const date = new Date(timestamp);
 
           filter.$or = [
-            { publishedAt: { $lt: date } },
-            { publishedAt: date, _id: { $lt: id } },
+            { rankAt: { $lt: date } },
+            { rankAt: date, _id: { $lt: id } },
           ];
         }
       }
 
       const rows = await Model.find(filter)
-        .sort({ publishedAt: -1, _id: -1 })
+        .sort({ rankAt: -1, _id: -1 })
         .limit(normaliseLimit(limit))
-        .select('title url source publishedAt tickers image description category')
+        .select('title url source publishedAt rankAt tickers image description category')
         .maxTimeMS(3000)
         .lean();
 
@@ -183,6 +198,9 @@ function createMongoStore(mongoose, { collection = 'news_items' } = {}) {
         url: row.url,
         source: row.source || 'Unknown',
         publishedAt: row.publishedAt ? row.publishedAt.getTime() : 0,
+        rankAt: row.rankAt
+          ? row.rankAt.getTime()
+          : (row.publishedAt ? row.publishedAt.getTime() : 0),
         tickers: row.tickers || [],
         image: row.image || null,
         description: row.description || '',

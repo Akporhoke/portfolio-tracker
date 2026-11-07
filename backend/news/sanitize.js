@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('node:crypto');
+const { scoreItem, rankAtFor } = require('./ranking');
 
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
@@ -257,6 +258,11 @@ function normalizeItem(raw, source, {
     }
 
     const description = extractDescription(raw);
+    const category = classifyCategory(title, description);
+    const tickers = matchTickers(title);
+
+    // Relevance score decides how far up the feed this article is lifted.
+    const score = scoreItem({ title, description, category, tickers });
 
     return {
         id: makeId(key),
@@ -265,10 +271,11 @@ function normalizeItem(raw, source, {
         source: publisher,
         publishedAt: published,
         expiresAt: published + retentionMs,
-        tickers: matchTickers(title),
+        tickers,
         image: extractImage(raw),
         description,
-        category: classifyCategory(title, description),
+        category,
+        rankAt: rankAtFor(published, score),
     };
 }
 

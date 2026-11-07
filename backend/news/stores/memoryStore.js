@@ -34,6 +34,7 @@ class MemoryStore {
         if (item.image) existing.image = item.image;
         if (item.description) existing.description = item.description;
         if (item.category) existing.category = item.category;
+        if (item.rankAt) existing.rankAt = Number(item.rankAt) || existing.rankAt;
         continue;
       }
 
@@ -44,6 +45,7 @@ class MemoryStore {
         source: item.source || '',
         publishedAt: Number(item.publishedAt) || 0,
         expiresAt: Number(item.expiresAt) || 0,
+        rankAt: Number(item.rankAt) || Number(item.publishedAt) || 0,
         tickers: Array.isArray(item.tickers) ? [...item.tickers] : [],
         image: item.image || null,
         description: item.description || '',
@@ -103,12 +105,13 @@ class MemoryStore {
       Number.isFinite(Number(before.publishedAt)) &&
       typeof before.id === 'string'
     ) {
+      // "publishedAt" in the cursor is really the article's rankAt.
       const cursorTime = Number(before.publishedAt);
 
       rows = rows.filter(
         (item) =>
-          item.publishedAt < cursorTime ||
-          (item.publishedAt === cursorTime && item.id < before.id)
+          item.rankAt < cursorTime ||
+          (item.rankAt === cursorTime && item.id < before.id)
       );
     }
 
@@ -120,6 +123,7 @@ class MemoryStore {
       url: item.url,
       source: item.source,
       publishedAt: item.publishedAt,
+      rankAt: item.rankAt,
       tickers: [...item.tickers],
       image: item.image || null,
       description: item.description || '',
@@ -133,8 +137,8 @@ class MemoryStore {
 // Newest first; equal timestamps ordered by ID descending so
 // pagination never skips or repeats articles.
 function compare(a, b) {
-  if (b.publishedAt !== a.publishedAt) {
-    return b.publishedAt - a.publishedAt;
+  if (b.rankAt !== a.rankAt) {
+    return b.rankAt - a.rankAt;
   }
 
   return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
