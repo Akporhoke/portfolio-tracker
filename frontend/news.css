@@ -246,3 +246,53 @@
     }
 
 }
+
+/* Add to the end of frontend/news.css */
+.news-item {
+    display: block;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    text-decoration: none;
+    color: inherit;
+}
+
+.news-image-wrap {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: #e8ecee;
+    overflow: hidden;
+}
+
+.news-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.news-item-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px 16px;
+}
+
+.news-category,
+.news-meta {
+    font-size: 0.8rem;
+    color: #6b7a80;
+}
+
+.news-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.news-description {
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: #44525a;
+}

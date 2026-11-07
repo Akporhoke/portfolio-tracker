@@ -2,10 +2,22 @@
 
 const Parser = require('rss-parser');
 const { fetchFeedText } = require('./fetcher');
-const { normalizeItem } = require('./sanitize');
+const { normalizeItem, cleanUrl } = require('./sanitize');
 
 const MIN_ATTEMPT_GAP_MS = 60 * 1000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
+
+// og:image fallback settings
+const OG_TIMEOUT_MS = 5000;              // give up on a slow article page
+const OG_MAX_BYTES = 300 * 1024;         // only the <head> matters
+const OG_CONCURRENCY = 5;                // pages fetched at once
+const OG_MAX_PER_REFRESH = 25;           // cap work per refresh cycle
+const OG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const OG_CACHE_MAX = 500;
+
+// Blocks obvious internal hosts (basic SSRF guard).
+const PRIVATE_HOST =
+  /^(localhost|.*\.local|.*\.internal|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[?::1\]?$)/i;
 
 class NewsService {
   constructor({
@@ -35,6 +47,9 @@ class NewsService {
         ],
       },
     });
+
+    // Remembers og:image lookups (including misses) so each page is fetched once.
+    this.ogCache = new Map();
 
     // Source health is kept in memory.
     this.health = new Map(
@@ -199,7 +214,135 @@ class NewsService {
       }
     }
 
+    // Articles the feed gave no image for: read og:image from the page.
+    await this._fillMissingImages(out);
+
     return out;
+  }
+
+  // --------------------------------------------------
+  // og:image FALLBACK
+  // --------------------------------------------------
+
+  async _fillMissingImages(items) {
+    const missing = items
+      .filter((item) => !item.image)
+      .slice(0, OG_MAX_PER_REFRESH);
+
+    // Work through the list in small groups to stay polite to publishers.
+    for (let i = 0; i < missing.length; i += OG_CONCURRENCY) {
+      const group = missing.slice(i, i + OG_CONCURRENCY);
+
+      await Promise.all(
+        group.map(async (item) => {
+          item.image = await this._ogImage(item.url);
+        })
+      );
+    }
+  }
+
+  async _ogImage(articleUrl) {
+    const now = this.now();
+    const cached = this.ogCache.get(articleUrl);
+
+    if (cached && cached.expires > now) {
+      return cached.image;
+    }
+
+    let image = null;
+
+    try {
+      image = await this._fetchOgImage(articleUrl);
+    } catch (error) {
+      image = null; // a failed lookup must never break the refresh
+    }
+
+    // Keep the cache from growing forever: drop the oldest entry.
+    if (this.ogCache.size >= OG_CACHE_MAX) {
+      this.ogCache.delete(this.ogCache.keys().next().value);
+    }
+
+    this.ogCache.set(articleUrl, {
+      image,
+      expires: now + OG_CACHE_TTL_MS,
+    });
+
+    return image;
+  }
+
+  async _fetchOgImage(articleUrl) {
+    const url = new URL(articleUrl);
+
+    if (url.protocol !== 'https:' || PRIVATE_HOST.test(url.hostname)) {
+      return null;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OG_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': this.config.userAgent || 'Mozilla/5.0 (compatible; GazeBot/1.0)',
+          Accept: 'text/html',
+        },
+      });
+
+      if (!response.ok || !response.body) return null;
+
+      const type = response.headers.get('content-type') || '';
+      if (!type.includes('html')) return null;
+
+      // Read only the start of the page, and stop once </head> is seen.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+
+      let html = '';
+      let bytes = 0;
+
+      while (bytes < OG_MAX_BYTES) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        bytes += value.length;
+        html += decoder.decode(value, { stream: true });
+
+        if (/<\/head>/i.test(html)) break;
+      }
+
+      reader.cancel().catch(() => {});
+
+      return this._parseOgImage(html, url);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  _parseOgImage(html, baseUrl) {
+    const metas = html.match(/<meta\b[^>]*>/gi) || [];
+
+    for (const wanted of ['og:image:secure_url', 'og:image', 'twitter:image']) {
+      for (const tag of metas) {
+        const name = tag.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i);
+        const content = tag.match(/\bcontent\s*=\s*["']([^"']+)["']/i);
+
+        if (name && content && name[1].toLowerCase() === wanted) {
+          try {
+            // Resolve relative paths like /img/a.jpg against the article URL.
+            const absolute = new URL(content[1].trim(), baseUrl).toString();
+            const clean = cleanUrl(absolute, 2048);
+
+            if (clean) return clean;
+          } catch (error) {
+            // try the next candidate
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   // Stale-while-revalidate.

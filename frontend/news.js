@@ -25,7 +25,6 @@
     var seen = Object.create(null);
     var lastLoadAt = 0;
 
-    // Accept HTTPS URLs only.
     function safeHref(value) {
         try {
             var url = new URL(value);
@@ -100,45 +99,33 @@
 
     // --------------------------------------------------
     // IMAGE RENDERING
+    // Returns null when there is no usable image, so no
+    // placeholder text is ever shown.
     // --------------------------------------------------
 
-    function buildImage(imageUrl, title, featured) {
-        var wrapper = document.createElement('div');
-
-        wrapper.className = 'news-image-wrap';
-
-        var placeholder = document.createElement('span');
-
-        placeholder.className = 'news-image-placeholder';
-        placeholder.textContent = 'IMAGE UNAVAILABLE';
-
-        wrapper.appendChild(placeholder);
-
+    function buildImage(imageUrl, title) {
         var safeImage = safeHref(imageUrl);
 
-        if (!safeImage) {
-            wrapper.classList.add('news-image-missing');
-            return wrapper;
-        }
+        if (!safeImage) return null;
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'news-image-wrap';
 
         var img = document.createElement('img');
 
         img.className = 'news-image';
-        img.src = safeImage;
-        img.alt = title || 'News image';
-        img.loading = featured ? 'eager' : 'lazy';
+        img.alt = title || '';
+        img.loading = 'lazy';
         img.decoding = 'async';
         img.referrerPolicy = 'no-referrer';
 
-        img.addEventListener('load', function () {
-            wrapper.classList.add('news-image-loaded');
-        });
-
+        // If the image fails, remove the whole box so the card
+        // collapses cleanly to text only.
         img.addEventListener('error', function () {
-            wrapper.classList.add('news-image-missing');
-            img.remove();
+            wrapper.remove();
         });
 
+        img.src = safeImage;
         wrapper.appendChild(img);
 
         return wrapper;
@@ -166,13 +153,15 @@
         card.rel = 'noopener noreferrer nofollow';
         card.referrerPolicy = 'no-referrer';
 
-        var image = buildImage(
-            article.image,
-            article.title,
-            featured
-        );
+        var image = buildImage(article.image, article.title);
 
-        card.appendChild(image);
+        if (image) {
+            if (featured) {
+                image.querySelector('img').loading = 'eager';
+            }
+
+            card.appendChild(image);
+        }
 
         var content = document.createElement('div');
         content.className = 'news-item-content';
@@ -193,7 +182,8 @@
 
         content.appendChild(title);
 
-        if (article.description) {
+        // Description only on the featured card, like Google Discover.
+        if (featured && article.description) {
             var description = document.createElement('span');
 
             description.className = 'news-description';
@@ -334,7 +324,6 @@
                     seen[article.id] = true;
                 });
 
-                // The first article becomes the featured story.
                 if (
                     !append &&
                     featuredEl &&

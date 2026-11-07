@@ -1,44 +1,16 @@
 'use strict';
 
-// STORE CONTRACT (any database can be plugged in by implementing these four):
+// STORE CONTRACT (any database can be plugged in by implementing these):
 //
-//   init()                         -> prepare the store
-//   upsertMany(items)              -> insert new items; never overwrite an
-//                                     existing ID; return count added
+//   init()                           -> prepare the store
+//   upsertMany(items)                -> insert new items; return count added.
+//                                       Existing items keep their core fields,
+//                                       but image, description and category
+//                                       may be improved by newer data.
 //   list({ tickers, limit, before }) -> newest first, ties broken by ID DESC
-//                                     tickers: string[] (any match)
-//                                     limit: number
-//                                     before: { publishedAt, id } | null
+//   close()                          -> release resources
 //
-// Item shape going IN:
-// {
-//   id,
-//   title,
-//   url,
-//   source,
-//   publishedAt,
-//   expiresAt,
-//   tickers,
-//   image,
-//   description,
-//   category
-// }
-//
-// Item shape returned by list():
-// {
-//   id,
-//   title,
-//   url,
-//   source,
-//   publishedAt,
-//   tickers,
-//   image,
-//   description,
-//   category
-// }
-//
-// Times are epoch milliseconds.
-// Expired rows are removed after expiresAt.
+// Times are epoch milliseconds. Expired rows are removed after expiresAt.
 
 class MemoryStore {
   constructor({ maxItems = 500 } = {}) {
@@ -54,24 +26,31 @@ class MemoryStore {
     for (const item of items) {
       if (!item || !item.id) continue;
 
-      // Preserve existing records. New RSS data must not overwrite
-      // an article that has already been stored.
-      if (!this.items.has(item.id)) {
-        this.items.set(item.id, {
-          id: item.id,
-          title: item.title || '',
-          url: item.url || '',
-          source: item.source || '',
-          publishedAt: Number(item.publishedAt) || 0,
-          expiresAt: Number(item.expiresAt) || 0,
-          tickers: Array.isArray(item.tickers) ? [...item.tickers] : [],
-          image: item.image || null,
-          description: item.description || '',
-          category: item.category || 'Global',
-        });
+      const existing = this.items.get(item.id);
 
-        added += 1;
+      if (existing) {
+        // Improve an existing record without replacing it:
+        // fill in a missing image, refresh cleaned text and category.
+        if (item.image) existing.image = item.image;
+        if (item.description) existing.description = item.description;
+        if (item.category) existing.category = item.category;
+        continue;
       }
+
+      this.items.set(item.id, {
+        id: item.id,
+        title: item.title || '',
+        url: item.url || '',
+        source: item.source || '',
+        publishedAt: Number(item.publishedAt) || 0,
+        expiresAt: Number(item.expiresAt) || 0,
+        tickers: Array.isArray(item.tickers) ? [...item.tickers] : [],
+        image: item.image || null,
+        description: item.description || '',
+        category: item.category || 'Global',
+      });
+
+      added += 1;
     }
 
     this.prune(Date.now());
@@ -111,7 +90,6 @@ class MemoryStore {
 
     let rows = [...this.items.values()];
 
-    // Return articles matching at least one requested ticker.
     if (requestedTickers.length) {
       rows = rows.filter((item) =>
         item.tickers.some((ticker) =>
@@ -120,7 +98,6 @@ class MemoryStore {
       );
     }
 
-    // Cursor pagination.
     if (
       before &&
       Number.isFinite(Number(before.publishedAt)) &&
@@ -153,9 +130,8 @@ class MemoryStore {
   async close() {}
 }
 
-// Newest first.
-// Equal timestamps are ordered by ID descending so pagination
-// does not skip or repeat articles.
+// Newest first; equal timestamps ordered by ID descending so
+// pagination never skips or repeats articles.
 function compare(a, b) {
   if (b.publishedAt !== a.publishedAt) {
     return b.publishedAt - a.publishedAt;
