@@ -1,31 +1,11 @@
 // frontend/logos.js
-// Company logos for Gaze stock avatars (watchlist, portfolio, sold,
-// market popup and search suggestions).
-//
-// No changes to app.js are needed. This file watches the page; whenever a
-// letter avatar appears, it reads the ticker shown beside it, finds the
-// company's website, and swaps the letter for the logo. If there is no
-// website listed, or the icon is missing or too small, the letter stays.
-//
-// Where each logo comes from, in this order:
-//   1. Your own file:  logos/TICKER.png   (best quality, always wins)
-//   2. Logo.dev real company logo (needs LOGO_DEV_TOKEN and the ticker in DOMAINS)
-//   3. The company's website icon (needs the ticker in DOMAINS below)
-//   4. The original coloured letter
-//
-// LOGO.DEV: create a free account at logo.dev, copy your PUBLISHABLE key
-// (it starts with pk_) and paste it between the quotes below. This key is
-// meant to be public. Check their current terms for the free plan, which
-// may ask you to credit them somewhere in your app.
-//
-// TO ADD A LOGO FILE: save it as  frontend/logos/GTCO.png  (ticker in capitals).
-// TO ADD A WEBSITE:   add  TICKER: 'website.com'  to DOMAINS below.
+// Company logos for Gaze stock avatars.
 
 (function () {
     'use strict';
 
     var DOMAINS = {
-        // NGX
+        // NGX — Banking and financial services
         GTCO: 'gtbank.com',
         ZENITHBANK: 'zenithbank.com',
         ACCESSCORP: 'accessbankplc.com',
@@ -37,6 +17,21 @@
         WEMABANK: 'wemabank.com',
         STANBIC: 'stanbicibtcbank.com',
         ETI: 'ecobank.com',
+        CUSTODIAN: 'custodianplc.com.ng',
+        AIICO: 'aiicoplc.com',
+        MANSARD: 'axamansard.com',
+        AVACAP: 'avacapitalplcgroup.com',
+        AVAIF: 'avacapitalgroup.com',
+        ABBEYBANK: 'abbeymortgagebank.com',
+        REGALINS: 'regencyalliance.com',
+        UCAP: 'unitedcapitalplcgroup.com',
+        CORNERST: 'cornerstone.com.ng',
+        LASACO: 'lasacoassurance.com',
+        LINKASSURE: 'linkageassurance.com',
+        MBENEFIT: 'mutualng.com',
+        INFINITY: 'infinitytrustbank.com',
+
+        // NGX — Industrial, energy and infrastructure
         MTNN: 'mtnonline.com',
         AIRTELAFRI: 'airtel.africa',
         DANGCEM: 'dangotecement.com',
@@ -50,70 +45,58 @@
         TOTAL: 'totalenergies.ng',
         GEREGU: 'geregupowerplc.com',
         TRANSCORP: 'transcorpnigeria.com',
+        JBERGER: 'julius-berger.com',
+        BERGER: 'bergerpaintsnig.com',
+        NAHCO: 'nahcoaviance.com',
+        SKYAVN: 'sahcoplc.com',
+        TRANSPOWER: 'transcorppower.com',
+        TRANSCOHOT: 'transcorphotels.com',
+        TIP: 'initiatesgroup.com',
+
+        // NGX — Consumer goods, agriculture and healthcare
         NESTLE: 'nestle-cwa.com',
         NB: 'nbplc.com',
+        INTBREW: 'internationalbreweriesplc.com',
         GUINNESS: 'guinness-nigeria.com',
         UNILEVER: 'unilevernigeria.com',
         CADBURY: 'cadburynigeria.com',
         PZ: 'pzcussons.com.ng',
-        NAHCO: 'nahcoaviance.com',
-        UACN: 'uacnplc.com',
-        CUSTODIAN: 'custodianplc.com.ng',
-        AIICO: 'aiicoplc.com',
-        MANSARD: 'axamansard.com',
         PRESCO: 'presco-plc.com',
+        LIVESTOCK: 'livestockfeedsplc.com',
+        HONEYFLOUR: 'honeywellfood.com',
+        HONYFLOUR: 'honeywellfood.com',
+        OKOMUOIL: 'okomunigeria.com',
+        MAYBAKER: 'may-baker.com',
+        VITAFOAM: 'vitafoamng.com',
+        NNFM: 'nnfmplc.com',
+        ETERNA: 'eternaplc.com',
+
+        // NGX — Other companies
         NGXGROUP: 'ngxgroup.com',
-        JBERGER: 'julius-berger.com',
+        ACADEMY: 'academypress-plc.com',
+        ALEX: 'alexnigeria.com',
+        HBMNG: 'hbmngplc.com',
+        UPL: 'universitypressplc.com',
         UPDC: 'updcplc.com',
+        UPDCREIT: 'updcplc.com',
         ETRANZACT: 'etranzact.com',
         CILEASING: 'cileasing.com',
-        VITAFOAM: 'vitafoamng.com',
-        TIP: 'initiatesgroup.com',
         CONHALLPLC: 'chiplc.com',
-        ABBEYBANK: 'abbeymortgagebank.com',
-        BERGER: 'bergerpaintsnig.com',
-        TRANSCOHOT: 'transcorphotels.com',
-        TRANSPOWER: 'transcorppower.com',
         FTGINSURE: 'fortisglobalinsurance.com',
-        // NGX — add these entries
-ACADEMY: 'academypress-plc.com',
-ALEX: 'alexnigeria.com',
-AVACAP: 'avacapitalplcgroup.com',
-AVAIF: 'avacapitalgroup.com',
-HBMNG: 'hbmngplc.com',
-INTBREW: 'internationalbreweriesplc.com',
-LIVESTOCK: 'livestockfeedsplc.com',
-REGALINS: 'regencyalliance.com',
-UPL: 'universitypressplc.com',
-UPDCREIT: 'updcplc.com',
-OMATEK: 'omatek.ng',
-OKOMUOIL: 'okomunigeria.com',
-SKYAVN: 'sahcoplc.com',
-NNFM: 'nnfmplc.com',
-HONEYFLOUR: 'honeywellfood.com',
-HONYFLOUR: 'honeywellfood.com',
-ETERNA: 'eternaplc.com',
-// Add inside DOMAINS
+        AUSTINLAZ: 'austinlaz.com.ng',
+        THOMASWY: 'thomaswyattng.com',
+        ABCTRANS: 'abctransport.com',
+        EKOCORP: 'ekohospitals.com',
+        OMATEK: 'omatek.ng',
 
-// NGX
-AUSTINLAZ: 'austinlaz.com.ng',
-INTBREW: 'internationalbreweriesplc.com',
+        // NGX — Additional confirmed company identities
+        IKEJAHOTEL: 'ikejahotelplc.com',
+        JOHNHOLT: 'johnholt.com',
+        LEARNAFRCA: 'learnafrica.com',
+        MEYER: 'meyerpaints.com',
+        NASCON: 'nascon.dangote.com',
 
-THOMASWY: 'thomaswyattng.com',
-ABCTRANS: 'abctransport.com',
-EKOCORP: 'ekohospitals.com',
-CORNERST: 'cornerstone.com.ng',
-
-// US
-SPCX: 'spacex.com',
-
-// Google ticker alias, if GOOGN is intentional in your data
-GOOGN: 'google.com',
-
-// US
-ARGT: 'globalxetfs.com',
-        UCAP: 'unitedcapitalplcgroup.com',
-        // US
+        // US — Existing mappings
         AAPL: 'apple.com',
         TSLA: 'tesla.com',
         NVDA: 'nvidia.com',
@@ -136,26 +119,59 @@ ARGT: 'globalxetfs.com',
         GBTC: 'grayscale.com',
         NXT: 'nextracker.com',
         DMAC: 'diamedica.com',
-        TWN: 'taiwanfund.com'
+        TWN: 'taiwanfund.com',
+        ARGT: 'globalxetfs.com',
+
+        // US — Additional stocks
+        MU: 'micron.com',
+        'BRK/A': 'berkshirehathaway.com',
+        'BRK/B': 'berkshirehathaway.com',
+        'BRK.A': 'berkshirehathaway.com',
+        'BRK.B': 'berkshirehathaway.com',
+        LLY: 'lilly.com',
+        JPM: 'jpmorganchase.com',
+        WMT: 'walmart.com',
+        V: 'visa.com',
+        JNJ: 'jnj.com',
+        INTC: 'intel.com',
+        MA: 'mastercard.com',
+        ABBV: 'abbvie.com',
+        PLTR: 'palantir.com',
+        CSCO: 'cisco.com',
+        ORCL: 'oracle.com',
+        COST: 'costco.com',
+        CVX: 'chevron.com',
+        BAC: 'bankofamerica.com',
+        LRCX: 'lamresearch.com',
+        AMAT: 'appliedmaterials.com',
+        CAT: 'caterpillar.com',
+        MRK: 'merck.com',
+        DELL: 'dell.com',
+        PG: 'pg.com',
+        GE: 'ge.com',
+        UNH: 'unitedhealthgroup.com',
+        MS: 'morganstanley.com',
+        PANW: 'paloaltonetworks.com',
+        PM: 'pmi.com'
     };
 
-    var LOGO_DEV_TOKEN = 'pk_YeBQRMVKST2Ia_4frzFn7A';           // paste your pk_... key here
-    var LOGO_DIR = 'logos/';           // folder for your own logo files
-    var MIN_SIZE = 32;                 // smaller icons look blurry, skip them
+    var LOGO_DEV_TOKEN = 'pk_YeBQRMVKST2Ia_4frzFn7A';
+    var LOGO_DIR = 'logos/';
+    var MIN_SIZE = 32;
+
     var AVATAR_SELECTOR = '.stock-avatar, .autocomplete-avatar';
-    var SCOPE_SELECTOR = '.stock-item, .watchlist-card-main, .autocomplete-item';
+    var SCOPE_SELECTOR =
+        '.stock-item, .watchlist-card-main, .autocomplete-item';
     var TICKER_SELECTOR = '.stock-ticker, .autocomplete-ticker';
 
-    // Remembered per ticker so lists that redraw do not flicker or re-test.
-    var good = Object.create(null);    // ticker -> url that worked
-    var bad = Object.create(null);     // ticker -> true if no usable logo
+    var good = Object.create(null);
+    var bad = Object.create(null);
 
     function logoUrl(ticker) {
         var domain = DOMAINS[ticker];
 
         if (!domain) return null;
 
-        // Answers 404 when the site has no icon, so onerror can fall back.
         return (
             'https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON' +
             '&url=' + encodeURIComponent('https://' + domain) +
@@ -163,7 +179,6 @@ ARGT: 'globalxetfs.com',
         );
     }
 
-    // Reads the ticker from the card the avatar belongs to.
     function tickerFor(avatar) {
         var scope = avatar.closest(SCOPE_SELECTOR);
 
@@ -173,7 +188,6 @@ ARGT: 'globalxetfs.com',
 
         if (!el) return '';
 
-        // The ticker is the first text; a confidence badge may follow it.
         for (var i = 0; i < el.childNodes.length; i++) {
             var node = el.childNodes[i];
 
@@ -216,8 +230,6 @@ ARGT: 'globalxetfs.com',
         avatar.setAttribute('data-logo', 'none');
     }
 
-    // Real company logo from Logo.dev. fallback=404 means "no logo found"
-    // is reported as an error, so we move on instead of showing a placeholder.
     function logoDevUrl(ticker) {
         var domain = DOMAINS[ticker];
 
@@ -230,7 +242,6 @@ ARGT: 'globalxetfs.com',
         );
     }
 
-    // Places to try for a ticker, best first.
     function sourcesFor(ticker) {
         var list = [LOGO_DIR + encodeURIComponent(ticker) + '.png'];
         var real = logoDevUrl(ticker);
@@ -251,16 +262,16 @@ ARGT: 'globalxetfs.com',
 
         avatar.setAttribute('data-logo', 'loading');
 
-        // Already confirmed earlier: show it at once so redrawn lists
-        // do not flicker.
         if (good[ticker]) {
             var cached = new Image();
 
             cached.referrerPolicy = 'no-referrer';
             cached.alt = '';
+
             cached.onerror = function () {
                 restoreLetter(avatar, ticker);
             };
+
             cached.src = good[ticker];
             showLogo(avatar, cached);
             return;
@@ -328,7 +339,10 @@ ARGT: 'globalxetfs.com',
                     scan(added[j]);
                 }
             }
-        }).observe(document.body, { childList: true, subtree: true });
+        }).observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
 
     if (document.body) {
@@ -337,6 +351,5 @@ ARGT: 'globalxetfs.com',
         document.addEventListener('DOMContentLoaded', start);
     }
 
-    // Optional manual use: window.gazeScanLogos(containerElement)
     window.gazeScanLogos = scan;
 })();
