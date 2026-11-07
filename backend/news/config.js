@@ -14,7 +14,46 @@ function intEnv(name, fallback, min, max) {
 // Feeds are fixed in code, never taken from a request. That removes the
 // biggest SSRF risk (a user making the server fetch an address they chose).
 // "domain" is the only host family the fetcher may contact for this source.
+//
+// Direct publisher feeds come first: they include the article HTML, so
+// images can be extracted. Google News feeds have no images, so they are
+// kept only to catch stories the direct feeds miss.
 const SOURCES = [
+  {
+    id: 'nairametrics',
+    name: 'Nairametrics',
+    domain: 'nairametrics.com',
+    url: 'https://nairametrics.com/feed/',
+    splitPublisher: false,
+  },
+  {
+    id: 'guardian-ng',
+    name: 'The Guardian Nigeria',
+    domain: 'guardian.ng',
+    url: 'https://guardian.ng/feed/',
+    splitPublisher: false,
+  },
+  {
+    id: 'businessday',
+    name: 'BusinessDay',
+    domain: 'businessday.ng',
+    url: 'https://businessday.ng/feed/',
+    splitPublisher: false,
+  },
+  {
+    id: 'punch',
+    name: 'Punch',
+    domain: 'punchng.com',
+    url: 'https://punchng.com/feed/',
+    splitPublisher: false,
+  },
+  {
+    id: 'premium-times',
+    name: 'Premium Times',
+    domain: 'premiumtimesng.com',
+    url: 'https://www.premiumtimesng.com/feed',
+    splitPublisher: false,
+  },
   {
     id: 'gnews-ngx',
     name: 'Google News',
@@ -28,13 +67,6 @@ const SOURCES = [
     domain: 'news.google.com',
     url: 'https://news.google.com/rss/search?q=Nigerian+stocks+dividend+earnings&hl=en-NG&gl=NG&ceid=NG:en',
     splitPublisher: true,
-  },
-  {
-    id: 'nairametrics',
-    name: 'Nairametrics',
-    domain: 'nairametrics.com',
-    url: 'https://nairametrics.com/feed/',
-    splitPublisher: false,
   },
 ];
 

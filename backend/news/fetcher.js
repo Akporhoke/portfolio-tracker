@@ -1,454 +1,92 @@
 'use strict';
 
-const Parser = require('rss-parser');
-const { fetchFeedText, assertSafeUrl } = require('./fetcher');
-const { normalizeItem, cleanUrl } = require('./sanitize');
+// Requires Node 18+ (built-in fetch and AbortSignal.timeout).
+// This is the only code that talks to the outside world, so it is strict:
+// https only, one allowed domain per source, bounded time, bounded size.
 
-const MIN_ATTEMPT_GAP_MS = 60 * 1000;
-const MAX_BACKOFF_MS = 60 * 60 * 1000;
-
-// og:image fallback settings
-const OG_TIMEOUT_MS = 8000;              // give up on a slow article page
-const OG_MAX_BYTES = 300 * 1024;         // only the <head> matters
-const OG_MAX_REDIRECTS = 3;
-const OG_CONCURRENCY = 5;                // pages fetched at once
-const OG_MAX_PER_REFRESH = 40;           // cap work per refresh cycle
-const OG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;   // keep a found image
-const OG_MISS_TTL_MS = 15 * 60 * 1000;        // retry misses/failures sooner
-const OG_CACHE_MAX = 500;
-
-function isGoogleNewsLink(value) {
-  try {
-    return new URL(value).hostname === 'news.google.com';
-  } catch (error) {
-    return false;
-  }
+function hostAllowed(host, domain) {
+  return host === domain || host.endsWith('.' + domain);
 }
 
-class NewsService {
-  constructor({
-    store,
-    config,
-    matchTickers,
-    logger = console,
-    fetchText = fetchFeedText,
-    now = Date.now,
-  }) {
-    this.store = store;
-    this.config = config;
-    this.matchTickers = matchTickers;
-    this.log = logger;
-    this.fetchText = fetchText;
-    this.now = now;
+// Throws unless the URL is safe to request for this source.
+function assertSafeUrl(urlString, domain) {
+  const u = new URL(urlString); // throws on malformed input
+  if (u.protocol !== 'https:') throw new Error('blocked: only https is allowed');
+  if (u.username || u.password) throw new Error('blocked: credentials in url');
+  if (u.port && u.port !== '443') throw new Error('blocked: unexpected port');
+  if (!hostAllowed(u.hostname.toLowerCase(), domain)) {
+    throw new Error('blocked: host not allowed');
+  }
+  return u;
+}
 
-    // Capture standard RSS fields and common media extensions.
-    this.parser = new Parser({
-      timeout: config.fetchTimeoutMs,
+// Read the body in chunks and stop as soon as it exceeds the cap, so a hostile
+// or broken server cannot make us buffer an unbounded response.
+async function readCapped(res, maxBytes) {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error('response too large');
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error('response too large');
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder('utf-8').decode(Buffer.concat(chunks));
+}
 
-      customFields: {
-        item: [
-          ['media:content', 'mediaContent', { keepArray: true }],
-          ['media:thumbnail', 'mediaThumbnail', { keepArray: true }],
-          ['content:encoded', 'contentEncoded'],
-        ],
+async function fetchFeedText(
+  source,
+  { timeoutMs, maxBytes, userAgent, maxRedirects = 3, fetchImpl = fetch }
+) {
+  // One deadline for the whole operation (all redirects and the body read).
+  const signal = AbortSignal.timeout(timeoutMs);
+  let current = source.url;
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const u = assertSafeUrl(current, source.domain);
+
+    // redirect: 'manual' so every hop is re-checked against the allowlist.
+    // Automatic redirects are how a trusted host bounces you to an internal one.
+    const res = await fetchImpl(u, {
+      redirect: 'manual',
+      signal,
+      headers: {
+        'user-agent': userAgent,
+        accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8',
       },
     });
 
-    // Remembers og:image lookups (including misses) so each page is fetched once.
-    this.ogCache = new Map();
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get('location');
+      if (res.body) await res.body.cancel().catch(() => {});
+      if (!location) throw new Error('redirect without location');
+      current = new URL(location, u).toString();
+      continue;
+    }
 
-    // Source health is kept in memory.
-    this.health = new Map(
-      config.sources.map((source) => [
-        source.id,
-        {
-          failures: 0,
-          nextAttemptAt: 0,
-          lastSuccessAt: null,
-          lastError: null,
-          lastCount: 0,
-        },
-      ])
-    );
+    if (!res.ok) {
+      if (res.body) await res.body.cancel().catch(() => {});
+      throw new Error(`HTTP ${res.status}`);
+    }
 
-    this.lastSuccessAt = null;
-    this.lastAttemptAt = 0;
-    this.running = null;
-    this.timer = null;
+    const type = (res.headers.get('content-type') || '').toLowerCase();
+    if (!/(xml|rss|atom)/.test(type)) {
+      if (res.body) await res.body.cancel().catch(() => {});
+      throw new Error('unexpected content type');
+    }
+
+    return readCapped(res, maxBytes);
   }
-
-  async start() {
-    await this.store.init();
-
-    // Do not delay server startup while feeds are downloading.
-    this.refresh().catch(() => {});
-
-    this.timer = setInterval(
-      () => this.refresh().catch(() => {}),
-      this.config.refreshIntervalMs
-    );
-
-    if (this.timer.unref) {
-      this.timer.unref();
-    }
-  }
-
-  async stop() {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
-
-    if (this.running) {
-      await this.running.catch(() => {});
-    }
-
-    await this.store.close();
-  }
-
-  // Prevent concurrent refreshes.
-  refresh() {
-    if (this.running) {
-      return this.running;
-    }
-
-    this.running = this._refresh()
-      .catch((error) => {
-        this.log.error('[news] refresh crashed:', error.message);
-      })
-      .finally(() => {
-        this.running = null;
-      });
-
-    return this.running;
-  }
-
-  async _refresh() {
-    const now = this.now();
-
-    this.lastAttemptAt = now;
-
-    // Skip sources currently in backoff.
-    const due = this.config.sources.filter((source) => {
-      const health = this.health.get(source.id);
-      return health && health.nextAttemptAt <= now;
-    });
-
-    if (!due.length) {
-      return;
-    }
-
-    const results = await Promise.allSettled(
-      due.map((source) => this._pull(source, now))
-    );
-
-    const batch = [];
-    let anySuccess = false;
-
-    results.forEach((result, index) => {
-      const source = due[index];
-      const health = this.health.get(source.id);
-
-      if (result.status === 'fulfilled') {
-        anySuccess = true;
-
-        health.failures = 0;
-        health.nextAttemptAt = 0;
-        health.lastSuccessAt = now;
-        health.lastError = null;
-        health.lastCount = result.value.length;
-
-        batch.push(...result.value);
-      } else {
-        health.failures += 1;
-
-        health.lastError = String(
-          (result.reason && result.reason.message) || result.reason
-        ).slice(0, 200);
-
-        // Exponential backoff: 2, 4, 8 ... 60 minutes.
-        health.nextAttemptAt =
-          now +
-          Math.min(
-            2 ** health.failures * 60 * 1000,
-            MAX_BACKOFF_MS
-          );
-
-        this.log.warn(
-          `[news] source ${source.id} failed: ${health.lastError}`
-        );
-      }
-    });
-
-    try {
-      if (batch.length) {
-        await this.store.upsertMany(batch);
-      }
-
-      if (anySuccess) {
-        this.lastSuccessAt = now;
-      }
-    } catch (error) {
-      this.log.error('[news] store write failed:', error.message);
-    }
-  }
-
-  async _pull(source, now) {
-    const config = this.config;
-
-    const xml = await this.fetchText(source, {
-      timeoutMs: config.fetchTimeoutMs,
-      maxBytes: config.maxFeedBytes,
-      userAgent: config.userAgent,
-    });
-
-    const feed = await this.parser.parseString(xml);
-
-    const out = [];
-
-    const feedItems = Array.isArray(feed.items) ? feed.items : [];
-
-    for (const raw of feedItems.slice(0, config.maxItemsPerSource)) {
-      const item = normalizeItem(raw, source, {
-        now,
-        retentionMs: config.retentionMs,
-        matchTickers: this.matchTickers,
-      });
-
-      if (item) {
-        out.push(item);
-      }
-    }
-
-    // Articles the feed gave no image for: read og:image from the page.
-    await this._fillMissingImages(out, source);
-
-    return out;
-  }
-
-  // --------------------------------------------------
-  // og:image FALLBACK
-  // --------------------------------------------------
-
-  async _fillMissingImages(items, source) {
-    // Google News links are redirect pages with no article image,
-    // so looking them up would only waste the per-refresh budget.
-    const missing = items
-      .filter((item) => !item.image && !isGoogleNewsLink(item.url))
-      .slice(0, OG_MAX_PER_REFRESH);
-
-    // Work through the list in small groups to stay polite to publishers.
-    for (let i = 0; i < missing.length; i += OG_CONCURRENCY) {
-      const group = missing.slice(i, i + OG_CONCURRENCY);
-
-      await Promise.all(
-        group.map(async (item) => {
-          item.image = await this._ogImage(item.url, source.domain);
-        })
-      );
-    }
-
-    if (missing.length) {
-      const found = missing.filter((item) => item.image).length;
-
-      this.log.info(
-        `[news] og:image filled ${found}/${missing.length} missing images`
-      );
-    }
-  }
-
-  async _ogImage(articleUrl, domain) {
-    const now = this.now();
-    const cached = this.ogCache.get(articleUrl);
-
-    if (cached && cached.expires > now) {
-      return cached.image;
-    }
-
-    let image = null;
-
-    try {
-      image = await this._fetchOgImage(articleUrl, domain);
-
-      if (!image) {
-        this.log.warn(`[news] og:image not found: ${articleUrl}`);
-      }
-    } catch (error) {
-      // A failed lookup must never break the refresh, but log why.
-      this.log.warn(
-        `[news] og:image failed (${error.message}): ${articleUrl}`
-      );
-    }
-
-    // Keep the cache from growing forever: drop the oldest entry.
-    if (this.ogCache.size >= OG_CACHE_MAX) {
-      this.ogCache.delete(this.ogCache.keys().next().value);
-    }
-
-    this.ogCache.set(articleUrl, {
-      image,
-      expires: now + (image ? OG_CACHE_TTL_MS : OG_MISS_TTL_MS),
-    });
-
-    return image;
-  }
-
-  // Same rules as fetcher.js: https only, the source's own domain only,
-  // and every redirect hop is re-checked (redirect: 'manual').
-  async _fetchOgImage(articleUrl, domain) {
-    const signal = AbortSignal.timeout(OG_TIMEOUT_MS);
-    const userAgent = this.config.userAgent || 'GazeNewsBot/1.0';
-
-    let current = articleUrl;
-
-    for (let hop = 0; hop <= OG_MAX_REDIRECTS; hop++) {
-      const url = assertSafeUrl(current, domain); // throws if not allowed
-
-      const response = await fetch(url, {
-        redirect: 'manual',
-        signal,
-        headers: {
-          'User-Agent': userAgent,
-          Accept: 'text/html,application/xhtml+xml',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get('location');
-        if (response.body) await response.body.cancel().catch(() => {});
-        if (!location) throw new Error('redirect without location');
-        current = new URL(location, url).toString();
-        continue;
-      }
-
-      if (!response.ok) {
-        if (response.body) await response.body.cancel().catch(() => {});
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const type = (response.headers.get('content-type') || '').toLowerCase();
-
-      if (!type.includes('html') || !response.body) {
-        if (response.body) await response.body.cancel().catch(() => {});
-        throw new Error(`content-type ${type || 'none'}`);
-      }
-
-      // Read only the start of the page; stop once </head> is seen.
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      let html = '';
-      let bytes = 0;
-
-      while (bytes < OG_MAX_BYTES) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        bytes += value.length;
-        html += decoder.decode(value, { stream: true });
-
-        if (/<\/head>/i.test(html)) break;
-      }
-
-      reader.cancel().catch(() => {});
-
-      return this._parseOgImage(html, url);
-    }
-
-    throw new Error('too many redirects');
-  }
-
-  _parseOgImage(html, baseUrl) {
-    const metas = html.match(/<meta\b[^>]*>/gi) || [];
-
-    for (const wanted of ['og:image:secure_url', 'og:image', 'twitter:image']) {
-      for (const tag of metas) {
-        const name = tag.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i);
-        const content = tag.match(/\bcontent\s*=\s*["']([^"']+)["']/i);
-
-        if (name && content && name[1].toLowerCase() === wanted) {
-          try {
-            // Resolve relative paths like /img/a.jpg against the article URL.
-            const absolute = new URL(content[1].trim(), baseUrl).toString();
-            const clean = cleanUrl(absolute, 2048);
-
-            if (clean) return clean;
-          } catch (error) {
-            // try the next candidate
-          }
-        }
-      }
-    }
-
-    return null;
-  }
-
-  // Stale-while-revalidate.
-  // Return stored news immediately while refreshing outdated data.
-  maybeRefresh() {
-    const now = this.now();
-
-    const age =
-      this.lastSuccessAt === null
-        ? Infinity
-        : now - this.lastSuccessAt;
-
-    if (
-      !this.running &&
-      age >= this.config.refreshIntervalMs &&
-      now - this.lastAttemptAt >= MIN_ATTEMPT_GAP_MS
-    ) {
-      this.refresh().catch(() => {});
-    }
-  }
-
-  isStale() {
-    return (
-      this.lastSuccessAt === null ||
-      this.now() - this.lastSuccessAt >
-        this.config.refreshIntervalMs * 3
-    );
-  }
-
-  async getNews({
-    tickers = [],
-    limit = 30,
-    before = null,
-  } = {}) {
-    this.maybeRefresh();
-
-    const items = await this.store.list({
-      tickers,
-      limit,
-      before,
-    });
-
-    const last = items[items.length - 1];
-
-    return {
-      items,
-      updatedAt: this.lastSuccessAt,
-      stale: this.isStale(),
-
-      nextCursor:
-        items.length === limit && last
-          ? `${last.publishedAt}-${last.id}`
-          : null,
-    };
-  }
-
-  getHealth() {
-    return {
-      lastSuccessAt: this.lastSuccessAt,
-      stale: this.isStale(),
-
-      sources: this.config.sources.map((source) => ({
-        id: source.id,
-        ...this.health.get(source.id),
-      })),
-    };
-  }
+  throw new Error('too many redirects');
 }
 
-module.exports = { NewsService };
+module.exports = { fetchFeedText, assertSafeUrl };
