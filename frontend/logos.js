@@ -9,8 +9,14 @@
 //
 // Where each logo comes from, in this order:
 //   1. Your own file:  logos/TICKER.png   (best quality, always wins)
-//   2. The company's website icon (needs the ticker in DOMAINS below)
-//   3. The original coloured letter
+//   2. Logo.dev real company logo (needs LOGO_DEV_TOKEN and the ticker in DOMAINS)
+//   3. The company's website icon (needs the ticker in DOMAINS below)
+//   4. The original coloured letter
+//
+// LOGO.DEV: create a free account at logo.dev, copy your PUBLISHABLE key
+// (it starts with pk_) and paste it between the quotes below. This key is
+// meant to be public. Check their current terms for the free plan, which
+// may ask you to credit them somewhere in your app.
 //
 // TO ADD A LOGO FILE: save it as  frontend/logos/GTCO.png  (ticker in capitals).
 // TO ADD A WEBSITE:   add  TICKER: 'website.com'  to DOMAINS below.
@@ -85,6 +91,7 @@
         GBTC: 'grayscale.com'
     };
 
+    var LOGO_DEV_TOKEN = 'pk_YeBQRMVKST2Ia_4frzFn7A';           // paste your pk_... key here
     var LOGO_DIR = 'logos/';           // folder for your own logo files
     var MIN_SIZE = 32;                 // smaller icons look blurry, skip them
     var AVATAR_SELECTOR = '.stock-avatar, .autocomplete-avatar';
@@ -161,11 +168,27 @@
         avatar.setAttribute('data-logo', 'none');
     }
 
+    // Real company logo from Logo.dev. fallback=404 means "no logo found"
+    // is reported as an error, so we move on instead of showing a placeholder.
+    function logoDevUrl(ticker) {
+        var domain = DOMAINS[ticker];
+
+        if (!LOGO_DEV_TOKEN || !domain) return null;
+
+        return (
+            'https://img.logo.dev/' + encodeURIComponent(domain) +
+            '?token=' + encodeURIComponent(LOGO_DEV_TOKEN) +
+            '&size=128&format=png&fallback=404'
+        );
+    }
+
     // Places to try for a ticker, best first.
     function sourcesFor(ticker) {
         var list = [LOGO_DIR + encodeURIComponent(ticker) + '.png'];
+        var real = logoDevUrl(ticker);
         var web = logoUrl(ticker);
 
+        if (real) list.push(real);
         if (web) list.push(web);
 
         return list;
