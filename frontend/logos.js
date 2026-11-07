@@ -49,7 +49,7 @@
         CONOIL: 'conoilplc.com',
         TOTAL: 'totalenergies.ng',
         GEREGU: 'gereguplc.com',
-        TRANSCORP: 'transcorpplc.com',
+        TRANSCORP: 'transcorpnigeria.com',
         NESTLE: 'nestle-cwa.com',
         NB: 'nbplc.com',
         GUINNESS: 'guinness-nigeria.com',
@@ -68,6 +68,14 @@
         ETRANZACT: 'etranzact.com',
         CILEASING: 'cileasing.com',
         VITAFOAM: 'vitafoamng.com',
+        TIP: 'initiatesgroup.com',
+        CONHALLPLC: 'chiplc.com',
+        ABBEYBANK: 'abbeymortgagebank.com',
+        BERGER: 'bergerpaintsnigeria.com',
+        TRANSCOHOT: 'transcorphotels.com',
+        TRANSPOWER: 'transcorppower.com',
+        FTGINSURE: 'fortisglobalinsurance.com',
+        UCAP: 'unitedcapitalplcgroup.com',
         // US
         AAPL: 'apple.com',
         TSLA: 'tesla.com',
@@ -80,15 +88,18 @@
         NFLX: 'netflix.com',
         AMD: 'amd.com',
         AVGO: 'broadcom.com',
-        KO: 'coca-colacompany.com',
-        COKE: 'cocacolaconsolidated.com',
+        KO: 'coca-cola.com',
+        COKE: 'cokeconsolidated.com',
         PEP: 'pepsico.com',
         XOM: 'exxonmobil.com',
         HPQ: 'hp.com',
         SPOT: 'spotify.com',
         QBTS: 'dwavequantum.com',
         GBTG: 'gbtg.com',
-        GBTC: 'grayscale.com'
+        GBTC: 'grayscale.com',
+        NXT: 'nextracker.com',
+        DMAC: 'diamedica.com',
+        TWN: 'taiwanfund.com'
     };
 
     var LOGO_DEV_TOKEN = 'pk_YeBQRMVKST2Ia_4frzFn7A';           // paste your pk_... key here
