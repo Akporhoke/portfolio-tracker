@@ -1,7 +1,7 @@
 'use strict';
 
 const Parser = require('rss-parser');
-const { fetchFeedText } = require('./fetcher');
+const { fetchFeedText, assertSafeUrl } = require('./fetcher');
 const { normalizeItem, cleanUrl } = require('./sanitize');
 
 const MIN_ATTEMPT_GAP_MS = 60 * 1000;
@@ -10,15 +10,12 @@ const MAX_BACKOFF_MS = 60 * 60 * 1000;
 // og:image fallback settings
 const OG_TIMEOUT_MS = 8000;              // give up on a slow article page
 const OG_MAX_BYTES = 300 * 1024;         // only the <head> matters
+const OG_MAX_REDIRECTS = 3;
 const OG_CONCURRENCY = 5;                // pages fetched at once
 const OG_MAX_PER_REFRESH = 40;           // cap work per refresh cycle
 const OG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;   // keep a found image
 const OG_MISS_TTL_MS = 15 * 60 * 1000;        // retry misses/failures sooner
 const OG_CACHE_MAX = 500;
-
-// Blocks obvious internal hosts (basic SSRF guard).
-const PRIVATE_HOST =
-  /^(localhost|.*\.local|.*\.internal|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[?::1\]?$)/i;
 
 function isGoogleNewsLink(value) {
   try {
@@ -77,6 +74,7 @@ class NewsService {
     this.lastSuccessAt = null;
     this.lastAttemptAt = 0;
     this.running = null;
+    this.enriching = false;
     this.timer = null;
   }
 
@@ -146,6 +144,7 @@ class NewsService {
     );
 
     const batch = [];
+    const pending = []; // { source, items } for background image lookups
     let anySuccess = false;
 
     results.forEach((result, index) => {
@@ -162,6 +161,7 @@ class NewsService {
         health.lastCount = result.value.length;
 
         batch.push(...result.value);
+        pending.push({ source, items: result.value });
       } else {
         health.failures += 1;
 
@@ -191,8 +191,40 @@ class NewsService {
       if (anySuccess) {
         this.lastSuccessAt = now;
       }
+
+      this.log.info(
+        `[news] refresh ok: ${batch.length} articles from ${pending.length}/${due.length} sources`
+      );
     } catch (error) {
-      this.log.error('[news] store write failed:', error.message);
+      // lastSuccessAt stays unchanged here, so the app shows the
+      // "updates delayed" banner until a save works again.
+      this.log.error('[news] store write failed:', error.stack || error.message);
+    }
+
+    // Articles are already saved and visible. Now look for missing images
+    // in the background so slow publisher pages never delay the news.
+    if (pending.length) {
+      this._enrichImages(pending).catch((error) => {
+        this.log.warn('[news] image enrichment failed:', error.message);
+      });
+    }
+  }
+
+  // Fills in missing images and saves only the articles that improved.
+  async _enrichImages(pending) {
+    if (this.enriching) return; // one background pass at a time
+    this.enriching = true;
+
+    try {
+      for (const { source, items } of pending) {
+        const filled = await this._fillMissingImages(items, source);
+
+        if (filled.length) {
+          await this.store.upsertMany(filled);
+        }
+      }
+    } finally {
+      this.enriching = false;
     }
   }
 
@@ -223,9 +255,6 @@ class NewsService {
       }
     }
 
-    // Articles the feed gave no image for: read og:image from the page.
-    await this._fillMissingImages(out);
-
     return out;
   }
 
@@ -233,7 +262,7 @@ class NewsService {
   // og:image FALLBACK
   // --------------------------------------------------
 
-  async _fillMissingImages(items) {
+  async _fillMissingImages(items, source) {
     // Google News links are redirect pages with no article image,
     // so looking them up would only waste the per-refresh budget.
     const missing = items
@@ -246,7 +275,7 @@ class NewsService {
 
       await Promise.all(
         group.map(async (item) => {
-          item.image = await this._ogImage(item.url);
+          item.image = await this._ogImage(item.url, source.domain);
         })
       );
     }
@@ -258,9 +287,11 @@ class NewsService {
         `[news] og:image filled ${found}/${missing.length} missing images`
       );
     }
+
+    return missing.filter((item) => item.image);
   }
 
-  async _ogImage(articleUrl) {
+  async _ogImage(articleUrl, domain) {
     const now = this.now();
     const cached = this.ogCache.get(articleUrl);
 
@@ -271,7 +302,7 @@ class NewsService {
     let image = null;
 
     try {
-      image = await this._fetchOgImage(articleUrl);
+      image = await this._fetchOgImage(articleUrl, domain);
 
       if (!image) {
         this.log.warn(`[news] og:image not found: ${articleUrl}`);
@@ -296,34 +327,48 @@ class NewsService {
     return image;
   }
 
-  async _fetchOgImage(articleUrl) {
-    const url = new URL(articleUrl);
+  // Same rules as fetcher.js: https only, the source's own domain only,
+  // and every redirect hop is re-checked (redirect: 'manual').
+  async _fetchOgImage(articleUrl, domain) {
+    const signal = AbortSignal.timeout(OG_TIMEOUT_MS);
+    const userAgent = this.config.userAgent || 'GazeNewsBot/1.0';
 
-    if (url.protocol !== 'https:' || PRIVATE_HOST.test(url.hostname)) {
-      return null;
-    }
+    let current = articleUrl;
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), OG_TIMEOUT_MS);
+    for (let hop = 0; hop <= OG_MAX_REDIRECTS; hop++) {
+      const url = assertSafeUrl(current, domain); // throws if not allowed
 
-    try {
       const response = await fetch(url, {
-        signal: controller.signal,
-        redirect: 'follow',
+        redirect: 'manual',
+        signal,
         headers: {
-          'User-Agent': this.config.userAgent || 'Mozilla/5.0 (compatible; GazeBot/1.0)',
+          'User-Agent': userAgent,
           Accept: 'text/html,application/xhtml+xml',
           'Accept-Language': 'en-US,en;q=0.9',
         },
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      if (!response.body) throw new Error('empty body');
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (response.body) await response.body.cancel().catch(() => {});
+        if (!location) throw new Error('redirect without location');
+        current = new URL(location, url).toString();
+        continue;
+      }
 
-      const type = response.headers.get('content-type') || '';
-      if (!type.includes('html')) throw new Error(`content-type ${type || 'none'}`);
+      if (!response.ok) {
+        if (response.body) await response.body.cancel().catch(() => {});
+        throw new Error(`HTTP ${response.status}`);
+      }
 
-      // Read only the start of the page, and stop once </head> is seen.
+      const type = (response.headers.get('content-type') || '').toLowerCase();
+
+      if (!type.includes('html') || !response.body) {
+        if (response.body) await response.body.cancel().catch(() => {});
+        throw new Error(`content-type ${type || 'none'}`);
+      }
+
+      // Read only the start of the page; stop once </head> is seen.
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
@@ -343,9 +388,9 @@ class NewsService {
       reader.cancel().catch(() => {});
 
       return this._parseOgImage(html, url);
-    } finally {
-      clearTimeout(timer);
     }
+
+    throw new Error('too many redirects');
   }
 
   _parseOgImage(html, baseUrl) {
