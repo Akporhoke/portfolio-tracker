@@ -8,16 +8,25 @@ const MIN_ATTEMPT_GAP_MS = 60 * 1000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
 
 // og:image fallback settings
-const OG_TIMEOUT_MS = 5000;              // give up on a slow article page
+const OG_TIMEOUT_MS = 8000;              // give up on a slow article page
 const OG_MAX_BYTES = 300 * 1024;         // only the <head> matters
 const OG_CONCURRENCY = 5;                // pages fetched at once
-const OG_MAX_PER_REFRESH = 25;           // cap work per refresh cycle
-const OG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const OG_MAX_PER_REFRESH = 40;           // cap work per refresh cycle
+const OG_CACHE_TTL_MS = 6 * 60 * 60 * 1000;   // keep a found image
+const OG_MISS_TTL_MS = 15 * 60 * 1000;        // retry misses/failures sooner
 const OG_CACHE_MAX = 500;
 
 // Blocks obvious internal hosts (basic SSRF guard).
 const PRIVATE_HOST =
   /^(localhost|.*\.local|.*\.internal|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[?::1\]?$)/i;
+
+function isGoogleNewsLink(value) {
+  try {
+    return new URL(value).hostname === 'news.google.com';
+  } catch (error) {
+    return false;
+  }
+}
 
 class NewsService {
   constructor({
@@ -225,8 +234,10 @@ class NewsService {
   // --------------------------------------------------
 
   async _fillMissingImages(items) {
+    // Google News links are redirect pages with no article image,
+    // so looking them up would only waste the per-refresh budget.
     const missing = items
-      .filter((item) => !item.image)
+      .filter((item) => !item.image && !isGoogleNewsLink(item.url))
       .slice(0, OG_MAX_PER_REFRESH);
 
     // Work through the list in small groups to stay polite to publishers.
@@ -237,6 +248,14 @@ class NewsService {
         group.map(async (item) => {
           item.image = await this._ogImage(item.url);
         })
+      );
+    }
+
+    if (missing.length) {
+      const found = missing.filter((item) => item.image).length;
+
+      this.log.info(
+        `[news] og:image filled ${found}/${missing.length} missing images`
       );
     }
   }
@@ -253,8 +272,15 @@ class NewsService {
 
     try {
       image = await this._fetchOgImage(articleUrl);
+
+      if (!image) {
+        this.log.warn(`[news] og:image not found: ${articleUrl}`);
+      }
     } catch (error) {
-      image = null; // a failed lookup must never break the refresh
+      // A failed lookup must never break the refresh, but log why.
+      this.log.warn(
+        `[news] og:image failed (${error.message}): ${articleUrl}`
+      );
     }
 
     // Keep the cache from growing forever: drop the oldest entry.
@@ -264,7 +290,7 @@ class NewsService {
 
     this.ogCache.set(articleUrl, {
       image,
-      expires: now + OG_CACHE_TTL_MS,
+      expires: now + (image ? OG_CACHE_TTL_MS : OG_MISS_TTL_MS),
     });
 
     return image;
@@ -286,14 +312,16 @@ class NewsService {
         redirect: 'follow',
         headers: {
           'User-Agent': this.config.userAgent || 'Mozilla/5.0 (compatible; GazeBot/1.0)',
-          Accept: 'text/html',
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
         },
       });
 
-      if (!response.ok || !response.body) return null;
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.body) throw new Error('empty body');
 
       const type = response.headers.get('content-type') || '';
-      if (!type.includes('html')) return null;
+      if (!type.includes('html')) throw new Error(`content-type ${type || 'none'}`);
 
       // Read only the start of the page, and stop once </head> is seen.
       const reader = response.body.getReader();

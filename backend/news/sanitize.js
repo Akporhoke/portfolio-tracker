@@ -7,7 +7,7 @@ const CONTROL = /[\u0000-\u001F\u007F-\u009F]/g;
 const TAGS = /<[^>]*>/g;
 const TRACKING_PARAM = /^(utm_|fbclid$|gclid$|mc_eid$)/i;
 // Images we never want (tracking pixels, emoji, avatars, share icons)
-const JUNK_IMAGE = /(gravatar\.com|\/emoji\/|s\.w\.org|pixel|1x1|spacer|blank\.gif)/i;
+const JUNK_IMAGE = /(gravatar\.com|\/emoji\/|s\.w\.org|\/(?:pixel|spacer|blank)\.(?:gif|png)|[-_\/]1x1\.)/i;
 // WordPress boilerplate: "The post X appeared first on Y."
 const WP_FOOTER = /\s*The post .*? appeared first on .*?\.?\s*$/i;
 
