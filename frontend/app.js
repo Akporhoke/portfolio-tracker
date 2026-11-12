@@ -47,8 +47,11 @@ const state = {
     portfolioSort: 'ticker-asc',
 
     watchlistSearch: '',
-    watchlistSort: 'date-desc'
-};
+        watchlistSort: 'date-desc',
+        favorites: [] // keys like "NGX:DANGCEM"
+    };
+    
+    const MAX_FAVORITES = 3;
 
 
 /* ============================================
@@ -99,6 +102,7 @@ function clearUserData() {
     state.userName = '';
     state.settings = { goalAmount: 1000000 };
     state.pricesFromServer = false;
+        state.favorites = [];
 
     updateUI();
 }
@@ -957,7 +961,7 @@ function applyWatchlistSearchAndSort(stocks) {
     }
 
 
-    return result;
+        return [         ...result.filter(isFavorite),         ...result.filter(s => !isFavorite(s))     ];
 }
 
 
@@ -1545,6 +1549,20 @@ async function fetchAllData(options = {}) {
             };
 
 
+
+        if (Array.isArray(data.favorites)) {
+
+            const watchKeys = new Set(
+                state.watchlist.stocks.map(
+                    s => favKey(s.ticker, s.market)
+                )
+            );
+
+            state.favorites = data.favorites
+                .filter(k => watchKeys.has(k))
+                .slice(0, MAX_FAVORITES);
+        }
+
         if (data.exchangeRate) {
 
             state.exchangeRate =
@@ -1934,6 +1952,111 @@ const res =
     }
 }
 
+/* ============================================
+   FAVORITES
+   ============================================ */
+
+function favKey(ticker, market) {
+    return `${String(market || 'NGX').toUpperCase()}:${String(ticker || '').toUpperCase()}`;
+}
+
+function isFavorite(stock) {
+    return state.favorites.includes(favKey(stock.ticker, stock.market));
+}
+
+function ensureFavoriteStyles() {
+    if (document.getElementById('favoriteStyles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'favoriteStyles';
+    style.textContent = `
+        .btn-star { color: #9ca3af; }
+        .btn-star.active { color: #f59e0b; }
+        .watchlist-card.is-favorite {
+            border-left: 3px solid #f59e0b;
+        }
+    `;
+    document.head.appendChild(style);
+}
+// Updates every star button's look without re-rendering the list
+function syncStarButtons() {
+    document.querySelectorAll('.btn-star').forEach(btn => {
+        const m = (btn.getAttribute('onclick') || '')
+            .match(/toggleFavorite\('([^']+)',\s*'([^']+)'\)/);
+        
+        if (!m) return;
+        
+        const fav = state.favorites.includes(favKey(m[1], m[2]));
+        
+        btn.classList.toggle('active', fav);
+        
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = (fav ? 'fa-solid' : 'fa-regular') + ' fa-star';
+        }
+        
+        // Keep the gold left border in sync too
+        const card = btn.closest('.watchlist-card');
+        if (card) {
+            card.classList.toggle('is-favorite', fav);
+        }
+    });
+}
+
+// Re-renders the list, unless a card is open (that would collapse it)
+function refreshFavoritesUI() {
+    if (document.querySelector('.watchlist-analysis.active')) {
+        syncStarButtons();
+    } else {
+        renderWatchlist();
+    }
+}
+
+async function toggleFavorite(ticker, market) {
+    const key = favKey(ticker, market);
+    const previous = [...state.favorites];
+    let next;
+    
+    if (previous.includes(key)) {
+        next = previous.filter(k => k !== key);
+    } else {
+        if (previous.length >= MAX_FAVORITES) {
+            showToast(
+                `You can only favorite ${MAX_FAVORITES} stocks. Unstar one first.`,
+                'warning'
+            );
+            return;
+        }
+        next = [...previous, key];
+    }
+    
+    // Optimistic update: the UI changes instantly
+    state.favorites = next;
+    saveToLocalStorage();
+    refreshFavoritesUI();
+    
+    try {
+        const res = await fetch(
+            `${API_BASE}/portfolio/${state.userId}/favorites`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ favorites: next })
+            }
+        );
+        
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        
+    } catch (err) {
+        console.error('Error saving favorites:', err);
+        
+        // Roll back so the UI matches the server
+        state.favorites = previous;
+        saveToLocalStorage();
+        refreshFavoritesUI();
+        showToast('Could not save favorite. Try again.', 'error');
+    }
+}
 
 /* ============================================
    WATCHLIST DELETE
@@ -5606,6 +5729,8 @@ function renderWatchlist() {
         document.getElementById(
             'watchlistEmpty'
         );
+        
+    ensureFavoriteStyles();
 
 
     if (
@@ -5780,10 +5905,10 @@ function renderWatchlist() {
 
                     return `
 
-                        <div
-                            class="watchlist-card"
-                            id="watchlist-card-${safeTicker}-${i}"
-                        >
+<div
+    class="watchlist-card ${isFavorite(stock) ? 'is-favorite' : ''}"
+    id="watchlist-card-${safeTicker}-${i}"
+>
 
 
                             <div
@@ -5874,7 +5999,7 @@ function renderWatchlist() {
 
                                 </div>
                                 
-<div class="stock-card-controls">
+<div class="stock-card-controls">     <button         class="btn-icon btn-star ${isFavorite(stock) ? 'active' : ''}"         onclick="event.stopPropagation(); toggleFavorite('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"         title="${isFavorite(stock) ? 'Remove from favorites' : 'Add to favorites'}"         aria-label="Toggle favorite for ${safeTicker}"     >         <i class="${isFavorite(stock) ? 'fa-solid' : 'fa-regular'} fa-star" aria-hidden="true"></i>     </button>
     <button
         class="btn-icon btn-alert"
         onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
@@ -8541,61 +8666,55 @@ function updateLastUpdatedTime() {
    SETTINGS
    ============================================ */
 
-function saveSettings() {
+async function saveSettings() {
 
-    const nameEl =
-        document.getElementById(
-            'settingName'
-        );
+    const nameEl = document.getElementById('settingName');
+    const goalEl = document.getElementById('settingGoal');
 
-
-    const goalEl =
-        document.getElementById(
-            'settingGoal'
-        );
-
-
-    const name =
-        nameEl
-            ? nameEl.value
-            : '';
-
-
-    const goal =
-        goalEl
-            ? parseInt(
-                goalEl.value
-            )
-            : NaN;
-
+    const name = nameEl ? nameEl.value : '';
+    const goal = goalEl ? parseInt(goalEl.value) : NaN;
 
     if (name) {
-        state.userName =
-            name;
+        state.userName = name;
     }
 
+    if (goal && goal > 0) {
 
-    if (
-        goal &&
-        goal > 0
-    ) {
+        const previousGoal = state.settings.goalAmount;
 
-        state.settings.goalAmount =
-            goal;
+        // Optimistic update
+        state.settings.goalAmount = goal;
+
+        try {
+            const res = await fetch(
+                `${API_BASE}/portfolio/${state.userId}/settings`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ goalAmount: goal })
+                }
+            );
+
+            if (!res.ok) {
+                throw new Error(`Status ${res.status}`);
+            }
+
+        } catch (err) {
+            console.error('Error saving goal:', err);
+
+            // Roll back so the UI matches the server
+            state.settings.goalAmount = previousGoal;
+            updateUI();
+            showToast('Could not save goal. Try again.', 'error');
+            return;
+        }
     }
-
 
     saveToLocalStorage();
-
     updateUI();
 
-
-    showToast(
-        '✓ Settings saved',
-        'success'
-    );
+    showToast('✓ Settings saved', 'success');
 }
-
 
 /* ============================================
    LOCAL STORAGE
@@ -8628,6 +8747,8 @@ function saveToLocalStorage() {
 
         lastUpdated:
             state.lastUpdated,
+            
+        favorites: state.favorites,
             
             owner: window.GazeAuth?.getUser()?.email || null,
     };
@@ -8701,6 +8822,9 @@ if (!currentOwner || data.owner !== currentOwner) {
         state.exchangeRate =
             data.exchangeRate ||
             state.exchangeRate;
+            
+        state.favorites = 
+            data.favorites || [];
 
 
         if (

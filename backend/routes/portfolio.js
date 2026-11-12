@@ -1442,9 +1442,11 @@ router.get(
 
                 activity:
                     result.activity || [],
-
                 settings:
                     result.settings || {},
+
+                favorites:
+                    result.favorites || [],
 
                 meta: {
                     pricesRefreshing: needRefresh.size
@@ -2098,9 +2100,13 @@ router.post(
                     new Date()
             });
 
-            portfolio.watchlist.splice(
+                        portfolio.watchlist.splice(
                 index,
                 1
+            );
+
+            portfolio.favorites = (portfolio.favorites || []).filter(
+                k => k !== `${normalizedMarket}:${normalizedTicker}`
             );
 
             portfolio.activity.push({
@@ -2181,7 +2187,11 @@ router.post(
             // Read the market BEFORE splicing the item out
             const removedMarket = normalizeMarket(removed.market);
 
-            portfolio.watchlist.splice(index, 1);
+                        portfolio.watchlist.splice(index, 1);
+
+            portfolio.favorites = (portfolio.favorites || []).filter(
+                k => k !== `${removedMarket}:${normalizedTicker}`
+            );
 
             portfolio.activity.push({
                 type: 'rejected',
@@ -2715,6 +2725,133 @@ router.post(
 
                 message:
                     error.message
+            });
+        }
+    }
+);
+
+
+// ============================================================
+// FAVORITES (max 3)
+// POST /api/portfolio/:userId/favorites
+// Body: { favorites: ["NGX:DANGCEM", "US:AAPL"] }
+// ============================================================
+
+router.post(
+    '/:userId/favorites',
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const { favorites } = req.body;
+
+            if (!Array.isArray(favorites)) {
+                return res.status(400).json({
+                    error: 'favorites must be an array'
+                });
+            }
+
+            const clean = [
+                ...new Set(
+                    favorites.map(k => String(k).trim().toUpperCase())
+                )
+            ];
+
+            if (
+                clean.length > 3 ||
+                !clean.every(k => /^(NGX|US):[A-Z0-9.]+$/.test(k))
+            ) {
+                return res.status(400).json({
+                    error: 'Invalid favorites'
+                });
+            }
+
+            const portfolio =
+                await Portfolio.findOne({ userId });
+
+            if (!portfolio) {
+                return res.status(404).json({
+                    error: 'Portfolio not found'
+                });
+            }
+
+            // Only stocks that are really on this watchlist
+            const watchKeys = new Set(
+                portfolio.watchlist.map(
+                    w =>
+                        `${normalizeMarket(w.market)}:${normalizeTicker(w.ticker)}`
+                )
+            );
+
+            if (!clean.every(k => watchKeys.has(k))) {
+                return res.status(400).json({
+                    error: 'Stock is not on your watchlist'
+                });
+            }
+
+            portfolio.favorites = clean;
+            await portfolio.save();
+
+            res.json({
+                success: true,
+                favorites: portfolio.favorites
+            });
+
+        } catch (error) {
+            console.error('[POST /:userId/favorites] Error:', error);
+
+            res.status(500).json({
+                error: 'Failed to save favorites',
+                message: error.message
+            });
+        }
+    }
+);  
+
+// ============================================================
+// SAVE SETTINGS (goal amount)
+// POST /api/portfolio/:userId/settings
+// Body: { goalAmount: 2500000 }
+// ============================================================
+
+router.post(
+    '/:userId/settings',
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const goalAmount = Number(req.body.goalAmount);
+
+            if (
+                !Number.isFinite(goalAmount) ||
+                goalAmount <= 0 ||
+                goalAmount > 1e12
+            ) {
+                return res.status(400).json({
+                    error: 'goalAmount must be a positive number'
+                });
+            }
+
+            const portfolio = await Portfolio.findOne({ userId });
+
+            if (!portfolio) {
+                return res.status(404).json({
+                    error: 'Portfolio not found'
+                });
+            }
+
+            portfolio.settings.goalAmount = goalAmount;
+            await portfolio.save();
+
+            res.json({
+                success: true,
+                settings: portfolio.settings
+            });
+
+        } catch (error) {
+            console.error('[POST /:userId/settings] Error:', error);
+
+            res.status(500).json({
+                error: 'Failed to save settings',
+                message: error.message
             });
         }
     }

@@ -419,6 +419,21 @@ index: true
             enum: ['NGN', 'USD']
         }
     },
+    
+        // ======================================================
+    // FAVORITES (max 3, keys like "NGX:DANGCEM")
+    // ======================================================
+
+    favorites: {
+        type: [String],
+        default: [],
+        validate: {
+            validator: arr =>
+                arr.length <= 3 &&
+                arr.every(k => /^(NGX|US):[A-Z0-9.]+$/.test(k)),
+            message: 'Invalid favorites'
+        }
+    },
 
 
     // ======================================================
