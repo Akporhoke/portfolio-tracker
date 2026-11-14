@@ -1024,16 +1024,107 @@ function setupTabNavigation() {
         });
 }
 
+/* ============================================
+   BACK BUTTON (HISTORY)
+   ============================================ */
+
+const modalStack = [];     // open popups, last = top-most
+let ignorePops = 0;        // popstate events WE caused
+let pendingBack = 0;       // history entries waiting to be removed
+let backTimer = null;
+let afterNav = [];         // pushes that must wait for a pending go(-n)
+
+// True while our own history change is still in progress
+function navBusy() {
+    return backTimer !== null || ignorePops > 0;
+}
+
+function runAfterNav() {
+    const queued = afterNav;
+    afterNav = [];
+    queued.forEach(item => item.fn());
+}
+
+function trackModalOpen(id) {
+    if (modalStack.includes(id)) return;
+    modalStack.push(id);
+
+    const push = () => history.pushState({ modal: id }, '');
+
+    // If entries are still being removed, wait, or the push would
+    // be undone by the pending go(-n)
+    if (navBusy()) afterNav.push({ id, fn: push });
+    else push();
+}
+
+function trackModalClose(id) {
+    const i = modalStack.lastIndexOf(id);
+    if (i === -1) return;
+    modalStack.splice(i, 1);
+
+    // Closed before its history entry was even pushed: just cancel the push
+    const q = afterNav.findIndex(item => item.id === id);
+    if (q !== -1) {
+        afterNav.splice(q, 1);
+        return;
+    }
+
+    // Collect all closes from this moment into ONE history.go(-n)
+    pendingBack++;
+    if (backTimer === null) backTimer = setTimeout(flushBackSteps, 0);
+}
+
+function flushBackSteps() {
+    backTimer = null;
+    const n = pendingBack;
+    pendingBack = 0;
+
+    if (n < 1) {
+        runAfterNav();
+        return;
+    }
+
+    ignorePops++;          // go(-n) fires exactly one popstate
+    history.go(-n);
+}
+
+function hideModalElement(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.classList.remove('active');
+        if (id === 'confirmModal') el.style.zIndex = '';
+        if (id === 'stockDetailModal') selectedStockForDetail = null;
+    }
+}
+
+window.addEventListener('popstate', e => {
+    if (ignorePops > 0) {
+        ignorePops--;
+        if (ignorePops === 0 && backTimer === null) runAfterNav();
+        return;
+    }
+
+    if (modalStack.length) {
+        hideModalElement(modalStack.pop());
+        return;
+    }
+
+    switchTab((e.state && e.state.tab) || 'home', true);
+});
 
 /* ============================================
    TAB SWITCHING
    ============================================ */
 
-function switchTab(tabName) {
+function switchTab(tabName, fromHistory = false) {
+
+    // Add a history entry only for real taps, not for Back presses
+    if (!fromHistory && tabName !== state.currentTab) {
+        history.pushState({ tab: tabName }, '');
+    }
 
     state.currentTab =
         tabName;
-
 
     document
         .querySelectorAll('.tab-content')
@@ -1122,6 +1213,10 @@ function escapeHtml(str) {
             /'/g,
             '&#39;'
         );
+}
+
+function jsArg(value) {
+    return escapeHtml(JSON.stringify(String(value ?? '')));
 }
 
 
@@ -1406,7 +1501,8 @@ function isUserInteractingWithLists() {
         'addStockModal',
         'confirmModal',
         'marketModal',
-        'stockDetailModal'
+        'stockDetailModal',
+        'inputModal'
     ].some(id => {
         const el = document.getElementById(id);
         return Boolean(el && el.classList.contains('active'));
@@ -1472,90 +1568,91 @@ document.addEventListener(
    API CALLS
    ============================================ */
 
+let fetchInFlight = false;
+let fetchQueued = false;
+
+// fetch that gives up after `ms` (60s covers a Render cold start)
+async function fetchWithTimeout(url, options = {}, ms = 60000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
 async function fetchAllData(options = {}) {
 
-    if (!state.isOnline) {
+    if (!state.isOnline) return;
+
+    // A refresh is already running: remember to run once more after it
+    if (fetchInFlight) {
+        fetchQueued = true;
         return;
     }
+
+    fetchInFlight = true;
 
     const isFollowUp = Boolean(options && options.followUp);
     const isBackground = Boolean(options && options.background);
 
-    // A regular refresh restarts the follow-up count
     if (!isFollowUp) {
         priceFollowUpCount = 0;
         showSyncIndicator(true);
     }
 
+    // Still loading after 6s: tell the user why
+    const wakeTimer = (!isFollowUp && !isBackground)
+        ? setTimeout(() => {
+            showToast(
+                'Waking up the server… this can take up to a minute',
+                'warning',
+                null,
+                10000
+            );
+        }, 6000)
+        : null;
 
     try {
 
         const portfolioRes =
-            await fetch(
-                `${API_BASE}/portfolio/${state.userId}`
-            );
-
+            await fetchWithTimeout(`${API_BASE}/portfolio/${state.userId}`);
 
         if (portfolioRes.status === 401) {
-    clearUserData();
-    return;
-}
-
-        if (!portfolioRes.ok) {
-
-            throw new Error(
-                `Portfolio request failed: ${portfolioRes.status}`
-            );
+            clearUserData();
+            return;
         }
 
+        if (!portfolioRes.ok) {
+            throw new Error(`Portfolio request failed: ${portfolioRes.status}`);
+        }
 
-        const data =
-            await portfolioRes.json();
-
+        const data = await portfolioRes.json();
 
         state.portfolio = {
-            stocks:
-                Array.isArray(data.portfolio)
-                    ? data.portfolio
-                    : []
+            stocks: Array.isArray(data.portfolio) ? data.portfolio : []
         };
-
 
         state.watchlist = {
-            stocks:
-                Array.isArray(data.watchlist)
-                    ? data.watchlist
-                    : []
+            stocks: Array.isArray(data.watchlist) ? data.watchlist : []
         };
-
 
         state.sold = {
-            stocks:
-                Array.isArray(data.sold)
-                    ? data.sold
-                    : []
+            stocks: Array.isArray(data.sold) ? data.sold : []
         };
 
-
         state.activity =
-            Array.isArray(data.activity)
-                ? data.activity
-                : [];
-
+            Array.isArray(data.activity) ? data.activity : [];
 
         state.settings =
-            data.settings || {
-                goalAmount: 1000000
-            };
-
-
+            data.settings || { goalAmount: 1000000 };
 
         if (Array.isArray(data.favorites)) {
 
             const watchKeys = new Set(
-                state.watchlist.stocks.map(
-                    s => favKey(s.ticker, s.market)
-                )
+                state.watchlist.stocks.map(s => favKey(s.ticker, s.market))
             );
 
             state.favorites = data.favorites
@@ -1564,81 +1661,51 @@ async function fetchAllData(options = {}) {
         }
 
         if (data.exchangeRate) {
-
-            state.exchangeRate =
-                data.exchangeRate;
-
-            console.log(
-                `📊 Exchange rate updated: 1 USD = ₦${data.exchangeRate.usdToNgn}`
-            );
+            state.exchangeRate = data.exchangeRate;
         }
 
-
-        // These prices now come from the server, not from the saved copy
         state.pricesFromServer = true;
-
 
         saveToLocalStorage();
 
-
-        console.log(
-            '📦 Portfolio loaded:',
-            state.portfolio.stocks.length,
-            'stocks'
-        );
-
-        console.log(
-            '👀 Watchlist loaded:',
-            state.watchlist.stocks.length,
-            'stocks'
-        );
-
-        console.log(
-            '💰 Sold loaded:',
-            state.sold.stocks.length,
-            'stocks'
-        );
-
-
-        // The server may still be refreshing some prices: look again shortly
         schedulePriceFollowUp(
             data.meta && data.meta.pricesRefreshing
         );
 
-
     } catch (err) {
 
-        console.error(
-            'Error fetching portfolio:',
-            err
-        );
+        console.error('Error fetching portfolio:', err);
 
         if (!isFollowUp) {
             showToast(
-                'Failed to load portfolio data',
+                err.name === 'AbortError'
+                    ? 'Server is taking too long. Please try again.'
+                    : 'Failed to load portfolio data',
                 'error'
             );
         }
 
-
     } finally {
 
+        clearTimeout(wakeTimer);
         showSyncIndicator(false);
+        fetchInFlight = false;
 
-        state.initialLoadComplete =
-            true;
+        state.initialLoadComplete = true;
 
-        // Automatic refresh while something is open: update the numbers
-        // but do not rebuild the lists
         updateUI({
             skipListRender:
                 isBackground && isUserInteractingWithLists()
         });
 
-        state.lastUpdated =
-            new Date();
-
+        state.lastUpdated = new Date();
         updateLastUpdatedTime();
+
+        // Something asked for a refresh while we were busy: do it now
+        if (fetchQueued) {
+            fetchQueued = false;
+            fetchAllData({ background: true });
+        }
     }
 }
 
@@ -2416,102 +2483,90 @@ function clearAllActivity() {
     );
 }
 
-function updateGreeting() {
-
-    const greetingEl =
-        document.getElementById(
-            'greetingText'
-        );
-
-    if (!greetingEl) return;
-
-    const hour =
-        new Date().getHours();
-
-    let greeting;
-
-    if (hour < 12) {
-        greeting = 'Good Morning,';
-    } else if (hour < 17) {
-        greeting = 'Good Afternoon,';
-    } else {
-        greeting = 'Good Evening,';
-    }
-
-    greetingEl.textContent =
-        greeting;
-}
-
 
 /*
- * Set greeting immediately
- */
-updateGreeting();
 
-
-/*
- * Keep it live while the app is open.
- * Checks once every minute.
- */
-setInterval(
-    updateGreeting,
-    60 * 1000
-);
 
 
 /* ============================================
-   WATCHLIST → PORTFOLIO
    ============================================ */
 
-function openWatchlistToPortfolioModal(
-    ticker
-) {
+function openWatchlistToPortfolioModal(ticker) {
 
-    openConfirmModal(
-
-        'Convert to Portfolio',
-
-        `Add ${escapeHtml(ticker)} to your portfolio?`,
-
-        'Quantity and price required to proceed',
-
-        () => {
-
-            const quantity =
-                prompt(
-                    `How many shares of ${ticker}?`
-                );
+    openInputModal({
+        title: 'Add to Portfolio',
+        message: `Add ${ticker} to your portfolio?`,
+        submitLabel: 'Add',
+        fields: [
+            { name: 'quantity', label: 'Number of shares', integer: true },
+            { name: 'price', label: 'Entry price per share' }
+        ],
+        onSubmit: v =>
+            moveWatchlistToPortfolio(ticker, v.quantity, v.price)
+    });
+}
 
 
-            if (
-                !quantity ||
-                quantity <= 0
-            ) {
-                return;
-            }
+function openEditStockModal(ticker, market) {
+
+    const stock = state.portfolio.stocks.find(
+        s => s.ticker === ticker && s.market === market
+    );
+
+    if (!stock) return;
+
+    openInputModal({
+        title: `Edit ${ticker}`,
+        message: 'This changes your recorded quantity and average buy price.',
+        submitLabel: 'Save',
+        fields: [
+            { name: 'quantity', label: 'Quantity', value: stock.quantity, integer: true },
+            { name: 'price', label: 'Average buy price', value: stock.buyPrice }
+        ],
+        onSubmit: v =>
+            editStockConfirmed(ticker, market, v.quantity, v.price)
+    });
+}
 
 
-            const price =
-                prompt(
-                    `Entry price per share for ${ticker}?`
-                );
+function confirmSellFromDetail(ticker, market) {
 
+    const stock = state.portfolio.stocks.find(
+        s => s.ticker === ticker && s.market === market
+    );
 
-            if (
-                !price ||
-                price <= 0
-            ) {
-                return;
-            }
+    if (!stock) return;
 
+    const currencySign = market === 'US' ? '$' : '₦';
 
-            moveWatchlistToPortfolio(
-                ticker,
-                parseInt(quantity),
-                parseFloat(price)
+    openInputModal({
+        title: `Sell ${stock.ticker}`,
+        message: `You own ${stock.quantity} shares.`,
+        submitLabel: 'Continue',
+        fields: [{
+            name: 'quantity',
+            label: 'Shares to sell',
+            value: stock.quantity,
+            integer: true,
+            max: stock.quantity
+        }],
+        onSubmit: v => {
+
+            const sellQty = v.quantity;
+
+            // Selling can't be undone, so keep the final confirm step
+            openConfirmModal(
+                'Sell Stock',
+                `Sell ${sellQty} of ${stock.quantity} shares of ${stock.ticker}?`,
+                `Entry: ${currencySign}${formatNumber(stock.buyPrice)} | Current: ${
+                    stock.currentPrice != null
+                        ? currencySign + formatNumber(stock.currentPrice)
+                        : '—'
+                }`,
+                () => sellStockConfirmed(stock.ticker, sellQty, market)
             );
         }
-    );
+    });
 }
 
 
@@ -2657,101 +2712,7 @@ async function getStockPrice(
    EDIT EXISTING POSITION
    ============================================ */
 
-function openEditStockModal(
-    ticker,
-    market
-) {
 
-    const stock =
-        state.portfolio.stocks.find(
-            s =>
-                s.ticker === ticker &&
-                s.market === market
-        );
-
-
-    if (!stock) {
-        return;
-    }
-
-
-    const qtyInput =
-        prompt(
-            `Edit quantity for ${ticker}`,
-            stock.quantity
-        );
-
-
-    if (qtyInput === null) {
-        return;
-    }
-
-
-    const newQuantity =
-        parseInt(qtyInput);
-
-
-    if (
-        !newQuantity ||
-        newQuantity <= 0
-    ) {
-
-        showToast(
-            'Invalid quantity',
-            'error'
-        );
-
-        return;
-    }
-
-
-    const priceInput =
-        prompt(
-            `Edit average buy price for ${ticker}`,
-            stock.buyPrice
-        );
-
-
-    if (priceInput === null) {
-        return;
-    }
-
-
-    const newBuyPrice =
-        parseFloat(priceInput);
-
-
-    if (
-        !newBuyPrice ||
-        newBuyPrice <= 0
-    ) {
-
-        showToast(
-            'Invalid price',
-            'error'
-        );
-
-        return;
-    }
-
-
-    openConfirmModal(
-
-        'Edit Position',
-
-        `Update ${escapeHtml(ticker)} to ${newQuantity} shares @ ${escapeHtml(String(newBuyPrice))}?`,
-
-        'This changes your recorded quantity and average buy price.',
-
-        () =>
-            editStockConfirmed(
-                ticker,
-                market,
-                newQuantity,
-                newBuyPrice
-            )
-    );
-}
 
 
 async function editStockConfirmed(
@@ -3277,35 +3238,176 @@ function selectStock(
 /* ============================================
    MODAL HANDLING
    ============================================ */
+   
+   /* ============================================
+   INPUT POPUP (replaces prompt())
+   ============================================ */
+
+function ensureInputModalStyles() {
+    if (document.getElementById('inputModalStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'inputModalStyles';
+    style.textContent = `
+        .input-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .input-modal.active { display: flex; }
+        .input-modal-box {
+            width: 100%;
+            max-width: 360px;
+            background: var(--card-bg, #fff);
+            color: var(--text-color, #111);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .input-modal-box h3 { margin: 0 0 6px; font-size: 18px; }
+        .input-modal-msg { margin: 0 0 14px; font-size: 13px; opacity: 0.75; }
+        .input-modal-field { display: block; margin-bottom: 12px; }
+        .input-modal-field span { display: block; font-size: 13px; margin-bottom: 4px; }
+        .input-modal-field input {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color, #d1d5db);
+            font: inherit;
+            box-sizing: border-box;
+        }
+        .input-modal-error { min-height: 16px; margin: 0 0 8px; font-size: 12px; color: #dc2626; }
+        .input-modal-actions { display: flex; gap: 8px; }
+        .input-modal-actions button {
+            flex: 1;
+            padding: 12px;
+            border: 0;
+            border-radius: 10px;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .input-modal-cancel { background: rgba(128, 128, 128, 0.2); color: inherit; }
+        .input-modal-submit { background: #6366f1; color: #fff; }
+    `;
+    document.head.appendChild(style);
+}
+
+function closeInputModal() {
+    const modal = document.getElementById('inputModal');
+    if (modal) modal.classList.remove('active');
+    trackModalClose('inputModal');
+}
+
+// config: { title, message, submitLabel, fields:[{name,label,value,integer,max}], onSubmit(values) }
+function openInputModal(config) {
+
+    ensureInputModalStyles();
+
+    let modal = document.getElementById('inputModal');
+
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'inputModal';
+        modal.className = 'input-modal';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="input-modal-box">
+            <h3>${escapeHtml(config.title)}</h3>
+            ${config.message
+                ? `<p class="input-modal-msg">${escapeHtml(config.message)}</p>`
+                : ''}
+            ${config.fields.map(f => `
+                <label class="input-modal-field">
+                    <span>${escapeHtml(f.label)}</span>
+                    <input
+                        type="number"
+                        inputmode="decimal"
+                        step="any"
+                        id="inputModal-${escapeHtml(f.name)}"
+                        value="${escapeHtml(f.value ?? '')}"
+                    >
+                </label>
+            `).join('')}
+            <p class="input-modal-error" id="inputModalError"></p>
+            <div class="input-modal-actions">
+                <button type="button" class="input-modal-cancel">Cancel</button>
+                <button type="button" class="input-modal-submit">
+                    ${escapeHtml(config.submitLabel || 'Confirm')}
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.onclick = e => {
+        if (e.target === modal) closeInputModal();   // tap the dark area
+    };
+
+    modal.querySelector('.input-modal-cancel')
+        .addEventListener('click', closeInputModal);
+
+    modal.querySelector('.input-modal-submit')
+        .addEventListener('click', () => {
+
+            const error = document.getElementById('inputModalError');
+            const values = {};
+
+            for (const f of config.fields) {
+
+                const v = parseFloat(
+                    document.getElementById(`inputModal-${f.name}`).value
+                );
+
+                if (
+                    !(v > 0) ||
+                    (f.integer && !Number.isInteger(v)) ||
+                    (f.max && v > f.max)
+                ) {
+                    error.textContent =
+                        f.max && v > f.max
+                            ? `${f.label} can't be more than ${f.max}`
+                            : `Enter a valid ${f.label.toLowerCase()}`;
+                    return;
+                }
+
+                values[f.name] = v;
+            }
+
+            closeInputModal();
+            config.onSubmit(values);
+        });
+
+    modal.classList.add('active');
+    trackModalOpen('inputModal');
+
+    setTimeout(() => {
+        const first = modal.querySelector('input');
+        if (first) first.focus();
+    }, 50);
+}
 
 function openAddStockModal() {
-
-    const modal =
-        document.getElementById(
-            'addStockModal'
-        );
-
-
+    const modal = document.getElementById('addStockModal');
+    
     if (modal) {
-        modal.classList.add(
-            'active'
-        );
+        modal.classList.add('active');
+        trackModalOpen('addStockModal'); // ← NEW
     }
 }
 
-
 function closeAddStockModal() {
-
-    const modal =
-        document.getElementById(
-            'addStockModal'
-        );
-
-
+    const modal = document.getElementById('addStockModal');
+    
     if (modal) {
-        modal.classList.remove(
-            'active'
-        );
+        modal.classList.remove('active');
+        trackModalClose('addStockModal'); // ← NEW
     }
 }
 
@@ -3436,99 +3538,38 @@ function clearForm() {
 }
 
 
-function openConfirmModal(
-    title,
-    message,
-    details,
-    callback
-) {
+function openConfirmModal(title, message, details, callback) {
 
-    const titleEl =
-        document.getElementById(
-            'confirmTitle'
-        );
+    const titleEl = document.getElementById('confirmTitle');
+    const messageEl = document.getElementById('confirmMessage');
+    const detailsEl = document.getElementById('confirmDetails');
+    const submitEl = document.getElementById('confirmSubmit');
 
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (detailsEl) detailsEl.textContent = details;
+    if (submitEl) submitEl.onclick = callback;
 
-    const messageEl =
-        document.getElementById(
-            'confirmMessage'
-        );
-
-
-    const detailsEl =
-        document.getElementById(
-            'confirmDetails'
-        );
-
-
-    const submitEl =
-        document.getElementById(
-            'confirmSubmit'
-        );
-
-
-    if (titleEl) {
-        titleEl.textContent =
-            title;
-    }
-
-
-    if (messageEl) {
-        messageEl.textContent =
-            message;
-    }
-
-
-    if (detailsEl) {
-        detailsEl.textContent =
-            details;
-    }
-
-
-    if (submitEl) {
-        submitEl.onclick =
-            callback;
-    }
-
-
-    const modal =
-        document.getElementById(
-            'confirmModal'
-        );
-
+    const modal = document.getElementById('confirmModal');
 
     if (modal) {
-
-        modal.style.zIndex =
-            9999;
-
-        modal.classList.add(
-            'active'
-        );
+        modal.style.zIndex = 9999;
+        modal.classList.add('active');
+        trackModalOpen('confirmModal');       // ← NEW
     }
 }
 
-
 function closeConfirmModal() {
-
-    const modal =
-        document.getElementById(
-            'confirmModal'
-        );
-
+    const modal = document.getElementById('confirmModal');
 
     if (!modal) {
         return;
     }
 
-
     modal.style.zIndex = '';
-
-    modal.classList.remove(
-        'active'
-    );
+    modal.classList.remove('active');
+    trackModalClose('confirmModal');          // ← NEW
 }
-
 
 /* ============================================
    STOCK DETAIL MODAL
@@ -3536,123 +3577,60 @@ function closeConfirmModal() {
 
 let selectedStockForDetail = null;
 
-
-async function showStockDetailModal(
-    ticker,
-    market
-) {
-
-    selectedStockForDetail = {
-        ticker,
-        market
-    };
-
-
-    const stock =
-        state.portfolio.stocks.find(
-            s =>
-                s.ticker === ticker &&
-                s.market === market
-        );
-
-
+async function showStockDetailModal(ticker, market) {
+    
+    selectedStockForDetail = { ticker, market };
+    
+    const stock = state.portfolio.stocks.find(
+        s => s.ticker === ticker && s.market === market
+    );
+    
     if (!stock) {
         return;
     }
-
-
-    const currencySign =
-        market === 'US'
-            ? '$'
-            : '₦';
-
-
-    const confidenceScore =
-        getConfidenceScore(stock);
-
-
-    const detailStockName =
-        document.getElementById(
-            'detailStockName'
-        );
-
-
+    
+    const currencySign = market === 'US' ? '$' : '₦';
+    const confidenceScore = getConfidenceScore(stock);
+    
+    const detailStockName = document.getElementById('detailStockName');
     if (detailStockName) {
-        detailStockName.textContent =
-            ticker;
+        detailStockName.textContent = ticker;
     }
-
-
-    const detailConfidence =
-        document.getElementById(
-            'detailConfidence'
-        );
-
-
+    
+    const detailConfidence = document.getElementById('detailConfidence');
     if (detailConfidence) {
         detailConfidence.textContent =
-            confidenceScore !== null
-                ? confidenceScore
-                : 'N/A';
+            confidenceScore !== null ? confidenceScore : 'N/A';
     }
-
-
-    const detailPrice =
-        document.getElementById(
-            'detailPrice'
-        );
-
-
+    
+    const detailPrice = document.getElementById('detailPrice');
     if (detailPrice) {
-
         detailPrice.textContent =
-            stock.currentPrice != null
-                ? `${currencySign}${formatNumber(
-                    stock.currentPrice
-                )}`
-                : '—';
+            stock.currentPrice != null ?
+            `${currencySign}${formatNumber(stock.currentPrice)}` :
+            '—';
     }
-
-
-    await fetchAndDisplayStockStats(
-        ticker,
-        market
-    );
-
-
-    const modal =
-        document.getElementById(
-            'stockDetailModal'
-        );
-
-
+    
+    await fetchAndDisplayStockStats(ticker, market);
+    
+    const modal = document.getElementById('stockDetailModal');
+    
     if (modal) {
-        modal.classList.add(
-            'active'
-        );
+        modal.classList.add('active');
+        trackModalOpen('stockDetailModal'); // ← NEW
     }
 }
-
 
 function closeStockDetailModal() {
-
-    const modal =
-        document.getElementById(
-            'stockDetailModal'
-        );
-
-
+    const modal = document.getElementById('stockDetailModal');
+    
     if (modal) {
-        modal.classList.remove(
-            'active'
-        );
+        modal.classList.remove('active');
+        trackModalClose('stockDetailModal'); // ← NEW
     }
-
-
-    selectedStockForDetail =
-        null;
+    
+    selectedStockForDetail = null;
 }
-
 
 async function fetchAndDisplayStockStats(
     ticker,
@@ -3871,88 +3849,7 @@ async function fetchAndDisplayStockStats(
 }
 
 
-function confirmSellFromDetail(
-    ticker,
-    market
-) {
 
-    const stock =
-        state.portfolio.stocks.find(
-            s =>
-                s.ticker === ticker &&
-                s.market === market
-        );
-
-
-    if (!stock) {
-        return;
-    }
-
-
-    const currencySign =
-        market === 'US'
-            ? '$'
-            : '₦';
-
-
-    const qtyInput =
-        prompt(
-            `How many shares of ${stock.ticker} to sell? (You own ${stock.quantity})`,
-            stock.quantity
-        );
-
-
-    if (!qtyInput) {
-        return;
-    }
-
-
-    const sellQty =
-        parseInt(qtyInput);
-
-
-    if (
-        !sellQty ||
-        sellQty <= 0 ||
-        sellQty > stock.quantity
-    ) {
-
-        showToast(
-            'Invalid quantity',
-            'error'
-        );
-
-        return;
-    }
-
-
-    openConfirmModal(
-
-        'Sell Stock',
-
-        `Sell ${sellQty} of ${stock.quantity} shares of ${stock.ticker}?`,
-
-        `Entry: ${currencySign}${formatNumber(
-            stock.buyPrice
-        )} | Current: ${
-            stock.currentPrice != null
-                ? currencySign +
-                  formatNumber(
-                      stock.currentPrice
-                  )
-                : '—'
-        }`,
-
-        () => {
-
-            sellStockConfirmed(
-                stock.ticker,
-                sellQty,
-                market
-            );
-        }
-    );
-}
 
 
 async function sellStockConfirmed(
@@ -4331,49 +4228,6 @@ function updateHeader() {
 
 
 
-function updateQuickStats() {
-
-    const watching =
-        document.getElementById(
-            'statWatching'
-        );
-
-
-    const held =
-        document.getElementById(
-            'statHeld'
-        );
-
-
-    const sold =
-        document.getElementById(
-            'statSold'
-        );
-
-
-    if (watching) {
-
-        watching.textContent =
-            state.watchlist.stocks?.length ||
-            0;
-    }
-
-
-    if (held) {
-
-        held.textContent =
-            state.portfolio.stocks?.length ||
-            0;
-    }
-
-
-    if (sold) {
-
-        sold.textContent =
-            state.sold.stocks?.length ||
-            0;
-    }
-}
 
 
 function syncCurrencyToggleUI() {
@@ -4397,79 +4251,58 @@ function syncCurrencyToggleUI() {
 /* ============================================
    PORTFOLIO SUMMARY
    ============================================ */
-   
-   function animatePortfolioValue(
-    targetValue,
-    currencySign,
-    duration = 900
-) {
-    const element =
-        document.getElementById('totalPortfolio');
+let portfolioAnimFrame = null;
+let portfolioAnimSign = null;
 
+function animatePortfolioValue(targetValue, currencySign, duration = 900) {
+
+    const element = document.getElementById('totalPortfolio');
     if (!element) return;
 
-    const endValue =
-        Number(targetValue) || 0;
+    const endValue = Number(targetValue) || 0;
 
-    const startValue =
-        Number(element.dataset.value) || 0;
+    // Stop any animation still running, so two never fight
+    if (portfolioAnimFrame) {
+        cancelAnimationFrame(portfolioAnimFrame);
+        portfolioAnimFrame = null;
+    }
 
-    // Don't animate if nothing changed
-    if (startValue === endValue) {
-        element.textContent =
-            `${currencySign}${formatNumber(endValue)}`;
+    // ₦ <-> $ changed: show the new number instantly, no count-down
+    const currencyChanged =
+        portfolioAnimSign !== null && portfolioAnimSign !== currencySign;
 
+    portfolioAnimSign = currencySign;
+
+    // Continue from what is on screen (updated every frame)
+    const startValue = Number(element.dataset.value) || 0;
+
+    if (currencyChanged || startValue === endValue) {
+        element.textContent = `${currencySign}${formatNumber(endValue)}`;
+        element.dataset.value = endValue;
         return;
     }
 
-    const startTime =
-        performance.now();
+    const startTime = performance.now();
 
-    function update(currentTime) {
-        const elapsed =
-            currentTime - startTime;
+    function update(now) {
 
-        const progress =
-            Math.min(
-                elapsed / duration,
-                1
-            );
+        const progress = Math.min((now - startTime) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = startValue + (endValue - startValue) * eased;
 
-        // Smooth ease-out
-        const easedProgress =
-            1 -
-            Math.pow(
-                1 - progress,
-                3
-            );
-
-        const currentValue =
-            startValue +
-            (
-                endValue -
-                startValue
-            ) *
-            easedProgress;
-
-        element.textContent =
-            `${currencySign}${formatNumber(
-                currentValue
-            )}`;
+        element.textContent = `${currencySign}${formatNumber(current)}`;
+        element.dataset.value = current;
 
         if (progress < 1) {
-            requestAnimationFrame(update);
+            portfolioAnimFrame = requestAnimationFrame(update);
         } else {
-            element.textContent =
-                `${currencySign}${formatNumber(
-                    endValue
-                )}`;
-
-            element.dataset.value =
-                endValue;
+            element.textContent = `${currencySign}${formatNumber(endValue)}`;
+            element.dataset.value = endValue;
+            portfolioAnimFrame = null;
         }
     }
 
-    requestAnimationFrame(update);
+    portfolioAnimFrame = requestAnimationFrame(update);
 }
 
 
@@ -4976,110 +4809,9 @@ if (topPerformerCard) {
                 : `-${currencySign}0`;
     }
 }
-console.log(
-    'TOP PERFORMER INPUT:',
-    portfolio.map(stock => ({
-        ticker: stock.ticker,
-        buyPrice: stock.buyPrice,
-        currentPrice: stock.currentPrice,
-        quantity: stock.quantity,
-        market: stock.market
-    }))
-);
+
 
 updateTopPerformer(portfolio);
-
-    const sectors = {};
-
-
-    ngxStocks.forEach(
-        stock => {
-
-            if (!stock.sector) {
-                return;
-            }
-
-
-            if (!sectors[stock.sector]) {
-                sectors[stock.sector] =
-                    0;
-            }
-
-
-            sectors[stock.sector] +=
-                (
-                    Number(
-                        stock.quantity
-                    ) || 0
-                ) *
-                (
-                    Number(
-                        stock.buyPrice
-                    ) || 0
-                );
-        }
-    );
-
-
-    usStocks.forEach(
-        stock => {
-
-            if (!stock.sector) {
-                return;
-            }
-
-
-            if (!sectors[stock.sector]) {
-                sectors[stock.sector] =
-                    0;
-            }
-
-
-            sectors[stock.sector] +=
-                (
-                    Number(
-                        stock.quantity
-                    ) || 0
-                ) *
-                (
-                    Number(
-                        stock.buyPrice
-                    ) || 0
-                ) *
-                rate;
-        }
-    );
-
-
-    const total =
-        Object.values(sectors)
-            .reduce(
-                (a, b) =>
-                    a + b,
-                0
-            );
-
-
-    const SECTOR_GROUP = {
-    'Financial Services': 'finance', 'Finance': 'finance',
-    'Technology': 'tech', 'Tech': 'tech',
-    'Consumer Cyclical': 'consumer', 'Consumer Defensive': 'consumer', 'Consumer': 'consumer'
-};
-
-const groups = { finance: 0, tech: 0, consumer: 0, other: 0 };
-
-Object.entries(sectors).forEach(([name, value]) => {
-    groups[SECTOR_GROUP[name] || 'other'] += value;
-});
-
-Object.entries(groups).forEach(([key, value]) => {
-    const pct = total > 0 ? (value / total) * 100 : 0;
-    const label = document.getElementById(`${key}Percent`);
-    const bar = document.getElementById(`sector${key[0].toUpperCase()}${key.slice(1)}`);
-
-    if (label) label.textContent = Math.round(pct);
-    if (bar) bar.style.flex = `${pct} 0 0`;
-});
 
 
 
@@ -7848,10 +7580,7 @@ function renderPortfolio() {
                  
 <button
     class="btn-icon btn-edit"
-    onclick="openEditStockModal(
-        '${stock.ticker}',
-        '${stock.market}'
-    )"
+    onclick="event.stopPropagation(); openEditStockModal(${jsArg(stock.ticker)}, ${jsArg(stock.market)})"
     title="Edit stock"
     aria-label="Edit ${safeTicker} position"
 >
@@ -7884,57 +7613,29 @@ function renderPortfolio() {
    MARKET MODAL
    ============================================ */
 
-function openMarketModal(
-    market
-) {
-
-    const modal =
-        document.getElementById(
-            'marketModal'
-        );
-
-
-    const title =
-        document.getElementById(
-            'marketModalTitle'
-        );
-
+function openMarketModal(market) {
+    const modal = document.getElementById('marketModal');
+    const title = document.getElementById('marketModalTitle');
 
     if (title) {
-
         title.textContent =
-            market === 'NGX'
-                ? 'NGX Portfolio'
-                : 'US Portfolio';
+            market === 'NGX' ? 'NGX Portfolio' : 'US Portfolio';
     }
 
-
-    renderMarketStockList(
-        market
-    );
-
+    renderMarketStockList(market);
 
     if (modal) {
-        modal.classList.add(
-            'active'
-        );
+        modal.classList.add('active');
+        trackModalOpen('marketModal');     // ← NEW
     }
 }
 
-
 function closeMarketModal() {
-
-    const modal =
-        document.getElementById(
-            'marketModal'
-        );
-
+    const modal = document.getElementById('marketModal');
 
     if (modal) {
-
-        modal.classList.remove(
-            'active'
-        );
+        modal.classList.remove('active');
+        trackModalClose('marketModal');    // ← NEW
     }
 }
 
@@ -8088,12 +7789,9 @@ function renderMarketStockList(
 
                     return `
 
-                        <div
+                                                <div
                             class="stock-item"
-                            onclick="showStockDetailModal(
-                                '${stock.ticker}',
-                                '${market}'
-                            )"
+                            onclick="showStockDetailModal(${jsArg(stock.ticker)}, ${jsArg(market)})"
                         >
 
                             <div
@@ -8188,16 +7886,12 @@ function renderMarketStockList(
                            
 <button
     class="btn-icon btn-edit"
-    onclick="openEditStockModal(
-        '${stock.ticker}',
-        '${stock.market}'
-    )"
+    onclick="event.stopPropagation(); openEditStockModal(${jsArg(stock.ticker)}, ${jsArg(stock.market)})"
     title="Edit stock"
     aria-label="Edit ${safeTicker} position"
 >
     <i class="fa-solid fa-pen" aria-hidden="true"></i>
 </button>
-
 <button
     class="btn-icon btn-alert"
     onclick="event.stopPropagation(); openAlertForStock('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}')"
@@ -8208,19 +7902,14 @@ function renderMarketStockList(
 </button>
     
 
-
-                                <button
-                                    class="btn-icon btn-sell"
-                                    onclick="event.stopPropagation(); confirmSellFromDetail(
-                                        '${stock.ticker}',
-                                        '${market}'
-                                    )"
-                                    title="Sell"
-                                    aria-label="Sell ${safeTicker}"
-                                >
-<i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i>
-                                </button>
-
+<button
+    class="btn-icon btn-sell"
+    onclick="event.stopPropagation(); confirmSellFromDetail(${jsArg(stock.ticker)}, ${jsArg(market)})"
+    title="Sell"
+    aria-label="Sell ${safeTicker}"
+>
+    <i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i>
+</button>
                             </div>
 
                         </div>
