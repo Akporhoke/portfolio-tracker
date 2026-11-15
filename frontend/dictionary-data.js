@@ -1429,6 +1429,145 @@ window.GAZE_DICTIONARY = {
             whyItMatters: "The two roles can create conflicts of interest, which is why firms must be regulated and keep them separate.",
             related: ["Broker", "Dealing Member", "Market Maker", "Market Intermediary"]
         },
+/* ============================================
+   NEW DICTIONARY TERMS (for Reading the Market)
+
+   Paste these inside GAZE_DICTIONARY.terms, e.g. right after
+   the "OHLC" entry. Remember the comma after the entry
+   before and after.
+   ============================================ */
+
+        {
+            term: "Chart",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "A visual display of how a security's price has changed over time.",
+            simpleExplanation: "A chart draws the price history so you can see where it has been at a glance.",
+            example: "A one-year chart shows how a stock's price moved over the past twelve months.",
+            whyItMatters: "Charts make trends, highs and lows easier to see than a list of numbers.",
+            related: ["Line Chart", "Candlestick", "Trend", "Technical Analysis"]
+        },
+
+        {
+            term: "Line Chart",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "A chart that joins a security's closing prices over time with a single line.",
+            simpleExplanation: "It is the simplest chart: one line that rises and falls with the closing price.",
+            example: "Closes of ₦50, ₦52 and ₦51 on three days are joined into one line.",
+            whyItMatters: "It gives a quick view of direction, but it hides the high and low of each period.",
+            related: ["Chart", "Candlestick", "OHLC"]
+        },
+
+        {
+            term: "Body",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "The thick part of a candlestick, running from the opening price to the closing price.",
+            simpleExplanation: "The body shows where the price started and where it ended in that period.",
+            example: "A candle that opens at ₦50 and closes at ₦53 has a body from ₦50 to ₦53.",
+            whyItMatters: "The size and direction of the body show how far the price moved between open and close.",
+            related: ["Candlestick", "Wick", "Up Candle", "Down Candle"]
+        },
+
+        {
+            term: "Wick",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "The thin line above or below a candlestick's body, reaching to the period's high or low.",
+            simpleExplanation: "Wicks show how far the price travelled beyond the open and close before coming back.",
+            example: "A long lower wick means the price fell far below the body and then recovered.",
+            whyItMatters: "Wicks show the full range of a period's trading, not just where it opened and closed.",
+            related: ["Candlestick", "Body", "OHLC"]
+        },
+
+        {
+            term: "Up Candle",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "A candlestick where the closing price is higher than the opening price.",
+            simpleExplanation: "The price finished the period higher than it started.",
+            example: "A stock opens at ₦50 and closes at ₦53, so the candle is an up candle.",
+            whyItMatters: "Up and down candles let you read the direction of each period at a glance. Colours vary by platform.",
+            related: ["Down Candle", "Candlestick", "Body"]
+        },
+
+        {
+            term: "Down Candle",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "A candlestick where the closing price is lower than the opening price.",
+            simpleExplanation: "The price finished the period lower than it started.",
+            example: "A stock opens at ₦50 and closes at ₦47, so the candle is a down candle.",
+            whyItMatters: "A series of down candles can show selling pressure, but each candle is only one period.",
+            related: ["Up Candle", "Candlestick", "Body"]
+        },
+
+        {
+            term: "Uptrend",
+            category: "Price & Movement",
+            level: "Beginner",
+            definition: "A trend in which a price makes a series of higher highs and higher lows.",
+            simpleExplanation: "Each peak and each dip is higher than the one before.",
+            example: "Peaks at ₦50, ₦55 and ₦60 with dips at ₦45, ₦50 and ₦54 form an uptrend.",
+            whyItMatters: "Spotting an uptrend helps you understand the price's recent direction, though trends can end.",
+            related: ["Trend", "Downtrend", "Sideways"]
+        },
+
+        {
+            term: "Downtrend",
+            category: "Price & Movement",
+            level: "Beginner",
+            definition: "A trend in which a price makes a series of lower highs and lower lows.",
+            simpleExplanation: "Each peak and each dip is lower than the one before.",
+            example: "A stock that peaks at ₦80, then ₦70, then ₦60 is in a downtrend.",
+            whyItMatters: "A downtrend can reverse, so it is a description of the past, not a prediction.",
+            related: ["Trend", "Uptrend", "Sideways"]
+        },
+
+        {
+            term: "Sideways",
+            category: "Price & Movement",
+            level: "Beginner",
+            definition: "A market where the price moves within a range without a clear upward or downward direction.",
+            simpleExplanation: "The price bounces up and down but does not go anywhere in particular.",
+            example: "A stock moving between ₦100 and ₦120 for weeks is moving sideways.",
+            whyItMatters: "A sideways market often has clear support and resistance levels.",
+            related: ["Trend", "Support", "Resistance", "Breakout"]
+        },
+
+        {
+            term: "False Breakout",
+            category: "Price & Movement",
+            level: "Intermediate",
+            definition: "A move beyond a support or resistance level that quickly reverses back inside the previous range.",
+            simpleExplanation: "The price appears to break out, then falls back, so the move did not last.",
+            example: "A stock pushes above ₦120 resistance, then closes back at ₦115 the next day.",
+            whyItMatters: "Not every breakout holds. Volume and follow-through help show how convincing one is.",
+            related: ["Breakout", "Support", "Resistance", "Volume"]
+        },
+
+        {
+            term: "Moving Average",
+            category: "Technical Analysis",
+            level: "Beginner",
+            definition: "The average of a security's closing prices over a set number of recent periods, recalculated as each new period ends.",
+            simpleExplanation: "It smooths out day-to-day swings so the general direction is easier to see.",
+            example: "Closes of ₦10, ₦12, ₦11, ₦13 and ₦14 give a 5-day moving average of ₦12.",
+            whyItMatters: "It is built from past prices, so it follows the price rather than predicting it.",
+            related: ["SMA", "EMA", "Trend", "Crossover"]
+        },
+
+        {
+            term: "Crossover",
+            category: "Technical Analysis",
+            level: "Intermediate",
+            definition: "When a shorter moving average crosses above or below a longer moving average.",
+            simpleExplanation: "The two average lines swap places on the chart.",
+            example: "A 50-day average moving above a 200-day average is a crossover some traders watch.",
+            whyItMatters: "Some traders treat it as a signal, but it can be wrong and is not a guarantee.",
+            related: ["Moving Average", "SMA", "Trend"]
+        },
 
         {
             term: "Liquidity Provider",
