@@ -1293,7 +1293,7 @@ window.GAZE_LEARN = {
             { "id": "tr-15", "q": "You buy on Monday and there are no holidays. Under T+1, when does the trade settle?", "options": ["Tuesday", "Monday evening only", "Friday", "The following Monday"], "answer": 0, "explain": "T+1 means one business day later." }
         ]
     }
-},,
+},
 
         {
             "id": "ipos-and-advanced-orders",
