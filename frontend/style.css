@@ -3310,3 +3310,7 @@ button:last-child:active {
         transform: rotate(360deg);
     }
 }
+
+.news-card { background: #fff; color: #111; }
+.news-card .news-title { color: #111; font-weight: 700; }
+.news-card .news-meta { color: #6b7280; }
