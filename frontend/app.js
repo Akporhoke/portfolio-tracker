@@ -2353,7 +2353,8 @@ function ensureExpiryStyles() {
         }
         .expiry-head h3 { margin: 0; font-size: 20px; }
         .expiry-sub { margin: 2px 0 0; font-size: 12px; opacity: 0.7; }
-        .expiry-price { text-align: right; }
+        .expiry-price { text-align: right; flex-shrink: 0; margin-left: 12px; white-space: nowrap; }
+.expiry-price .stock-change { font-size: 12px; }
         .expiry-price p { margin: 0; }
         .expiry-extend-label { font-size: 12px; opacity: 0.7; margin: 16px 0 6px; }
         .expiry-extend-row { display: flex; gap: 6px; }
@@ -2376,7 +2377,16 @@ function ensureExpiryStyles() {
         .expiry-actions button { border: 0; }
         .expiry-remove { background: #dc2626; color: #fff; }
         .expiry-later { background: rgba(128, 128, 128, 0.2); color: inherit; }
-        .expiry-title { display: flex; align-items: center; gap: 12px; }
+      .expiry-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.expiry-title > div:last-child { min-width: 0; }
+.expiry-title .stock-avatar {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    padding: 6px !important;
+    border-radius: 14px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+}
     `;
     document.head.appendChild(style);
 }
@@ -2439,17 +2449,27 @@ function showExpiryModal(stock) {
         change = ((stock.currentPrice - priceAtAdd) / priceAtAdd) * 100;
     }
 
-    const expiredBefore =
-        startOfDay(getWatchExpiry(stock)) < startOfDay(new Date());
-
+        const daysAgo = Math.round(
+        (startOfDay(new Date()) - startOfDay(getWatchExpiry(stock))) / 86400000
+    );
+    
+    const expiredBefore = daysAgo > 0;
+    
+    const endedLabel =
+        daysAgo <= 0 ? 'ENDS TODAY' :
+        daysAgo === 1 ? 'ENDED YESTERDAY' :
+        `ENDED ${daysAgo} DAYS AGO`;
+    
+    const sinceAddedText =
+        stock.currentPrice != null ?
+        `${change >= 0 ? '+' : ''}${change.toFixed(1)}% since added` :
+        '—';
     const safeTicker = escapeHtml(stock.ticker);
 
     modal.innerHTML = `
         <div class="expiry-box">
 
-            <span class="expiry-tag">
-                ${expiredBefore ? 'WATCH PERIOD ENDED' : 'ENDS TODAY'}
-            </span>
+            <span class="expiry-tag">${endedLabel}</span>
 
                        <div class="expiry-head">
                 <div class="expiry-title">
@@ -2468,10 +2488,14 @@ function showExpiryModal(stock) {
                             ? sign + formatNumber(stock.currentPrice)
                             : '—'}
                     </p>
-                    <p class="stock-change ${change >= 0 ? 'positive' : 'negative'}">
-                        ${stock.currentPrice != null
-                            ? (change >= 0 ? '+' : '') + change.toFixed(1) + '% since added'
-                            : '—'}
+                    <p class="stock-change ${expiredBefore ? '' : (change >= 0 ? 'positive' : 'negative')}"
+                       id="expiry-change"
+                       data-ticker="${safeTicker}"
+                       data-fallback="${escapeHtml(sinceAddedText)}"
+                       data-fallback-class="${change >= 0 ? 'positive' : 'negative'}">
+                        ${expiredBefore && stock.currentPrice != null
+                            ? 'Calculating…'
+                            : escapeHtml(sinceAddedText)}
                     </p>
                 </div>
             </div>
@@ -2547,6 +2571,9 @@ function showExpiryModal(stock) {
 
     // Reuses your existing chart; the container id above matches index "expiry"
     loadConfidenceHistory(stock.ticker, market, 'expiry');
+        if (expiredBefore && stock.currentPrice != null) {
+        loadExpiryPeriodChange(stock, market);
+    }
 }
 
 async function extendWatchlistStock(ticker, market, extraDays) {
@@ -2578,6 +2605,117 @@ async function extendWatchlistStock(ticker, market, extraDays) {
     }
 }
 
+/* ============================================
+   WATCH-PERIOD RESULT (price at add -> close on expiry day)
+   ============================================ */
+
+const periodHistoryCache = new Map();
+
+// Local date as YYYY-MM-DD (same format the history rows use)
+function ymd(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function daysBetween(a, b) {
+    return (Date.parse(b) - Date.parse(a)) / 86400000;
+}
+
+async function loadExpiryPeriodChange(stock, market) {
+
+    const el = document.getElementById('expiry-change');
+    if (!el) return;
+
+    const showFallback = () => {
+        if (el.dataset.ticker !== stock.ticker) return;
+        el.textContent = el.dataset.fallback;
+        el.className = `stock-change ${el.dataset.fallbackClass}`;
+    };
+
+    try {
+
+        const added = new Date(stock.dateAdded);
+        const addedStr = ymd(added);
+        const expiryStr = ymd(getWatchExpiry(stock));
+
+        // The backend counts TRADING days back from today, so ask for
+        // enough to reach the day the stock was added
+        const calendarDays =
+            Math.ceil((Date.now() - added.getTime()) / 86400000);
+
+        const days =
+            Math.min(365, Math.ceil(calendarDays * 5 / 7) + 8);
+
+        const cacheKey = `${market}:${stock.ticker}:${days}`;
+        let rows = periodHistoryCache.get(cacheKey);
+
+        if (!rows) {
+
+            const res = await fetch(
+                `${API_BASE}/stocks/history/${encodeURIComponent(stock.ticker)}` +
+                `?market=${encodeURIComponent(market)}&days=${days}`
+            );
+
+            if (!res.ok) throw new Error(`History ${res.status}`);
+
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : data.data;
+
+            rows = (list || [])
+                .map(r => ({
+                    date: String(r.date || '').slice(0, 10),
+                    close: Number(r.close ?? r.price)
+                }))
+                .filter(r => r.date && r.close > 0)
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+            periodHistoryCache.set(cacheKey, rows);
+        }
+
+        // End price: last close ON or BEFORE the expiry day
+        const endRow =
+            [...rows].reverse().find(r => r.date <= expiryStr);
+
+        // The data must really reach the expiry day (weekends allowed)
+        if (!endRow || daysBetween(endRow.date, expiryStr) > 5) {
+            return showFallback();
+        }
+
+        // Start price: the price saved when it was added, else the
+        // last close on or before the add date
+        let start = Number(stock.priceAtAdd);
+
+        if (!(start > 0)) {
+            const startRow =
+                [...rows].reverse().find(r => r.date <= addedStr);
+            start = startRow ? startRow.close : NaN;
+        }
+
+        if (!(start > 0) || endRow.date < addedStr) {
+            return showFallback();
+        }
+
+        // The popup may have been closed or replaced while loading
+        if (el.dataset.ticker !== stock.ticker) return;
+
+        const pct = ((endRow.close - start) / start) * 100;
+        const sign = market === 'US' ? '$' : '₦';
+
+        el.textContent =
+            `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% during watch`;
+
+        el.className =
+            `stock-change ${pct >= 0 ? 'positive' : 'negative'}`;
+
+        el.title =
+            `${sign}${formatNumber(start)} when added → ` +
+            `${sign}${formatNumber(endRow.close)} on ${endRow.date}`;
+
+    } catch (err) {
+        console.error('[Expiry] period change failed:', err);
+        showFallback();
+    }
+}
 
 /* ============================================
    LOCAL ACTIVITY
