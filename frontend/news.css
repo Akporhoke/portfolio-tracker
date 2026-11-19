@@ -296,3 +296,56 @@
     line-height: 1.45;
     color: #44525a;
 }
+.news-item {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.news-item .news-category,
+.news-item .news-meta {
+    color: var(--text-secondary);
+}
+
+.news-item .news-description {
+    color: var(--text-secondary);
+}
+
+
+/* =========================================
+   NEWS CARDS: follow the app theme
+========================================= */
+
+.news-item {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    border: 1px solid rgba(128, 128, 128, .2);
+}
+
+.news-item .news-title {
+    color: var(--text-primary);
+}
+
+.news-item .news-category,
+.news-item .news-meta,
+.news-item .news-description {
+    color: var(--text-secondary);
+    opacity: 1;
+}
+
+.news-item-featured .news-title {
+    font-size: 1.3rem;
+}
+
+/* Show the whole image instead of cropping logos */
+.news-image {
+    object-fit: contain;
+}
+
+.news-image-wrap {
+    background: rgba(128, 128, 128, .15);
+}
+
+/* Refresh button: the old variable name didn't exist */
+.news-refresh-btn {
+    background: var(--bg-card);
+}
