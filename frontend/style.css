@@ -3833,3 +3833,7 @@ button:last-child:active {
     align-items: center;
     flex-shrink: 0;
 }
+
+.news-card { background: #fff; color: #111; }
+.news-card .news-title { color: #111; font-weight: 700; }
+.news-card .news-meta { color: #6b7280; }
