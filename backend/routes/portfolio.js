@@ -2231,6 +2231,108 @@ router.post(
     }
 );
 
+// ============================================================
+// EXTEND WATCHLIST DURATION
+// POST /api/portfolio/:userId/watchlist/:ticker/extend
+// Body: { market: "NGX", extraDays: 7 }
+// ============================================================
+
+router.post(
+    '/:userId/watchlist/:ticker/extend',
+    async (req, res) => {
+        try {
+            const { userId } = req.params;
+
+            const normalizedTicker =
+                normalizeTicker(req.params.ticker);
+
+            const normalizedMarket =
+                normalizeMarket(req.body.market);
+
+            const extraDays = Number(req.body.extraDays);
+
+            // Whole days only, 1 to 90
+            if (
+                !Number.isInteger(extraDays) ||
+                extraDays < 1 ||
+                extraDays > 90
+            ) {
+                return res.status(400).json({
+                    error: 'Invalid extension',
+                    message: 'extraDays must be a whole number from 1 to 90'
+                });
+            }
+
+            const portfolio =
+                await Portfolio.findOne({ userId });
+
+            if (!portfolio) {
+                return res.status(404).json({
+                    error: 'Portfolio not found',
+                    message: 'Portfolio not found'
+                });
+            }
+
+            const item = portfolio.watchlist.find(
+                s =>
+                    normalizeTicker(s.ticker) === normalizedTicker &&
+                    normalizeMarket(s.market) === normalizedMarket
+            );
+
+            if (!item) {
+                return res.status(404).json({
+                    error: 'Stock not found in watchlist',
+                    message: 'Stock not found in watchlist'
+                });
+            }
+
+            // Calendar days since it was added, in the stock's own timezone
+            const todayStr =
+                dateOnly(new Date(), normalizedMarket);
+
+            const addedStr =
+                dateOnly(item.dateAdded, normalizedMarket);
+
+            if (!todayStr || !addedStr) {
+                return res.status(400).json({
+                    error: 'Invalid date',
+                    message: 'Could not read the date this stock was added'
+                });
+            }
+
+            const daysSinceAdded = Math.max(
+                0,
+                Math.round(
+                    (Date.parse(todayStr) - Date.parse(addedStr)) / 86400000
+                )
+            );
+
+            // New expiry = today + extraDays. dateAdded is NOT touched,
+            // so sorting and confidence history stay correct.
+            item.watchingDuration =
+                `${daysSinceAdded + extraDays}d`;
+
+            await portfolio.save();
+
+            res.json({
+                success: true,
+                watchingDuration: item.watchingDuration
+            });
+
+        } catch (error) {
+            console.error(
+                '[POST /:userId/watchlist/:ticker/extend] Error:',
+                error
+            );
+
+            res.status(500).json({
+                error: 'Failed to extend watchlist stock',
+                message: error.message
+            });
+        }
+    }
+);
+
 
 
 // ============================================================

@@ -87,7 +87,9 @@ const API_COLORS = [
    const USER_DATA_KEYS = [
     'portfolioTrackerState',
     'portfolioTrackerLocalActivity',
-    'portfolioTrackerActivityClearedAt'
+    'portfolioTrackerActivityClearedAt',
+    'portfolioTrackerActivityClearedAt',
+    'gazeExpirySeen'
 ];
 
 function clearUserData() {
@@ -1502,7 +1504,8 @@ function isUserInteractingWithLists() {
         'confirmModal',
         'marketModal',
         'stockDetailModal',
-        'inputModal'
+        'inputModal', 
+        'expiryModal'
     ].some(id => {
         const el = document.getElementById(id);
         return Boolean(el && el.classList.contains('active'));
@@ -1700,6 +1703,8 @@ async function fetchAllData(options = {}) {
 
         state.lastUpdated = new Date();
         updateLastUpdatedTime();
+        
+        checkWatchlistExpiry();
 
         // Something asked for a refresh while we were busy: do it now
         if (fetchQueued) {
@@ -2224,6 +2229,336 @@ async function performDeleteFromWatchlist(
             'Failed to remove from watchlist',
             'error'
         );
+    }
+}
+
+
+
+/* ============================================
+   WATCHLIST EXPIRY POPUP
+   ============================================ */
+
+const EXPIRY_SEEN_KEY = 'gazeExpirySeen';
+
+const EXTEND_OPTIONS = [
+    { label: '+2 days',  days: 2 },
+    { label: '+1 week',  days: 7 },
+    { label: '+2 weeks', days: 14 }
+];
+
+// Midnight of a date, so we compare calendar days, not hours
+const startOfDay = d =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+// "2d" -> 2, "1w" -> 7, "1m" -> 30
+function durationToDays(duration) {
+    const m = String(duration || '').trim().match(/^(\d+)\s*([dwm])/i);
+    if (!m) return null;
+    const unit = m[2].toLowerCase();
+    return Number(m[1]) * (unit === 'w' ? 7 : unit === 'm' ? 30 : 1);
+}
+
+function getWatchExpiry(stock) {
+    // Use the server's date if it sends one
+    if (stock.expiresAt) {
+        const e = new Date(stock.expiresAt);
+        if (!Number.isNaN(e.getTime())) return e;
+    }
+
+    const days = durationToDays(stock.watchingDuration || '1w');
+    const added = new Date(stock.dateAdded);
+
+    if (days === null || Number.isNaN(added.getTime())) return null;
+
+    const expiry = new Date(added);
+    expiry.setDate(expiry.getDate() + days);
+    return expiry;
+}
+
+// One id per stock per expiry day, so each popup shows only once
+function expiryId(stock) {
+    return `${favKey(stock.ticker, stock.market)}:${startOfDay(getWatchExpiry(stock))}`;
+}
+
+function loadExpirySeen() {
+    try {
+        return JSON.parse(localStorage.getItem(EXPIRY_SEEN_KEY)) || [];
+    } catch {
+        return [];
+    }
+}
+
+function markExpirySeen(id) {
+    const seen = loadExpirySeen();
+    if (!seen.includes(id)) seen.push(id);
+    localStorage.setItem(EXPIRY_SEEN_KEY, JSON.stringify(seen.slice(-100)));
+}
+
+function ensureExpiryStyles() {
+    if (document.getElementById('expiryStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'expiryStyles';
+    style.textContent = `
+        .expiry-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .expiry-modal.active { display: flex; }
+        .expiry-box {
+            width: 100%;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+            background: var(--card-bg, #fff);
+            color: var(--text-color, #111);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .expiry-tag {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(217, 119, 6, 0.15);
+            color: #d97706;
+            margin-bottom: 10px;
+        }
+        .expiry-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .expiry-head h3 { margin: 0; font-size: 20px; }
+        .expiry-sub { margin: 2px 0 0; font-size: 12px; opacity: 0.7; }
+        .expiry-price { text-align: right; }
+        .expiry-price p { margin: 0; }
+        .expiry-extend-label { font-size: 12px; opacity: 0.7; margin: 16px 0 6px; }
+        .expiry-extend-row { display: flex; gap: 6px; }
+        .expiry-extend-row button,
+        .expiry-actions button {
+            flex: 1;
+            padding: 11px 8px;
+            border-radius: 10px;
+            font: inherit;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .expiry-extend-row button {
+            border: 1px solid #6366f1;
+            background: transparent;
+            color: #6366f1;
+        }
+        .expiry-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .expiry-actions button { border: 0; }
+        .expiry-remove { background: #dc2626; color: #fff; }
+        .expiry-later { background: rgba(128, 128, 128, 0.2); color: inherit; }
+    `;
+    document.head.appendChild(style);
+}
+
+function closeExpiryModal() {
+    const modal = document.getElementById('expiryModal');
+    if (modal) modal.classList.remove('active');
+    trackModalClose('expiryModal');
+}
+
+function checkWatchlistExpiry() {
+
+    // Wait for real server data, not the saved copy
+    if (!state.pricesFromServer) return;
+
+    // Don't interrupt anything the user has open
+    if (isUserInteractingWithLists()) return;
+
+    const seen = loadExpirySeen();
+    const today = startOfDay(new Date());
+
+    const due = (state.watchlist.stocks || []).find(stock => {
+        const expiry = getWatchExpiry(stock);
+        return expiry &&
+               startOfDay(expiry) <= today &&
+               !seen.includes(expiryId(stock));
+    });
+
+    if (due) showExpiryModal(due);
+}
+
+function showExpiryModal(stock) {
+
+    ensureExpiryStyles();
+
+    // Remember it now so it only pops up once
+    markExpirySeen(expiryId(stock));
+
+    let modal = document.getElementById('expiryModal');
+
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'expiryModal';
+        modal.className = 'expiry-modal';
+        document.body.appendChild(modal);
+    }
+
+    const market = stock.market || 'NGX';
+    const sign = market === 'US' ? '$' : '₦';
+
+    const score = getConfidenceScore(stock);
+    const signal = getConfidenceSignal(stock);
+    const breakdown = getConfidenceBreakdown(stock);
+    const confClass = getConfidenceClass(score, signal);
+    const signalLabel = formatConfidenceSignal(signal);
+
+    const priceAtAdd = stock.priceAtAdd ?? stock.currentPrice;
+    let change = 0;
+    if (priceAtAdd && stock.currentPrice != null) {
+        change = ((stock.currentPrice - priceAtAdd) / priceAtAdd) * 100;
+    }
+
+    const expiredBefore =
+        startOfDay(getWatchExpiry(stock)) < startOfDay(new Date());
+
+    const safeTicker = escapeHtml(stock.ticker);
+
+    modal.innerHTML = `
+        <div class="expiry-box">
+
+            <span class="expiry-tag">
+                ${expiredBefore ? 'WATCH PERIOD ENDED' : 'ENDS TODAY'}
+            </span>
+
+            <div class="expiry-head">
+                <div>
+                    <h3>${safeTicker}</h3>
+                    <p class="expiry-sub">
+                        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
+                        • added ${formatDate(stock.dateAdded)}
+                    </p>
+                </div>
+
+                <div class="expiry-price">
+                    <p class="stock-value">
+                        ${stock.currentPrice != null
+                            ? sign + formatNumber(stock.currentPrice)
+                            : '—'}
+                    </p>
+                    <p class="stock-change ${change >= 0 ? 'positive' : 'negative'}">
+                        ${stock.currentPrice != null
+                            ? (change >= 0 ? '+' : '') + change.toFixed(1) + '% since added'
+                            : '—'}
+                    </p>
+                </div>
+            </div>
+
+            <div class="confidence-header">
+                <div>
+                    <p class="analysis-title">Confidence</p>
+                    <p class="analysis-subtitle">
+                        ${stock.confidenceLevel?.dataDays > 0
+                            ? `Based on ${stock.confidenceLevel.dataDays} real trading days`
+                            : 'Historical data pending'}
+                    </p>
+                </div>
+
+                <div class="confidence-score-large ${confClass}">
+                    ${score !== null ? score : '—'}
+                </div>
+            </div>
+
+            ${signalLabel
+                ? `<div class="confidence-signal ${confClass}">${escapeHtml(signalLabel)}</div>`
+                : ''}
+
+            <div class="confidence-components">
+                ${renderConfidenceMetric('Momentum', breakdown?.momentum)}
+                ${renderConfidenceMetric('Stability', breakdown?.stability)}
+                ${renderConfidenceMetric('Volatility', breakdown?.volatility)}
+                ${renderConfidenceMetric('Volume', breakdown?.volume)}
+                ${renderConfidenceMetric('Sector', breakdown?.sector)}
+            </div>
+
+            <div class="confidence-history" id="confidence-history-expiry"></div>
+
+            <p class="expiry-extend-label">Keep watching it?</p>
+
+            <div class="expiry-extend-row">
+                ${EXTEND_OPTIONS.map(o => `
+                    <button type="button" data-extend="${o.days}">${o.label}</button>
+                `).join('')}
+            </div>
+
+            <div class="expiry-actions">
+                <button type="button" class="expiry-remove">Remove</button>
+                <button type="button" class="expiry-later">Decide later</button>
+            </div>
+
+        </div>
+    `;
+
+    modal.onclick = e => {
+        if (e.target === modal) closeExpiryModal();
+    };
+
+    modal.querySelectorAll('[data-extend]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            closeExpiryModal();
+            extendWatchlistStock(stock.ticker, market, Number(btn.dataset.extend));
+        });
+    });
+
+    modal.querySelector('.expiry-remove').addEventListener('click', () => {
+        closeExpiryModal();
+        performDeleteFromWatchlist(stock.ticker);
+    });
+
+    modal.querySelector('.expiry-later').addEventListener('click', () => {
+        closeExpiryModal();
+        checkWatchlistExpiry(); // show the next due stock, if any
+    });
+
+    modal.classList.add('active');
+    trackModalOpen('expiryModal');
+
+    // Reuses your existing chart; the container id above matches index "expiry"
+    loadConfidenceHistory(stock.ticker, market, 'expiry');
+}
+
+async function extendWatchlistStock(ticker, market, extraDays) {
+
+    try {
+
+        const res = await fetch(
+            `${API_BASE}/portfolio/${state.userId}/watchlist/${encodeURIComponent(ticker)}/extend`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ market, extraDays })
+            }
+        );
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            showToast(error.message || 'Failed to extend', 'error');
+            return;
+        }
+
+        showToast(`${ticker} extended by ${extraDays} days`, 'success');
+
+        await fetchAllData(); // also checks for the next due stock
+
+    } catch (err) {
+        console.error('Error extending watchlist stock:', err);
+        showToast('Failed to extend', 'error');
     }
 }
 
@@ -5463,6 +5798,7 @@ function renderWatchlist() {
         );
         
     ensureFavoriteStyles();
+    ensureChartRangeStyles();
 
 
     if (
@@ -5784,7 +6120,17 @@ function renderWatchlist() {
 
                                         </div>
 
-
+              <div class="chart-range-buttons" id="chart-ranges-${i}">
+    <button type="button" class="chart-range-btn" data-days="7"
+        onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 7)">7D</button>
+    <button type="button" class="chart-range-btn" data-days="14"
+        onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 14)">2W</button>
+    <button type="button" class="chart-range-btn active" data-days="30"
+        onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 30)">1M</button>
+        <button type="button" class="chart-range-btn" data-days="60"
+    onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 60)">2M</button><>
+</div>
+ 
                                         <div
                                             class="stock-history-chart"
                                             id="stock-chart-${i}"
@@ -6133,146 +6479,144 @@ await loadWatchlistChart(ticker, market, index);
    REAL STOCK HISTORY
    ============================================ */
 
-async function loadWatchlistChart(
-    ticker,
-    market,
-    index
-) {
+// Cache so each stock's history is downloaded only once
+const chartHistoryCache = new Map();
 
-    const chart =
-        document.getElementById(
-            `stock-chart-${index}`
-        );
+const CHART_FETCH_DAYS = 45; // matches what your backend collects
 
+function sliceHistoryByDays(history, days) {
 
-    const loading =
-        document.getElementById(
-            `chart-loading-${index}`
-        );
+    const getDate = item =>
+        new Date(item.date || item.timestamp || item.datetime).getTime();
 
+    const times = history.map(getDate).filter(Number.isFinite);
 
-    if (!chart) {
+    if (!times.length) return [];
+
+    // Count back from the newest data point, not from today,
+    // so weekends/holidays/stale data don't shrink the range
+    const cutoff = Math.max(...times) - days * 86400000;
+
+    return history.filter(item => getDate(item) >= cutoff);
+}
+
+async function loadWatchlistChart(ticker, market, index, days = 30) {
+
+    const chart = document.getElementById(`stock-chart-${index}`);
+    const loading = document.getElementById(`chart-loading-${index}`);
+
+    if (!chart) return;
+
+    // Already showing this exact range
+    if (chart.dataset.loaded === 'true' && chart.dataset.days === String(days)) {
         return;
     }
-
-
-    if (
-        chart.dataset.loaded ===
-        'true'
-    ) {
-        return;
-    }
-
-
-    chart.innerHTML = `
-
-        <div class="chart-placeholder">
-            Loading real price history...
-        </div>
-
-    `;
-
 
     if (loading) {
-
-        loading.textContent =
-            'Loading...';
-
-        loading.style.display =
-            'inline';
+        loading.textContent = 'Loading...';
+        loading.style.display = 'inline';
     }
-
 
     try {
 
-        const response =
-            await fetch(
-                `${API_BASE}/stocks/history/${encodeURIComponent(
-                    ticker
-                )}?market=${encodeURIComponent(
-                    market
-                )}&days=30`
+        const cacheKey = `${market}:${ticker}`;
+        let history = chartHistoryCache.get(cacheKey);
+
+        if (!history) {
+
+            chart.innerHTML =
+                '<div class="chart-placeholder">Loading real price history...</div>';
+
+            const response = await fetch(
+                `${API_BASE}/stocks/history/${encodeURIComponent(ticker)}` +
+                `?market=${encodeURIComponent(market)}&days=${CHART_FETCH_DAYS}`
             );
 
+            if (!response.ok) {
+                throw new Error(`History request failed: ${response.status}`);
+            }
 
-        if (!response.ok) {
+            const data = await response.json();
+            history = Array.isArray(data) ? data : data.data;
 
-            throw new Error(
-                `History request failed: ${response.status}`
-            );
+            if (!Array.isArray(history)) {
+                throw new Error('Invalid history response');
+            }
+
+            chartHistoryCache.set(cacheKey, history);
         }
 
+        const slice = sliceHistoryByDays(history, days);
 
-        const data =
-            await response.json();
-
-            console.log(
-    `[Watchlist Chart] ${ticker} raw history response:`,
-    data
-);
-
-
-        const history =
-            Array.isArray(data)
-                ? data
-                : data.data;
-
-
-        if (
-            !Array.isArray(history) ||
-            history.length < 2
-        ) {
-
-            throw new Error(
-                'Not enough real historical data'
-            );
+        if (slice.length < 2) {
+            throw new Error('Not enough real historical data');
         }
 
+        renderRealStockChart(chart, slice, market);
 
-        renderRealStockChart(
-            chart,
-            history,
-            market
-        );
-
-
-        chart.dataset.loaded =
-            'true';
-
-
-        if (loading) {
-
-            loading.style.display =
-                'none';
-        }
-
+        chart.dataset.loaded = 'true';
+        chart.dataset.days = String(days);
 
     } catch (error) {
 
-        console.error(
-            `[Watchlist Chart] ${ticker}:`,
-            error
-        );
+        console.error(`[Watchlist Chart] ${ticker}:`, error);
 
+        chart.innerHTML =
+            '<div class="chart-placeholder chart-error">Unable to load real price history</div>';
 
-        chart.innerHTML = `
+    } finally {
 
-            <div
-                class="chart-placeholder chart-error"
-            >
-                Unable to load real price history
-            </div>
-
-        `;
-
-
-        if (loading) {
-
-            loading.style.display =
-                'none';
-        }
+        if (loading) loading.style.display = 'none';
     }
 }
+
+
+// Called by the 7D / 2W / 1M buttons
+function changeChartRange(ticker, market, index, days) {
+
+    document
+        .querySelectorAll(`#chart-ranges-${index} .chart-range-btn`)
+        .forEach(btn =>
+            btn.classList.toggle('active', Number(btn.dataset.days) === days)
+        );
+
+    loadWatchlistChart(ticker, market, index, days);
+}
+
+
+function ensureChartRangeStyles() {
+
+    if (document.getElementById('chartRangeStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'chartRangeStyles';
+
+    style.textContent = `
+        .chart-range-buttons {
+            display: flex;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .chart-range-btn {
+            padding: 4px 12px;
+            border: 1px solid rgba(128, 128, 128, 0.35);
+            border-radius: 999px;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .chart-range-btn.active {
+            background: #6366f1;
+            border-color: #6366f1;
+            color: #fff;
+        }
+    `;
+
+    document.head.appendChild(style);
+};
 
 
 /* ============================================

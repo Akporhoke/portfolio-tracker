@@ -266,10 +266,10 @@ index: true
             },
 
             watchingDuration: {
-                type: String,
-                enum: ['2d', '1w', '2w'],
-                default: '1w'
-            },
+    type: String,
+    match: /^\d{1,3}[dwm]$/,
+    default: '1w'
+},
 
             sector: {
                 type: String,
