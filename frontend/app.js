@@ -2451,23 +2451,17 @@ function showExpiryModal(stock) {
                 ${expiredBefore ? 'WATCH PERIOD ENDED' : 'ENDS TODAY'}
             </span>
 
-            <div class="expiry-head">
-         <div class="expiry-title">
-    ${stockAvatarHtml(stock, 0)}
-<div>
-    <h3>${safeTicker}</h3>
-    <p class="expiry-sub">
-        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
-        • added ${formatDate(stock.dateAdded)}
-    </p>
-</div><div>
-    <h3>${safeTicker}</h3>
-    <p class="expiry-sub">
-        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
-        • added ${formatDate(stock.dateAdded)}
-    </p>
-</div>
-</div>
+                       <div class="expiry-head">
+                <div class="expiry-title">
+                    ${stockAvatarHtml(stock, 0)}
+                    <div>
+                        <h3 class="expiry-ticker">${safeTicker}</h3>
+                        <p class="expiry-sub">
+                            Watched for ${escapeHtml(stock.watchingDuration || '1w')}
+                            • added ${formatDate(stock.dateAdded)}
+                        </p>
+                    </div>
+                </div>
                 <div class="expiry-price">
                     <p class="stock-value">
                         ${stock.currentPrice != null
