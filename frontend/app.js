@@ -2333,8 +2333,8 @@ function ensureExpiryStyles() {
     background: var(--card-bg, #fff);
     color: var(--text-color, #111);
     border-radius: 16px;
-    padding: 20px;}
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);}
         .expiry-tag {
             display: inline-block;
             font-size: 11px;
@@ -2451,7 +2451,7 @@ function showExpiryModal(stock) {
                 ${expiredBefore ? 'WATCH PERIOD ENDED' : 'ENDS TODAY'}
             </span>
 
-            <d!!iv class="expiry-head">
+            <div class="expiry-head">
          <div class="expiry-title">
     ${stockAvatarHtml(stock, 0)}
 <div>
@@ -6510,76 +6510,67 @@ function sliceHistoryByDays(history, days) {
     return history.filter(item => getDate(item) >= cutoff);
 }
 
-async function loadWatchlistChart(ticker, market, index, days = 30) {
+async function loadWatchlistChart(ticker, market, index, days = 30){
 
-    const chart = document.getElementById(`stock-chart-${index}`);
+    const chart   = document.getElementById(`stock-chart-${index}`);
     const loading = document.getElementById(`chart-loading-${index}`);
-
     if (!chart) return;
 
-    // Already showing this exact range
-    if (chart.dataset.loaded === 'true' && chart.dataset.days === String(days)) {
-        return;
-    }
+    if (chart.dataset.loaded === 'true' && chart.dataset.days === String(days)) return;
 
-    if (loading) {
-        loading.textContent = 'Loading...';
-        loading.style.display = 'inline';
-    }
+    ensureCandleStyles();
+    if (loading) { loading.textContent = 'Loading...'; loading.style.display = 'inline'; }
 
     try {
-
         const cacheKey = `${market}:${ticker}`;
         let history = chartHistoryCache.get(cacheKey);
 
         if (!history) {
-
-            chart.innerHTML =
-                '<div class="chart-placeholder">Loading real price history...</div>';
+            chart.innerHTML = '<div class="chart-placeholder">Loading real price history...</div>';
 
             const response = await fetch(
                 `${API_BASE}/stocks/history/${encodeURIComponent(ticker)}` +
                 `?market=${encodeURIComponent(market)}&days=${CHART_FETCH_DAYS}`
             );
-
-            if (!response.ok) {
-                throw new Error(`History request failed: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`History request failed: ${response.status}`);
 
             const data = await response.json();
             history = Array.isArray(data) ? data : data.data;
-
-            if (!Array.isArray(history)) {
-                throw new Error('Invalid history response');
-            }
+            if (!Array.isArray(history)) throw new Error('Invalid history response');
 
             chartHistoryCache.set(cacheKey, history);
         }
 
         const slice = sliceHistoryByDays(history, days);
+        if (slice.length < 2) throw new Error('Not enough real historical data');
 
-        if (slice.length < 2) {
-            throw new Error('Not enough real historical data');
+        chart._history = slice;
+
+        if (!chart.parentElement.querySelector('.chart-mode-bar')) {
+            const bar = document.createElement('div');
+            bar.className = 'chart-mode-bar';
+            bar.innerHTML = `
+                <button type="button" class="chart-mode-btn active" data-mode="line">Line</button>
+                <button type="button" class="chart-mode-btn" data-mode="candles">Candles</button>`;
+            bar.addEventListener('click', e => {
+                e.stopPropagation();
+                const btn = e.target.closest('.chart-mode-btn');
+                if (btn) draw(chart, btn.dataset.mode, market);
+            });
+            chart.parentElement.insertBefore(bar, chart);
         }
 
-        renderRealStockChart(chart, slice, market);
-
+        draw(chart, chart.dataset.mode || 'line', market);
         chart.dataset.loaded = 'true';
         chart.dataset.days = String(days);
 
     } catch (error) {
-
         console.error(`[Watchlist Chart] ${ticker}:`, error);
-
-        chart.innerHTML =
-            '<div class="chart-placeholder chart-error">Unable to load real price history</div>';
-
+        chart.innerHTML = '<div class="chart-placeholder chart-error">Unable to load real price history</div>';
     } finally {
-
         if (loading) loading.style.display = 'none';
     }
-}
-
+};
 
 // Called by the 7D / 2W / 1M buttons
 function changeChartRange(ticker, market, index, days) {
