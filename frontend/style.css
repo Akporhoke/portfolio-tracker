@@ -1012,7 +1012,7 @@ body {
    ============================================ */
 .tabs {
     position: fixed;
-    z-index :10000000000000;
+    z-index :10000;
     bottom: 0;
     left: 0;
     right: 0;

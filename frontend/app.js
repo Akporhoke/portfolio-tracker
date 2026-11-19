@@ -2468,7 +2468,6 @@ function showExpiryModal(stock) {
     </p>
 </div>
 </div>
-
                 <div class="expiry-price">
                     <p class="stock-value">
                         ${stock.currentPrice != null
@@ -6510,7 +6509,15 @@ function sliceHistoryByDays(history, days) {
     return history.filter(item => getDate(item) >= cutoff);
 }
 
-async function loadWatchlistChart(ticker, market, index, days = 30){
+function drawChart(chart, mode, market) {
+    if (typeof window.gazeDrawChart === 'function') {
+        window.gazeDrawChart(chart, mode, market);
+    } else {
+        renderRealStockChart(chart, chart._history, market);
+    }
+}
+
+async function loadWatchlistChart(ticker, market, index, days = 30) {
 
     const chart   = document.getElementById(`stock-chart-${index}`);
     const loading = document.getElementById(`chart-loading-${index}`);
@@ -6518,7 +6525,7 @@ async function loadWatchlistChart(ticker, market, index, days = 30){
 
     if (chart.dataset.loaded === 'true' && chart.dataset.days === String(days)) return;
 
-    ensureCandleStyles();
+    if (typeof window.ensureCandleStyles === 'function') window.ensureCandleStyles();
     if (loading) { loading.textContent = 'Loading...'; loading.style.display = 'inline'; }
 
     try {
@@ -6546,7 +6553,11 @@ async function loadWatchlistChart(ticker, market, index, days = 30){
 
         chart._history = slice;
 
-        if (!chart.parentElement.querySelector('.chart-mode-bar')) {
+        // Only show the Line | Candles switch when the candles file is loaded
+        if (
+            typeof window.gazeDrawChart === 'function' &&
+            !chart.parentElement.querySelector('.chart-mode-bar')
+        ) {
             const bar = document.createElement('div');
             bar.className = 'chart-mode-bar';
             bar.innerHTML = `
@@ -6555,12 +6566,12 @@ async function loadWatchlistChart(ticker, market, index, days = 30){
             bar.addEventListener('click', e => {
                 e.stopPropagation();
                 const btn = e.target.closest('.chart-mode-btn');
-                if (btn) draw(chart, btn.dataset.mode, market);
+                if (btn) drawChart(chart, btn.dataset.mode, market);
             });
             chart.parentElement.insertBefore(bar, chart);
         }
 
-        draw(chart, chart.dataset.mode || 'line', market);
+        drawChart(chart, chart.dataset.mode || 'line', market);
         chart.dataset.loaded = 'true';
         chart.dataset.days = String(days);
 
@@ -6570,8 +6581,7 @@ async function loadWatchlistChart(ticker, market, index, days = 30){
     } finally {
         if (loading) loading.style.display = 'none';
     }
-};
-
+}
 // Called by the 7D / 2W / 1M buttons
 function changeChartRange(ticker, market, index, days) {
 

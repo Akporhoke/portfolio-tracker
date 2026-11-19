@@ -130,8 +130,22 @@
                 <rect class="${cls}"
                       x="${x - bodyW / 2}" y="${top}" width="${bodyW}" height="${bodyH}"/>`;
         }).join('');
+        
+        const first = rows[0].close;
+const last = rows[rows.length - 1].close;
+const pct = first > 0 ? ((last - first) / first) * 100 : 0;
 
         container.innerHTML = `
+            <div class="stock-chart-summary">
+                <div>
+                    <span class="chart-range-label">${currency}${formatNumber(last)}</span>
+                    <span class="chart-change ${pct >= 0 ? 'positive' : 'negative'}">
+                        ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%
+                    </span>
+                </div>
+                <span class="chart-data-label">${rows.length} real trading days</span>
+            </div>
+
             <div class="candle-info">
                 ${fullCount} of ${rows.length} days have full OHLC. Tap a candle for details.
             </div>
@@ -197,102 +211,36 @@
     /* ---------- draw in the chosen mode ---------- */
 
     function draw(chart, mode, market) {
-        const bar = chart.parentElement.querySelector('.chart-mode-bar');
+    const bar = chart.parentElement.querySelector('.chart-mode-bar');
 
-        if (mode === 'candles') {
-            const ok = renderCandles(chart, chart._history, market);
+    if (mode === 'candles') {
+        const ok = renderCandles(chart, chart._history, market);
 
-            if (!ok) {
-                // Not enough real OHLC: fall back to line and say why
-                renderRealStockChart(chart, chart._history, market);
-                chart.insertAdjacentHTML(
-                    'afterbegin',
-                    '<div class="candle-info">Not enough full OHLC data for candles yet. Showing line.</div>'
-                );
-                mode = 'line';
-            }
-        } else {
+        if (!ok) {
+            // Not enough real OHLC: fall back to line and say why
             renderRealStockChart(chart, chart._history, market);
-        }
-
-        if (bar) {
-            bar.querySelectorAll('.chart-mode-btn').forEach(b =>
-                b.classList.toggle('active', b.dataset.mode === mode)
+            chart.insertAdjacentHTML(
+                'afterbegin',
+                '<div class="candle-info">Not enough full OHLC data for candles yet. Showing line.</div>'
             );
+            mode = 'line';
         }
+    } else {
+        renderRealStockChart(chart, chart._history, market);
     }
 
+    chart.dataset.mode = mode;   // <-- add this line here
+
+    if (bar) {
+        bar.querySelectorAll('.chart-mode-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.mode === mode)
+        );
+    }
+}
+
     /* ---------- override of the original loader ---------- */
-
-    window.loadWatchlistChart = async function (ticker, market, index) {
-
-        const chart   = document.getElementById(`stock-chart-${index}`);
-        const loading = document.getElementById(`chart-loading-${index}`);
-
-        if (!chart) return;
-        if (chart.dataset.loaded === 'true') return;
-
-        ensureCandleStyles();
-
-        chart.innerHTML =
-            '<div class="chart-placeholder">Loading real price history...</div>';
-
-        if (loading) {
-            loading.textContent = 'Loading...';
-            loading.style.display = 'inline';
-        }
-
-        try {
-            const response = await fetch(
-                `${API_BASE}/stocks/history/${encodeURIComponent(ticker)}` +
-                `?market=${encodeURIComponent(market)}&days=30`
-            );
-
-            if (!response.ok) {
-                throw new Error(`History request failed: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const history = Array.isArray(data) ? data : data.data;
-
-            if (!Array.isArray(history) || history.length < 2) {
-                throw new Error('Not enough real historical data');
-            }
-
-            // Keep the data on the element so toggling needs no refetch
-            chart._history = history;
-
-            // Build the Line | Candles switch once, above the chart
-            if (!chart.parentElement.querySelector('.chart-mode-bar')) {
-                const bar = document.createElement('div');
-                bar.className = 'chart-mode-bar';
-                bar.innerHTML = `
-                    <button type="button" class="chart-mode-btn active" data-mode="line">Line</button>
-                    <button type="button" class="chart-mode-btn" data-mode="candles">Candles</button>
-                `;
-
-                bar.addEventListener('click', e => {
-                    e.stopPropagation(); // don't collapse the card
-                    const btn = e.target.closest('.chart-mode-btn');
-                    if (btn) draw(chart, btn.dataset.mode, market);
-                });
-
-                chart.parentElement.insertBefore(bar, chart);
-            }
-
-            draw(chart, 'line', market);   // default view unchanged
-            chart.dataset.loaded = 'true';
-
-            if (loading) loading.style.display = 'none';
-
-        } catch (error) {
-            console.error(`[Watchlist Chart] ${ticker}:`, error);
-
-            chart.innerHTML =
-                '<div class="chart-placeholder chart-error">Unable to load real price history</div>';
-
-            if (loading) loading.style.display = 'none';
-        }
-    };
+    
+    window.ensureCandleStyles = ensureCandleStyles;
+window.gazeDrawChart = draw;
 
 })();
