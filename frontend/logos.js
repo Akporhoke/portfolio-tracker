@@ -1103,10 +1103,9 @@
     var MIN_SIZE = 32;
 
     var AVATAR_SELECTOR = '.stock-avatar, .autocomplete-avatar';
-    var SCOPE_SELECTOR =
-        '.stock-item, .watchlist-card-main, .autocomplete-item';
-    var TICKER_SELECTOR = '.stock-ticker, .autocomplete-ticker';
-
+   var SCOPE_SELECTOR =
+    '.stock-item, .watchlist-card-main, .autocomplete-item, .expiry-title';
+var TICKER_SELECTOR = '.stock-ticker, .autocomplete-ticker, .expiry-ticker';
     var good = Object.create(null);
     var bad = Object.create(null);
 

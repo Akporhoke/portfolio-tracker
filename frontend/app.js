@@ -1232,7 +1232,21 @@ function sanitizeTicker(raw) {
         );
 }
 
+/* ============================================
+   STOCK LOGOS
+   ============================================ */
 
+// Tickers whose logo file was not found, so we stop asking for them
+/* ============================================
+   STOCK AVATAR (logos.js adds the logo)
+   ============================================ */
+
+function stockAvatarHtml(stock, index = 0) {
+    const letter =
+        escapeHtml(String(stock.ticker || '?')[0].toUpperCase());
+    
+    return `<div class="stock-avatar" style="background: ${API_COLORS[index % API_COLORS.length]}">${letter}</div>`;
+}
 /* ============================================
    CONFIDENCE SCORE HELPERS
    ============================================ */
@@ -2304,7 +2318,7 @@ function ensureExpiryStyles() {
             display: none;
             position: fixed;
             inset: 0;
-            z-index: 10000;
+            z-index: 10000000;
             background: rgba(0, 0, 0, 0.5);
             align-items: center;
             justify-content: center;
@@ -2312,16 +2326,15 @@ function ensureExpiryStyles() {
         }
         .expiry-modal.active { display: flex; }
         .expiry-box {
-            width: 100%;
-            max-width: 400px;
-            max-height: 90vh;
-            overflow-y: auto;
-            background: var(--card-bg, #fff);
-            color: var(--text-color, #111);
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        }
+    width: 100%;
+    max-width: 400px;
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    background: var(--card-bg, #fff);
+    color: var(--text-color, #111);
+    border-radius: 16px;
+    padding: 20px;}
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         .expiry-tag {
             display: inline-block;
             font-size: 11px;
@@ -2363,6 +2376,7 @@ function ensureExpiryStyles() {
         .expiry-actions button { border: 0; }
         .expiry-remove { background: #dc2626; color: #fff; }
         .expiry-later { background: rgba(128, 128, 128, 0.2); color: inherit; }
+        .expiry-title { display: flex; align-items: center; gap: 12px; }
     `;
     document.head.appendChild(style);
 }
@@ -2437,14 +2451,23 @@ function showExpiryModal(stock) {
                 ${expiredBefore ? 'WATCH PERIOD ENDED' : 'ENDS TODAY'}
             </span>
 
-            <div class="expiry-head">
-                <div>
-                    <h3>${safeTicker}</h3>
-                    <p class="expiry-sub">
-                        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
-                        • added ${formatDate(stock.dateAdded)}
-                    </p>
-                </div>
+            <d!!iv class="expiry-head">
+         <div class="expiry-title">
+    ${stockAvatarHtml(stock, 0)}
+<div>
+    <h3>${safeTicker}</h3>
+    <p class="expiry-sub">
+        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
+        • added ${formatDate(stock.dateAdded)}
+    </p>
+</div><div>
+    <h3>${safeTicker}</h3>
+    <p class="expiry-sub">
+        Watched for ${escapeHtml(stock.watchingDuration || '1w')}
+        • added ${formatDate(stock.dateAdded)}
+    </p>
+</div>
+</div>
 
                 <div class="expiry-price">
                     <p class="stock-value">
@@ -5989,20 +6012,7 @@ function renderWatchlist() {
                             >
 
 
-                                <div
-                                    class="stock-avatar"
-                                    style="background: ${
-                                        API_COLORS[
-                                            i %
-                                            API_COLORS.length
-                                        ]
-                                    }"
-                                >
-                                    ${escapeHtml(
-                                        stock.ticker?.[0] ||
-                                        '?'
-                                    )}
-                                </div>
+${stockAvatarHtml(stock, i)}
 
 
                                 <div class="stock-info">
@@ -6128,7 +6138,7 @@ function renderWatchlist() {
     <button type="button" class="chart-range-btn active" data-days="30"
         onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 30)">1M</button>
         <button type="button" class="chart-range-btn" data-days="60"
-    onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 60)">2M</button><>
+    onclick="event.stopPropagation(); changeChartRange('${safeTicker}', '${escapeHtml(stock.market || 'NGX')}', ${i}, 60)">2M</button>
 </div>
  
                                         <div
@@ -7834,21 +7844,7 @@ function renderPortfolio() {
 
                         <div class="stock-item">
 
-                            <div
-                                class="stock-avatar"
-                                style="background: ${
-                                    API_COLORS[
-                                        i %
-                                        API_COLORS.length
-                                    ]
-                                }"
-                            >
-                                ${escapeHtml(
-                                    stock.ticker?.[0] ||
-                                    '?'
-                                )}
-                            </div>
-
+${stockAvatarHtml(stock, i)}
 
                             <div class="stock-info">
 
@@ -8138,20 +8134,7 @@ function renderMarketStockList(
                             onclick="showStockDetailModal(${jsArg(stock.ticker)}, ${jsArg(market)})"
                         >
 
-                            <div
-                                class="stock-avatar"
-                                style="background: ${
-                                    API_COLORS[
-                                        i %
-                                        API_COLORS.length
-                                    ]
-                                }"
-                            >
-                                ${escapeHtml(
-                                    stock.ticker?.[0] ||
-                                    '?'
-                                )}
-                            </div>
+               ${stockAvatarHtml(stock, i)}
 
 
                             <div class="stock-info">
@@ -8357,22 +8340,7 @@ function renderSold() {
 
                         <div class="stock-item">
 
-                            <div
-                                class="stock-avatar"
-                                style="background: ${
-                                    API_COLORS[
-                                        i %
-                                        API_COLORS.length
-                                    ]
-                                }"
-                            >
-                                ${escapeHtml(
-                                    stock.ticker?.[0] ||
-                                    '?'
-                                )}
-                            </div>
-
-
+          ${stockAvatarHtml(stock, i)}
                             <div class="stock-info">
 
                                 <p class="stock-ticker">
