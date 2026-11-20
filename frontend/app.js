@@ -117,6 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSkeletons();
     setupNetworkListeners();
     syncCurrencyToggleUI();
+    ensureUxStyles();
+setupWatchlistSwipe();
 
     const start = () => {
         if (window.GazeAuth?.getUser()) {
@@ -1096,6 +1098,8 @@ function hideModalElement(id) {
         el.classList.remove('active');
         if (id === 'confirmModal') el.style.zIndex = '';
         if (id === 'stockDetailModal') selectedStockForDetail = null;
+        if (id === 'expiryModal') expiryDeferred = true;
+        if (id === 'onboardingModal') markOnboardingDone();
     }
 }
 
@@ -1653,8 +1657,9 @@ async function fetchAllData(options = {}) {
         };
 
         state.watchlist = {
-            stocks: Array.isArray(data.watchlist) ? data.watchlist : []
-        };
+    stocks: (Array.isArray(data.watchlist) ? data.watchlist : [])
+        .filter(s => !pendingWatchlistRemovals.has(favKey(s.ticker, s.market)))
+};
 
         state.sold = {
             stocks: Array.isArray(data.sold) ? data.sold : []
@@ -1719,6 +1724,7 @@ async function fetchAllData(options = {}) {
         updateLastUpdatedTime();
         
         checkWatchlistExpiry();
+        maybeShowOnboarding();
 
         // Something asked for a refresh while we were busy: do it now
         if (fetchQueued) {
@@ -2102,7 +2108,7 @@ async function toggleFavorite(ticker, market) {
     const key = favKey(ticker, market);
     const previous = [...state.favorites];
     let next;
-    
+
     if (previous.includes(key)) {
         next = previous.filter(k => k !== key);
     } else {
@@ -2115,12 +2121,13 @@ async function toggleFavorite(ticker, market) {
         }
         next = [...previous, key];
     }
-    
+
     // Optimistic update: the UI changes instantly
+    haptic(15);   // ← NEW: short tap
     state.favorites = next;
     saveToLocalStorage();
     refreshFavoritesUI();
-    
+
     try {
         const res = await fetch(
             `${API_BASE}/portfolio/${state.userId}/favorites`,
@@ -2130,12 +2137,12 @@ async function toggleFavorite(ticker, market) {
                 body: JSON.stringify({ favorites: next })
             }
         );
-        
+
         if (!res.ok) throw new Error(`Status ${res.status}`);
-        
+
     } catch (err) {
         console.error('Error saving favorites:', err);
-        
+
         // Roll back so the UI matches the server
         state.favorites = previous;
         saveToLocalStorage();
@@ -2148,111 +2155,109 @@ async function toggleFavorite(ticker, market) {
    WATCHLIST DELETE
    ============================================ */
 
+/* ============================================
+   WATCHLIST DELETE (with undo)
+   ============================================ */
+
+// Removals waiting for the undo window to finish. key -> { timer, stock }
+const pendingWatchlistRemovals = new Map();
+
 function deleteFromWatchlist(ticker) {
 
-    openConfirmModal(
-        'Remove from Watchlist',
+    const stock = state.watchlist.stocks.find(s => s.ticker === ticker);
+    if (!stock) return;
 
-        `Remove ${escapeHtml(ticker)} from your watchlist?`,
+    const key = favKey(stock.ticker, stock.market);
+    if (pendingWatchlistRemovals.has(key)) return;
+    const wasFavorite = isFavorite(stock);   // ← NEW
+    haptic(20);
 
-        'You can add it back anytime.',
+    // Hide it from the list immediately
+    state.watchlist.stocks = state.watchlist.stocks.filter(s => s !== stock);
+    updateUI();
 
-        () =>
-            performDeleteFromWatchlist(
-                ticker
-            )
+    // The server delete only happens after the undo window closes,
+    // so Undo restores everything (date added, history, favorite)
+    const timer = setTimeout(async () => {
+        const ok = await performDeleteFromWatchlist(ticker, true);
+        pendingWatchlistRemovals.delete(key);
+
+        if (!ok) {                       // server refused: bring it back
+            state.watchlist.stocks.push(stock);
+            updateUI();
+        }
+    }, UNDO_TOAST_DURATION + 300);
+
+    pendingWatchlistRemovals.set(key, { timer, stock });
+
+    showToast(
+        `${ticker} removed`,
+        'success',
+        {
+            label: 'Undo',
+            onClick: () => {
+                clearTimeout(timer);
+                pendingWatchlistRemovals.delete(key);
+                state.watchlist.stocks.push(stock);
+                if (wasFavorite && !state.favorites.includes(key)) {
+    state.favorites.push(key);           // ← NEW
+}
+                saveToLocalStorage();
+                updateUI();
+                showToast(`${ticker} restored`, 'success');
+            }
+        },
+        UNDO_TOAST_DURATION
     );
 }
 
-
-async function performDeleteFromWatchlist(
-    ticker
-) {
+// Returns true when the server removed it
+async function performDeleteFromWatchlist(ticker, quiet = false) {
 
     try {
 
-        const res =
-            await fetch(
-                `${API_BASE}/portfolio/${state.userId}/remove-watchlist`,
-                {
-                    method: 'POST',
+        const res = await fetch(
+            `${API_BASE}/portfolio/${state.userId}/remove-watchlist`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticker })
+            }
+        );
 
-                    headers: {
-                        'Content-Type':
-                            'application/json'
-                    },
-
-                    body:
-                        JSON.stringify({
-                            ticker
-                        })
-                }
-            );
-
-
-        if (res.ok) {
-
-            showToast(
-                `✓ ${ticker} removed from watchlist`,
-                'success'
-            );
-
-
-            logLocalActivity({
-                type: 'rejected',
-
-                title:
-                    `${ticker} rejected`,
-
-                description:
-                    'Removed from watchlist'
-            });
-
-
-            closeConfirmModal();
-
-            await fetchAllData();
-
-
-        } else {
-
-            const error =
-                await res
-                    .json()
-                    .catch(
-                        () => ({})
-                    );
-
-
-            showToast(
-                error.message ||
-                'Failed to remove from watchlist',
-                'error'
-            );
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            showToast(error.message || 'Failed to remove from watchlist', 'error');
+            return false;
         }
 
+        if (!quiet) {
+            showToast(`${ticker} removed from watchlist`, 'success');
+        }
+
+        logLocalActivity({
+            type: 'rejected',
+            title: `${ticker} rejected`,
+            description: 'Removed from watchlist'
+        });
+
+        await fetchAllData();
+        return true;
 
     } catch (err) {
-
-        console.error(
-            'Error deleting from watchlist:',
-            err
-        );
-
-        showToast(
-            'Failed to remove from watchlist',
-            'error'
-        );
+        console.error('Error deleting from watchlist:', err);
+        showToast('Failed to remove from watchlist', 'error');
+        return false;
     }
 }
-
-
 
 /* ============================================
    WATCHLIST EXPIRY POPUP
    ============================================ */
 
-const EXPIRY_SEEN_KEY = 'gazeExpirySeen';
+/* ============================================
+   WATCHLIST EXPIRY POPUP
+   ============================================ */
 
 const EXTEND_OPTIONS = [
     { label: '+2 days',  days: 2 },
@@ -2273,7 +2278,6 @@ function durationToDays(duration) {
 }
 
 function getWatchExpiry(stock) {
-    // Use the server's date if it sends one
     if (stock.expiresAt) {
         const e = new Date(stock.expiresAt);
         if (!Number.isNaN(e.getTime())) return e;
@@ -2289,24 +2293,25 @@ function getWatchExpiry(stock) {
     return expiry;
 }
 
-// One id per stock per expiry day, so each popup shows only once
-function expiryId(stock) {
-    return `${favKey(stock.ticker, stock.market)}:${startOfDay(getWatchExpiry(stock))}`;
+/* ---------- "Decide later" pause ---------- */
+
+// true = no expiry popup at all, until you leave the app and come back
+let expiryDeferred = false;
+
+function deferExpiry() {
+    expiryDeferred = true;
+    closeExpiryModal();
 }
 
-function loadExpirySeen() {
-    try {
-        return JSON.parse(localStorage.getItem(EXPIRY_SEEN_KEY)) || [];
-    } catch {
-        return [];
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        expiryDeferred = false;   // you left: clear the pause
+        return;
     }
-}
+    checkWatchlistExpiry();       // you came back: show due stocks again
+});
 
-function markExpirySeen(id) {
-    const seen = loadExpirySeen();
-    if (!seen.includes(id)) seen.push(id);
-    localStorage.setItem(EXPIRY_SEEN_KEY, JSON.stringify(seen.slice(-100)));
-}
+/* ---------- Styles ---------- */
 
 function ensureExpiryStyles() {
     if (document.getElementById('expiryStyles')) return;
@@ -2326,15 +2331,16 @@ function ensureExpiryStyles() {
         }
         .expiry-modal.active { display: flex; }
         .expiry-box {
-    width: 100%;
-    max-width: 400px;
-    max-height: calc(100dvh - 32px);
-    overflow-y: auto;
-    background: var(--card-bg, #fff);
-    color: var(--text-color, #111);
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);}
+            width: 100%;
+            max-width: 400px;
+            max-height: calc(100dvh - 32px);
+            overflow-y: auto;
+            background: var(--card-bg, #fff);
+            color: var(--text-color, #111);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
         .expiry-tag {
             display: inline-block;
             font-size: 11px;
@@ -2354,7 +2360,7 @@ function ensureExpiryStyles() {
         .expiry-head h3 { margin: 0; font-size: 20px; }
         .expiry-sub { margin: 2px 0 0; font-size: 12px; opacity: 0.7; }
         .expiry-price { text-align: right; flex-shrink: 0; margin-left: 12px; white-space: nowrap; }
-.expiry-price .stock-change { font-size: 12px; }
+        .expiry-price .stock-change { font-size: 12px; }
         .expiry-price p { margin: 0; }
         .expiry-extend-label { font-size: 12px; opacity: 0.7; margin: 16px 0 6px; }
         .expiry-extend-row { display: flex; gap: 6px; }
@@ -2377,16 +2383,30 @@ function ensureExpiryStyles() {
         .expiry-actions button { border: 0; }
         .expiry-remove { background: #dc2626; color: #fff; }
         .expiry-later { background: rgba(128, 128, 128, 0.2); color: inherit; }
-      .expiry-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.expiry-title > div:last-child { min-width: 0; }
-.expiry-title .stock-avatar {
-    width: 64px;
-    height: 64px;
-    flex-shrink: 0;
-    padding: 6px !important;
-    border-radius: 14px;
-    border: 1px solid rgba(128, 128, 128, 0.2);
-}
+        .expiry-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .expiry-title > div:last-child { min-width: 0; }
+        .expiry-title .stock-avatar {
+            width: 64px;
+            height: 64px;
+            flex-shrink: 0;
+            padding: 6px !important;
+            border-radius: 14px;
+            border: 1px solid rgba(128, 128, 128, 0.2);
+        }
+        .expiry-history-toggle {
+            width: 100%;
+            margin-top: 14px;
+            padding: 11px;
+            border-radius: 10px;
+            border: 1px solid rgba(128, 128, 128, 0.35);
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .expiry-history-panel { margin-top: 10px; }
     `;
     document.head.appendChild(style);
 }
@@ -2397,33 +2417,31 @@ function closeExpiryModal() {
     trackModalClose('expiryModal');
 }
 
+/* ---------- Check which stock is due ---------- */
+
 function checkWatchlistExpiry() {
 
-    // Wait for real server data, not the saved copy
-    if (!state.pricesFromServer) return;
+    if (!state.pricesFromServer) return;        // wait for real server data
+    if (expiryDeferred) return;                 // "Decide later" was pressed
+    if (isUserInteractingWithLists()) return;   // something is open
 
-    // Don't interrupt anything the user has open
-    if (isUserInteractingWithLists()) return;
-
-    const seen = loadExpirySeen();
     const today = startOfDay(new Date());
 
     const due = (state.watchlist.stocks || []).find(stock => {
+        if (isFavorite(stock)) return false;    // favorites never expire
         const expiry = getWatchExpiry(stock);
-        return expiry &&
-               startOfDay(expiry) <= today &&
-               !seen.includes(expiryId(stock));
+        return expiry && startOfDay(expiry) <= today;
     });
 
     if (due) showExpiryModal(due);
 }
 
+/* ---------- The popup ---------- */
+
 function showExpiryModal(stock) {
 
     ensureExpiryStyles();
-
-    // Remember it now so it only pops up once
-    markExpirySeen(expiryId(stock));
+    ensureChartRangeStyles();
 
     let modal = document.getElementById('expiryModal');
 
@@ -2449,29 +2467,31 @@ function showExpiryModal(stock) {
         change = ((stock.currentPrice - priceAtAdd) / priceAtAdd) * 100;
     }
 
-        const daysAgo = Math.round(
+    const daysAgo = Math.round(
         (startOfDay(new Date()) - startOfDay(getWatchExpiry(stock))) / 86400000
     );
-    
+
     const expiredBefore = daysAgo > 0;
-    
+
     const endedLabel =
         daysAgo <= 0 ? 'ENDS TODAY' :
         daysAgo === 1 ? 'ENDED YESTERDAY' :
         `ENDED ${daysAgo} DAYS AGO`;
-    
+
     const sinceAddedText =
-        stock.currentPrice != null ?
-        `${change >= 0 ? '+' : ''}${change.toFixed(1)}% since added` :
-        '—';
+        stock.currentPrice != null
+            ? `${change >= 0 ? '+' : ''}${change.toFixed(1)}% since added`
+            : '—';
+
     const safeTicker = escapeHtml(stock.ticker);
+    const safeMarket = escapeHtml(market);
 
     modal.innerHTML = `
         <div class="expiry-box">
 
             <span class="expiry-tag">${endedLabel}</span>
 
-                       <div class="expiry-head">
+            <div class="expiry-head">
                 <div class="expiry-title">
                     ${stockAvatarHtml(stock, 0)}
                     <div>
@@ -2529,6 +2549,36 @@ function showExpiryModal(stock) {
 
             <div class="confidence-history" id="confidence-history-expiry"></div>
 
+            <button type="button" class="expiry-history-toggle" id="expiry-history-toggle">
+                View price history ▾
+            </button>
+
+            <div class="expiry-history-panel" id="expiry-history-panel" style="display:none;">
+
+                <div class="analysis-section-header">
+                    <div>
+                        <p class="analysis-title">Price History</p>
+                        <p class="analysis-subtitle">Real market data</p>
+                    </div>
+                    <span class="chart-loading" id="chart-loading-expiry">Loading...</span>
+                </div>
+
+                <div class="chart-range-buttons" id="chart-ranges-expiry">
+                    <button type="button" class="chart-range-btn" data-days="7"
+                        onclick="changeChartRange('${safeTicker}', '${safeMarket}', 'expiry', 7)">7D</button>
+                    <button type="button" class="chart-range-btn" data-days="14"
+                        onclick="changeChartRange('${safeTicker}', '${safeMarket}', 'expiry', 14)">2W</button>
+                    <button type="button" class="chart-range-btn active" data-days="30"
+                        onclick="changeChartRange('${safeTicker}', '${safeMarket}', 'expiry', 30)">1M</button>
+                    <button type="button" class="chart-range-btn" data-days="60"
+                        onclick="changeChartRange('${safeTicker}', '${safeMarket}', 'expiry', 60)">2M</button>
+                </div>
+
+                <div class="stock-history-chart" id="stock-chart-expiry">
+                    <div class="chart-placeholder">Loading...</div>
+                </div>
+            </div>
+
             <p class="expiry-extend-label">Keep watching it?</p>
 
             <div class="expiry-extend-row">
@@ -2545,9 +2595,21 @@ function showExpiryModal(stock) {
         </div>
     `;
 
+    // Tapping the dark area counts as "Decide later"
     modal.onclick = e => {
-        if (e.target === modal) closeExpiryModal();
+        if (e.target === modal) deferExpiry();
     };
+
+    // Expand / collapse the price history
+    const toggle = modal.querySelector('#expiry-history-toggle');
+    const panel = modal.querySelector('#expiry-history-panel');
+
+    toggle.addEventListener('click', () => {
+        const opening = panel.style.display === 'none';
+        panel.style.display = opening ? 'block' : 'none';
+        toggle.textContent = opening ? 'Hide price history ▴' : 'View price history ▾';
+        if (opening) loadWatchlistChart(stock.ticker, market, 'expiry', 30);
+    });
 
     modal.querySelectorAll('[data-extend]').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -2561,21 +2623,18 @@ function showExpiryModal(stock) {
         performDeleteFromWatchlist(stock.ticker);
     });
 
-    modal.querySelector('.expiry-later').addEventListener('click', () => {
-        closeExpiryModal();
-        checkWatchlistExpiry(); // show the next due stock, if any
-    });
+    // Pauses ALL expiry popups until you leave and come back
+    modal.querySelector('.expiry-later').addEventListener('click', deferExpiry);
 
     modal.classList.add('active');
     trackModalOpen('expiryModal');
 
-    // Reuses your existing chart; the container id above matches index "expiry"
     loadConfidenceHistory(stock.ticker, market, 'expiry');
-        if (expiredBefore && stock.currentPrice != null) {
+
+    if (expiredBefore && stock.currentPrice != null) {
         loadExpiryPeriodChange(stock, market);
     }
 }
-
 async function extendWatchlistStock(ticker, market, extraDays) {
 
     try {
@@ -2596,6 +2655,7 @@ async function extendWatchlistStock(ticker, market, extraDays) {
         }
 
         showToast(`${ticker} extended by ${extraDays} days`, 'success');
+        haptic(15);   // ← NEW
 
         await fetchAllData(); // also checks for the next due stock
 
@@ -2604,7 +2664,6 @@ async function extendWatchlistStock(ticker, market, extraDays) {
         showToast('Failed to extend', 'error');
     }
 }
-
 /* ============================================
    WATCH-PERIOD RESULT (price at add -> close on expiry day)
    ============================================ */
@@ -4340,85 +4399,45 @@ async function fetchAndDisplayStockStats(
 
 
 
-
-async function sellStockConfirmed(
-    ticker,
-    quantity,
-    market
-) {
+async function sellStockConfirmed(ticker, quantity, market) {
 
     try {
 
-        const res =
-            await fetch(
-                `${API_BASE}/portfolio/${state.userId}/sell-stock`,
-                {
-                    method: 'POST',
-
-                    headers: {
-                        'Content-Type':
-                            'application/json'
-                    },
-
-                    body:
-                        JSON.stringify({
-                            ticker,
-                            quantity,
-                            market
-                        })
-                }
-            );
-
+        const res = await fetch(
+            `${API_BASE}/portfolio/${state.userId}/sell-stock`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ticker, quantity, market })
+            }
+        );
 
         if (res.ok) {
 
-            showToast(
-                `✓ ${ticker} sold successfully`,
-                'success'
-            );
+            haptic([20, 40, 20]);   // ← NEW: double tap
 
+            showToast(`✓ ${ticker} sold successfully`, 'success');
 
             closeStockDetailModal();
             closeMarketModal();
             closeConfirmModal();
 
-
             await fetchAllData();
-
 
         } else {
 
-            const error =
-                await res
-                    .json()
-                    .catch(
-                        () => ({})
-                    );
+            const error = await res.json().catch(() => ({}));
 
-
-            showToast(
-                error.message ||
-                'Failed to sell stock',
-                'error'
-            );
+            showToast(error.message || 'Failed to sell stock', 'error');
         }
-
 
     } catch (err) {
 
-        console.error(
-            'Error selling stock:',
-            err
-        );
+        console.error('Error selling stock:', err);
 
-
-        showToast(
-            'Failed to sell stock',
-            'error'
-        );
+        showToast('Failed to sell stock', 'error');
     }
 }
-
 
 /* ============================================
    LOADING SKELETONS
@@ -4949,7 +4968,7 @@ function updatePortfolioCard() {
                     : ''
             }${changePercent.toFixed(
                 2
-            )}% today`;
+            )}% total return`;
 
 
         portfolioChange.style.color =
@@ -5952,6 +5971,7 @@ function renderWatchlist() {
         );
         
     ensureFavoriteStyles();
+    ensureUxStyles();
     ensureChartRangeStyles();
 
 
@@ -6130,6 +6150,8 @@ function renderWatchlist() {
 <div
     class="watchlist-card ${isFavorite(stock) ? 'is-favorite' : ''}"
     id="watchlist-card-${safeTicker}-${i}"
+    data-ticker="${safeTicker}"
+    data-market="${escapeHtml(stock.market || 'NGX')}"
 >
 
 
@@ -6370,7 +6392,14 @@ ${stockAvatarHtml(stock, i)}
                                         </div>
 
                                     </div>
-
+                                    
+                                    ${stock.notes ? `
+    <div class="watchlist-notes">
+        <p class="analysis-title">Notes</p>
+        <p class="watchlist-notes-text">${escapeHtml(stock.notes)}</p>
+    </div>
+` : ''}
+                     
                                     <div class="confidence-history" id="confidence-history-${i}"></div>
 
                                     <div class="watchlist-analysis-actions">
@@ -9600,3 +9629,411 @@ function updateQuickStats() {
         state.sold.stocks?.length || 0
     );
 } 
+
+/* ============================================
+   UX ADDITIONS: haptics, swipe, onboarding
+   ============================================ */
+
+function haptic(pattern = 15) {
+    try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+    } catch {}
+}
+
+function ensureUxStyles() {
+    if (document.getElementById('uxStyles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'uxStyles';
+    style.textContent = `
+        /* Notes */
+        .watchlist-notes { margin-top: 14px; }
+        .watchlist-notes-text {
+            margin: 4px 0 0;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            opacity: 0.85;
+        }
+
+        /* Swipe */
+        .watchlist-card { position: relative; }
+        .watchlist-card-main {
+            position: relative;
+            z-index: 1;
+            touch-action: pan-y;
+            transition: transform 0.2s ease;
+        }
+        .watchlist-card-main.swiping {
+            transition: none;
+            background: var(--card-bg, #fff);
+        }
+        .watchlist-card[data-swipe]::before {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 13px;
+            font-weight: 700;
+            z-index: 0;
+        }
+        .watchlist-card[data-swipe="star"] { background-color: rgba(245, 158, 11, 0.15); }
+        .watchlist-card[data-swipe="star"]::before {
+            content: '★ Favorite';
+            left: 16px;
+            color: #f59e0b;
+        }
+        .watchlist-card[data-swipe="remove"] { background-color: rgba(220, 38, 38, 0.12); }
+        .watchlist-card[data-swipe="remove"]::before {
+            content: 'Remove';
+            right: 16px;
+            color: #dc2626;
+        }
+
+        /* Onboarding */
+        .onboarding-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 10000001;
+            background: rgba(0, 0, 0, 0.55);
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .onboarding-modal.active { display: flex; }
+        .onboarding-box {
+            width: 100%;
+            max-width: 360px;
+            background: var(--card-bg, #fff);
+            color: var(--text-color, #111);
+            border-radius: 20px;
+            padding: 28px 22px 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        .onboarding-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: #fff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .onboarding-box h3 { margin: 0 0 8px; font-size: 20px; }
+        .onboarding-box p { margin: 0; font-size: 14px; line-height: 1.5; opacity: 0.8; }
+        .onboarding-dots { display: flex; justify-content: center; gap: 6px; margin: 18px 0; }
+        .onboarding-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(128, 128, 128, 0.35);
+        }
+        .onboarding-dots span.active { width: 20px; background: #6366f1; }
+        .onboarding-sample {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 11px;
+            border-radius: 10px;
+            border: 1px solid #6366f1;
+            background: transparent;
+            color: #6366f1;
+            font: inherit;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .onboarding-actions { display: flex; gap: 8px; }
+        .onboarding-actions button {
+            flex: 1;
+            padding: 12px;
+            border: 0;
+            border-radius: 10px;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .onboarding-skip { background: rgba(128, 128, 128, 0.2); color: inherit; }
+        .onboarding-next { background: #6366f1; color: #fff; }
+    `;
+    document.head.appendChild(style);
+}
+
+/* ---------- Swipe: right = star, left = remove ---------- */
+
+function setupWatchlistSwipe() {
+
+    const list = document.getElementById('watchlistList');
+    if (!list) return;
+
+    const THRESHOLD = 80;   // px you must drag before it counts
+    const MAX = 120;        // card never moves further than this
+
+    let main = null, card = null;
+    let startX = 0, startY = 0, dx = 0;
+    let horizontal = false;
+    let justSwiped = false;
+
+    const reset = () => {
+        if (main) {
+            main.style.transform = '';
+            main.classList.remove('swiping');
+        }
+        if (card) delete card.dataset.swipe;
+        main = card = null;
+        horizontal = false;
+        dx = 0;
+    };
+
+    list.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse') return;        // touch only
+        if (e.target.closest('button')) return;       // star/bell keep working
+
+        const m = e.target.closest('.watchlist-card-main');
+        if (!m) return;
+
+        const c = m.closest('.watchlist-card');
+        if (!c || c.classList.contains('expanded')) return;  // not on open cards
+
+        main = m;
+        card = c;
+        startX = e.clientX;
+        startY = e.clientY;
+        dx = 0;
+        horizontal = false;
+    });
+
+    list.addEventListener('pointermove', e => {
+        if (!main) return;
+
+        const mx = e.clientX - startX;
+        const my = e.clientY - startY;
+
+        // Decide direction once: mostly vertical = let the page scroll
+        if (!horizontal) {
+            if (Math.abs(my) > 10 && Math.abs(my) > Math.abs(mx)) {
+                reset();
+                return;
+            }
+            if (Math.abs(mx) < 10) return;
+
+            horizontal = true;
+            main.classList.add('swiping');
+            try { main.setPointerCapture(e.pointerId); } catch {}
+        }
+
+        dx = Math.max(-MAX, Math.min(MAX, mx));
+        main.style.transform = `translateX(${dx}px)`;
+        card.dataset.swipe = dx > 0 ? 'star' : 'remove';
+    });
+
+    const finish = e => {
+        if (!main) return;
+
+        const { ticker, market } = card.dataset;
+        const distance = dx;
+        const wasHorizontal = horizontal;
+        const commit =
+            wasHorizontal &&
+            e.type === 'pointerup' &&
+            Math.abs(distance) >= THRESHOLD;
+
+        reset();
+
+        // A swipe also fires a click: block it so the card doesn't expand
+        if (wasHorizontal) {
+            justSwiped = true;
+            setTimeout(() => { justSwiped = false; }, 350);
+        }
+
+        if (!commit) return;
+
+        if (distance > 0) {
+            toggleFavorite(ticker, market);
+        } else {
+            deleteFromWatchlist(ticker);   // has Undo
+        }
+    };
+
+    list.addEventListener('pointerup', finish);
+    list.addEventListener('pointercancel', finish);
+
+    // Capture phase: runs before the card's own onclick
+    list.addEventListener('click', e => {
+        if (justSwiped) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    }, true);
+}
+
+/* ---------- Onboarding ---------- */
+
+const ONBOARDING_STEPS = [
+    {
+        icon: 'fa-eye',
+        title: 'Watch before you buy',
+        text: 'Add stocks to your watchlist and choose how long to watch them. Each one gets a confidence score built from real price history.'
+    },
+    {
+        icon: 'fa-briefcase',
+        title: 'Track what you own',
+        text: 'Move a stock to your portfolio when you buy it. NGX and US holdings are tracked together, with your total return and goal progress on the home screen.'
+    },
+    {
+        icon: 'fa-hand-pointer',
+        title: 'Handy gestures',
+        text: 'Swipe a watchlist card right to star it, or left to remove it (you can undo). Tap a card to see its chart and confidence history.'
+    }
+];
+
+const onboardingKey = () =>
+    `gazeOnboardingDone:${window.GazeAuth?.getUser()?.email || 'guest'}`;
+
+const isOnboardingDone = () => localStorage.getItem(onboardingKey()) === '1';
+
+function markOnboardingDone() {
+    localStorage.setItem(onboardingKey(), '1');
+}
+
+let onboardingChecked = false;
+
+// Called after every successful load; only acts once per page load
+function maybeShowOnboarding() {
+
+    if (onboardingChecked || !state.pricesFromServer) return;
+    if (!window.GazeAuth?.getUser()) return;
+
+    onboardingChecked = true;
+
+    if (isOnboardingDone()) return;
+
+    const hasData =
+        state.portfolio.stocks.length ||
+        state.watchlist.stocks.length ||
+        state.sold.stocks.length;
+
+    // Existing users already know the app: never show it to them
+    if (hasData) {
+        markOnboardingDone();
+        return;
+    }
+
+    showOnboarding();
+}
+
+function closeOnboarding() {
+    markOnboardingDone();
+
+    const modal = document.getElementById('onboardingModal');
+    if (modal) modal.classList.remove('active');
+    trackModalClose('onboardingModal');
+}
+
+function showOnboarding() {
+
+    ensureUxStyles();
+
+    let modal = document.getElementById('onboardingModal');
+
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'onboardingModal';
+        modal.className = 'onboarding-modal';
+        document.body.appendChild(modal);
+    }
+
+    let step = 0;
+
+    const render = () => {
+
+        const s = ONBOARDING_STEPS[step];
+        const last = step === ONBOARDING_STEPS.length - 1;
+
+        modal.innerHTML = `
+            <div class="onboarding-box">
+                <div class="onboarding-icon">
+                    <i class="fa-solid ${s.icon}" aria-hidden="true"></i>
+                </div>
+
+                <h3>${escapeHtml(s.title)}</h3>
+                <p>${escapeHtml(s.text)}</p>
+
+                <div class="onboarding-dots">
+                    ${ONBOARDING_STEPS.map((_, i) =>
+                        `<span class="${i === step ? 'active' : ''}"></span>`
+                    ).join('')}
+                </div>
+
+                ${last
+                    ? '<button type="button" class="onboarding-sample">Add a sample stock to my watchlist</button>'
+                    : ''}
+
+                <div class="onboarding-actions">
+                    ${last ? '' : '<button type="button" class="onboarding-skip">Skip</button>'}
+                    <button type="button" class="onboarding-next">
+                        ${last ? 'Get started' : 'Next'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.querySelector('.onboarding-skip')
+            ?.addEventListener('click', closeOnboarding);
+
+        modal.querySelector('.onboarding-next')
+            .addEventListener('click', () => {
+                if (last) {
+                    closeOnboarding();
+                } else {
+                    step++;
+                    render();
+                }
+            });
+
+        modal.querySelector('.onboarding-sample')
+            ?.addEventListener('click', async () => {
+                closeOnboarding();          // close first, then do the network work
+                await addSampleStock();
+            });
+    };
+
+    render();
+    modal.classList.add('active');
+    trackModalOpen('onboardingModal');
+}
+
+async function addSampleStock() {
+
+    try {
+
+        const res = await fetch(
+            `${API_BASE}/portfolio/${state.userId}/add-watchlist`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticker: 'DANGCEM',
+                    watchingDuration: '1w',
+                    sector: null,
+                    notes: 'Sample stock. Swipe left to remove it.',
+                    market: 'NGX'
+                })
+            }
+        );
+
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+
+        showToast('Sample stock added to your watchlist', 'success');
+
+        await fetchAllData();
+        switchTab('watchlist');
+
+    } catch (err) {
+        console.error('Error adding sample stock:', err);
+        showToast('Could not add the sample stock', 'error');
+    }
+}
